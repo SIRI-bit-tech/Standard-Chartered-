@@ -1,0 +1,112 @@
+import os
+import secrets
+from datetime import datetime, timedelta
+from typing import Optional
+from utils.auth import hash_password, verify_password, create_access_token as create_user_token
+from utils.logger import logger
+
+
+class AdminAuthManager:
+    """Manage admin authentication"""
+    
+    # Admin code from environment - should be set securely
+    ADMIN_CODE = os.getenv("ADMIN_REGISTRATION_CODE", "")
+    ADMIN_LOGIN_CODE = os.getenv("ADMIN_LOGIN_CODE", "")
+    
+    @staticmethod
+    def validate_admin_code(provided_code: str) -> bool:
+        """Validate admin registration code"""
+        if not AdminAuthManager.ADMIN_CODE:
+            logger.error("ADMIN_REGISTRATION_CODE not configured")
+            return False
+        
+        # Use constant-time comparison to prevent timing attacks
+        return secrets.compare_digest(provided_code, AdminAuthManager.ADMIN_CODE)
+    
+    @staticmethod
+    def validate_admin_login_code(provided_code: Optional[str]) -> bool:
+        """Validate admin login code (optional, for additional security)"""
+        if not provided_code:
+            return True  # Optional
+        
+        if not AdminAuthManager.ADMIN_LOGIN_CODE:
+            return True  # Not configured, skip
+        
+        return secrets.compare_digest(provided_code, AdminAuthManager.ADMIN_LOGIN_CODE)
+    
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """Hash password using bcrypt"""
+        return hash_password(password)
+    
+    @staticmethod
+    def verify_password(password: str, password_hash: str) -> bool:
+        """Verify password against hash"""
+        return verify_password(password, password_hash)
+    
+    @staticmethod
+    def create_access_token(admin_id: str, admin_email: str, role: str, expires_delta: Optional[timedelta] = None) -> str:
+        """Create JWT access token for admin"""
+        payload = {
+            "sub": admin_id,
+            "email": admin_email,
+            "role": role,
+            "type": "admin_access"
+        }
+        return create_user_token(payload, expires_delta)
+    
+    @staticmethod
+    def create_refresh_token(admin_id: str) -> str:
+        """Create refresh token for admin"""
+        payload = {
+            "sub": admin_id,
+            "type": "admin_refresh"
+        }
+        # Refresh token expires in 30 days
+        return create_user_token(payload, timedelta(days=30))
+
+
+class AdminPermissionManager:
+    """Manage admin permissions"""
+    
+    # Default role permissions mapping
+    ROLE_PERMISSIONS = {
+        "super_admin": [
+            "users:create", "users:read", "users:update", "users:delete",
+            "transfers:approve", "transfers:decline", "transfers:view",
+            "deposits:approve", "deposits:decline", "deposits:view",
+            "cards:approve", "cards:decline", "cards:view",
+            "loans:approve", "loans:decline", "loans:view",
+            "admins:create", "admins:read", "admins:update", "admins:delete",
+            "audit_logs:view", "settings:manage"
+        ],
+        "manager": [
+            "users:read", "users:update",
+            "transfers:approve", "transfers:decline", "transfers:view",
+            "deposits:approve", "deposits:decline", "deposits:view",
+            "cards:approve", "cards:decline", "cards:view",
+            "loans:approve", "loans:decline", "loans:view",
+            "audit_logs:view"
+        ],
+        "moderator": [
+            "users:read",
+            "transfers:view", "deposits:view", "cards:view", "loans:view",
+            "audit_logs:view"
+        ],
+        "support": [
+            "users:read",
+            "transfers:view", "deposits:view", "cards:view",
+            "support_tickets:view", "support_tickets:respond"
+        ]
+    }
+    
+    @staticmethod
+    def has_permission(role: str, permission: str) -> bool:
+        """Check if role has specific permission"""
+        permissions = AdminPermissionManager.ROLE_PERMISSIONS.get(role, [])
+        return permission in permissions
+    
+    @staticmethod
+    def get_role_permissions(role: str) -> list:
+        """Get all permissions for a role"""
+        return AdminPermissionManager.ROLE_PERMISSIONS.get(role, [])
