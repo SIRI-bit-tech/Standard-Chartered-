@@ -9,7 +9,7 @@ from models.admin import AdminUser, AdminAuditLog, AdminRole
 from models.user import User
 from models.transfer import Transfer, TransferStatus
 from models.deposit import Deposit, DepositStatus
-from models.virtual_card import VirtualCard, CardStatus
+from models.virtual_card import VirtualCard, VirtualCardStatus
 from models.loan import Loan, LoanStatus
 from database import get_db
 from schemas.admin import (

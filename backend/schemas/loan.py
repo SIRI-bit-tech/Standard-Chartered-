@@ -35,7 +35,7 @@ class LoanApplicationRequest(BaseModel):
     currency: str = Field(..., min_length=3, max_length=3)
     duration_months: int = Field(..., ge=1, le=360)
     purpose: str = Field(..., max_length=500)
-    employment_status: str = Field(..., regex="^(employed|self_employed|unemployed|retired)$")
+    employment_status: str = Field(..., pattern="^(employed|self_employed|unemployed|retired)$")
     annual_income: float = Field(..., gt=0)
     employment_type: Optional[str] = Field(None, max_length=100)
     employer_name: Optional[str] = Field(None, max_length=100)

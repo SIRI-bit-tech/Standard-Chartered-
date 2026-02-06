@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Bell, User, Menu, X, LogOut, Settings } from 'lucide-react'
+import { Bell, User, LogOut, Settings } from 'lucide-react'
 
 export default function TopHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -11,7 +11,11 @@ export default function TopHeader() {
     <header className="bg-white border-b border-border shadow-sm sticky top-0 z-40">
       <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
         <div className="flex items-center">
-          <h1 className="text-lg font-bold text-primary">SC Bank</h1>
+          <img 
+            src="/logo.png" 
+            alt="SC Bank" 
+            className="h-10 w-auto"
+          />
         </div>
 
         <div className="flex items-center gap-4">

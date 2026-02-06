@@ -87,7 +87,7 @@ class ChangePasswordRequest(BaseModel):
 
 class TwoFactorSetupRequest(BaseModel):
     """Two-factor authentication setup request"""
-    method: str = Field(..., regex="^(sms|email|authenticator)$")
+    method: str = Field(..., pattern="^(sms|email|authenticator)$")
 
 
 class TwoFactorVerifyRequest(BaseModel):

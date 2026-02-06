@@ -1,5 +1,6 @@
 import React from "react"
 import Link from 'next/link'
+import { Shield, Globe, Zap } from 'lucide-react'
 
 export default function AuthLayout({
   children,
@@ -9,38 +10,45 @@ export default function AuthLayout({
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 to-secondary/10 flex">
       {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-primary text-white flex-col justify-between p-8">
-        <div>
-          <Link href="/" className="text-3xl font-bold">
-            Standard Chartered
-          </Link>
-          <p className="mt-2 text-primary-50">Digital Banking Platform</p>
-        </div>
-        <div>
-          <h2 className="text-4xl font-bold mb-4">Welcome to the Future of Banking</h2>
-          <p className="text-lg text-primary-100 mb-8">
-            Manage your finances securely with our state-of-the-art banking platform.
-          </p>
-          <div className="space-y-4">
-            <div className="flex items-start gap-4">
-              <span className="text-2xl">🔒</span>
-              <div>
-                <h3 className="font-semibold">Secure</h3>
-                <p className="text-primary-100">Bank-grade security for your peace of mind</p>
+      <div className="hidden lg:flex lg:w-1/2 relative bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url("/standardcharted.png")' }}>
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="relative z-10 text-white flex-col justify-between p-8 flex">
+          <div>
+            <Link href="/" className="inline-block bg-white p-2 rounded-lg shadow-lg">
+              <img 
+                src="/logo.png" 
+                alt="Standard Chartered" 
+                className="h-10 w-auto"
+              />
+            </Link>
+            <p className="mt-3 text-white font-semibold text-lg">Digital Banking Platform</p>
+          </div>
+          <div>
+            <h2 className="text-4xl font-bold mb-4">Welcome to the Future of Banking</h2>
+            <p className="text-lg text-white/90 mb-8 font-medium">
+              Manage your finances securely with our state-of-the-art banking platform.
+            </p>
+            <div className="space-y-4">
+              <div className="flex items-start gap-4">
+                <Shield className="w-8 h-8 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-bold text-lg">Secure</h3>
+                  <p className="text-white/80 font-medium">Bank-grade security for your peace of mind</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <span className="text-2xl">🌍</span>
-              <div>
-                <h3 className="font-semibold">Global</h3>
-                <p className="text-primary-100">Multi-currency support for international transactions</p>
+              <div className="flex items-start gap-4">
+                <Globe className="w-8 h-8 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-bold text-lg">Global</h3>
+                  <p className="text-white/80 font-medium">Multi-currency support for international transactions</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <span className="text-2xl">⚡</span>
-              <div>
-                <h3 className="font-semibold">Fast</h3>
-                <p className="text-primary-100">Instant transfers and real-time updates</p>
+              <div className="flex items-start gap-4">
+                <Zap className="w-8 h-8 mt-1 flex-shrink-0" />
+                <div>
+                  <h3 className="font-bold text-lg">Fast</h3>
+                  <p className="text-white/80 font-medium">Instant transfers and real-time updates</p>
+                </div>
               </div>
             </div>
           </div>

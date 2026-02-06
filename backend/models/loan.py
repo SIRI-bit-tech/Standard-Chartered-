@@ -15,6 +15,7 @@ class LoanType(str, enum.Enum):
 
 
 class LoanStatus(str, enum.Enum):
+    PENDING = "pending"
     APPLICATION = "application"
     UNDER_REVIEW = "under_review"
     APPROVED = "approved"

@@ -26,7 +26,7 @@ class DocumentUploadRequest(BaseModel):
     document_type: DocumentType
     file_name: str = Field(..., max_length=255)
     file_size: int = Field(..., gt=0, le=10485760)  # 10MB limit
-    mime_type: str = Field(..., regex="^(image|application)/(jpeg|png|pdf|x-pdf)$")
+    mime_type: str = Field(..., pattern="^(image|application)/(jpeg|png|pdf|x-pdf)$")
     expiration_date: Optional[datetime] = None
 
 

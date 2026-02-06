@@ -70,7 +70,7 @@ class AccountStatementRequest(BaseModel):
     """Account statement request"""
     start_date: datetime
     end_date: datetime
-    format: str = Field(default="pdf", regex="^(pdf|csv|json)$")
+    format: str = Field(default="pdf", pattern="^(pdf|csv|json)$")
 
 
 class ExchangeRateResponse(BaseModel):

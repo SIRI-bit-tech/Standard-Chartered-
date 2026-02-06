@@ -42,9 +42,13 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Company Info */}
           <div className="lg:col-span-2">
-            <h3 className="text-2xl font-bold mb-4 text-white">
-              Standard Chartered
-            </h3>
+            <div className="mb-4">
+              <img 
+                src="/logo.png" 
+                alt="Standard Chartered" 
+                className="h-14 w-auto"
+              />
+            </div>
             <p className="text-gray-400 mb-6 leading-relaxed">
               A leading international banking group with a presence in 60 of the world's most dynamic markets, serving clients across Asia, Africa, and the Middle East.
             </p>

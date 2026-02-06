@@ -48,7 +48,6 @@
     },
     "types": [
       "node",
-      "jest",
       "@types/react"
     ],
     "allowJs": true,

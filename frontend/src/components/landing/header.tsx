@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { colors } from '@/types'
@@ -14,9 +15,11 @@ export function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold" style={{ color: colors.primary }}>
-                Standard Chartered
-              </h1>
+              <img 
+                src="/logo.png" 
+                alt="Standard Chartered" 
+                className="h-12 w-auto"
+              />
             </div>
           </div>
 
@@ -38,17 +41,21 @@ export function Header() {
 
           {/* Search and Actions */}
           <div className="hidden md:flex items-center space-x-4">
-            <button className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors">
-              Sign In
-            </button>
-            <button 
-              className="px-4 py-2 text-white rounded-lg transition-colors"
-              style={{ backgroundColor: colors.primary }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.primaryDark}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.primary}
-            >
-              Open Account
-            </button>
+            <Link href="/auth/login">
+              <button className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors">
+                Sign In
+              </button>
+            </Link>
+            <Link href="/auth/register">
+              <button 
+                className="px-4 py-2 text-white rounded-lg transition-colors"
+                style={{ backgroundColor: colors.primary }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.primaryDark}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.primary}
+              >
+                Open Account
+              </button>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -79,15 +86,19 @@ export function Header() {
                 Contact
               </a>
               <div className="pt-2 space-y-2">
-                <button className="w-full px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md text-left">
-                  Sign In
-                </button>
-                <button 
-                  className="w-full px-3 py-2 text-white rounded-md"
-                  style={{ backgroundColor: colors.primary }}
-                >
-                  Open Account
-                </button>
+                <Link href="/auth/login">
+                  <button className="w-full px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md text-left">
+                    Sign In
+                  </button>
+                </Link>
+                <Link href="/auth/register">
+                  <button 
+                    className="w-full px-3 py-2 text-white rounded-md"
+                    style={{ backgroundColor: colors.primary }}
+                  >
+                    Open Account
+                  </button>
+                </Link>
               </div>
             </div>
           </div>

@@ -4,8 +4,34 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import json
 
-# Initialize Ably client
-ably_client = ably.AblyRest(settings.ABLY_API_KEY)
+_ably_client: Optional[ably.AblyRest] = None
+
+
+def _is_valid_ably_key(key: Optional[str]) -> bool:
+    if not key:
+        return False
+    # Ably keys look like: "appId.keyId:secret"
+    if ":" not in key:
+        return False
+    if "your-ably-api-key" in key.lower():
+        return False
+    return True
+
+
+def _get_ably_client() -> Optional[ably.AblyRest]:
+    global _ably_client
+    if _ably_client is not None:
+        return _ably_client
+
+    key = getattr(settings, "ABLY_API_KEY", None)
+    if not _is_valid_ably_key(key):
+        return None
+
+    try:
+        _ably_client = ably.AblyRest(key)
+        return _ably_client
+    except Exception:
+        return None
 
 
 class AblyRealtimeManager:
@@ -27,6 +53,9 @@ class AblyRealtimeManager:
         transaction_data: Dict[str, Any]
     ) -> bool:
         """Publish transaction update to user's channel"""
+        ably_client = _get_ably_client()
+        if ably_client is None:
+            return False
         try:
             channel = ably_client.channels.get(f"{AblyRealtimeManager.CHANNELS['transactions']}:{user_id}")
             
@@ -51,6 +80,9 @@ class AblyRealtimeManager:
         currency: str
     ) -> bool:
         """Publish account balance update"""
+        ably_client = _get_ably_client()
+        if ably_client is None:
+            return False
         try:
             channel = ably_client.channels.get(f"{AblyRealtimeManager.CHANNELS['accounts']}:{user_id}")
             
@@ -76,6 +108,9 @@ class AblyRealtimeManager:
         details: Dict[str, Any]
     ) -> bool:
         """Publish transfer status update"""
+        ably_client = _get_ably_client()
+        if ably_client is None:
+            return False
         try:
             channel = ably_client.channels.get(f"{AblyRealtimeManager.CHANNELS['transfers']}:{user_id}")
             
@@ -102,6 +137,9 @@ class AblyRealtimeManager:
         data: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Publish notification to user"""
+        ably_client = _get_ably_client()
+        if ably_client is None:
+            return False
         try:
             channel = ably_client.channels.get(f"{AblyRealtimeManager.CHANNELS['notifications']}:{user_id}")
             
@@ -128,6 +166,9 @@ class AblyRealtimeManager:
         is_agent: bool = False
     ) -> bool:
         """Publish support chat message"""
+        ably_client = _get_ably_client()
+        if ably_client is None:
+            return False
         try:
             channel = ably_client.channels.get(f"{AblyRealtimeManager.CHANNELS['support']}:{ticket_id}")
             
@@ -153,6 +194,9 @@ class AblyRealtimeManager:
         details: Dict[str, Any]
     ) -> bool:
         """Publish loan status update"""
+        ably_client = _get_ably_client()
+        if ably_client is None:
+            return False
         try:
             channel = ably_client.channels.get(f"{AblyRealtimeManager.CHANNELS['loans']}:{user_id}")
             
@@ -171,8 +215,11 @@ class AblyRealtimeManager:
             return False
 
 
-def get_ably_token_request(user_id: str) -> Dict[str, Any]:
+def get_ably_token_request(user_id: str) -> Optional[Dict[str, Any]]:
     """Generate Ably token request for client-side connection"""
+    ably_client = _get_ably_client()
+    if ably_client is None:
+        return None
     try:
         token_request = ably_client.auth.create_token_request(
             {

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { KenBurnsCarousel } from '@/components/ui/ken-burns-carousel'
 import { colors } from '@/types'
@@ -13,19 +14,19 @@ interface HeroSlide {
 
 const heroSlides: HeroSlide[] = [
   {
-    image: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=1920&h=1080&fit=crop',
+    image: '/hero-1.jpg',
     tag: 'GLOBAL BANKING EXCELLENCE',
     title: 'Empowering Your Global Financial Future',
     description: 'Secure, worldwide banking at your fingertips. Manage wealth, transfer funds, and grow assets with a partner that spans across 60 markets.'
   },
   {
-    image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=1920&h=1080&fit=crop',
+    image: '/hero-2.jpg',
     tag: 'DIGITAL BANKING SOLUTIONS',
     title: 'Innovation Meets Tradition',
     description: 'Experience the perfect blend of cutting-edge technology and time-tested banking principles. Your financial journey, reimagined.'
   },
   {
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&h=1080&fit=crop',
+    image: '/hero-3.jpg',
     tag: 'WEALTH MANAGEMENT EXPERTISE',
     title: 'Build Your Legacy With Confidence',
     description: 'Strategic financial planning and investment solutions designed to secure your future and maximize your potential.'
@@ -76,20 +77,24 @@ export function Hero() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button 
-                className="px-8 py-4 rounded-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg"
-                style={{ backgroundColor: colors.primary }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.primaryDark}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.primary}
-              >
-                Get Started Now
-              </button>
-              <button 
-                className="px-8 py-4 rounded-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg border-2 border-white hover:bg-white hover:text-gray-900"
-                style={{ backgroundColor: 'transparent' }}
-              >
-                View Wealth Solutions
-              </button>
+              <Link href="/auth/register">
+                <button 
+                  className="px-8 py-4 rounded-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg"
+                  style={{ backgroundColor: colors.primary }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.primaryDark}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.primary}
+                >
+                  Get Started Now
+                </button>
+              </Link>
+              <Link href="#features">
+                <button 
+                  className="px-8 py-4 rounded-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg border-2 border-white hover:bg-white hover:text-gray-900"
+                  style={{ backgroundColor: 'transparent' }}
+                >
+                  View Wealth Solutions
+                </button>
+              </Link>
             </div>
           </div>
         </div>
