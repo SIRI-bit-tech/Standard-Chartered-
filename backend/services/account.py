@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
-import random
+import secrets
 import string
 
 from models.user import User
@@ -74,15 +74,15 @@ class AccountService:
     
     @staticmethod
     def generate_account_number(country: str = "United States") -> str:
-        """Generate a country-specific account number"""
+        """Generate a country-specific account number using cryptographically secure method"""
         length = AccountService.ACCOUNT_LENGTHS.get(country, 12)  # Default to 12 digits
-        return ''.join(random.choices(string.digits, k=length))
+        return ''.join(secrets.choice(string.digits, k=length))
     
     @staticmethod
     def generate_routing_number() -> str:
-        """Generate a US routing number"""
+        """Generate a US routing number using cryptographically secure method"""
         # Generate 9-digit routing number
-        return ''.join(random.choices(string.digits, k=9))
+        return ''.join(secrets.choice(string.digits, k=9))
     
     @staticmethod
     async def create_default_accounts(user_id: str, user_country: str, db: AsyncSession) -> list[Account]:

@@ -71,23 +71,22 @@ async def verify_email(
         user.is_active = True
         user.updated_at = datetime.utcnow()
         
-        await db.commit()
+        # Generate short-lived verification token for PIN setup (5 minutes)
+        verification_token = secrets.token_urlsafe(32)
+        user.email_verification_token = verification_token
+        user.email_verification_expires = datetime.utcnow().timestamp() + 300  # 5 minutes
         
-        # Send welcome email
-        try:
-            email_service.send_welcome_email(
-                user.email, 
-                f"{user.first_name} {user.last_name}"
-            )
-        except Exception as e:
-            logger.warning(f"Failed to send welcome email: {e}")
+        await db.commit()
         
         logger.info(f"Email verification successful for: {request.email}")
         
         return AuthResponse(
             success=True,
             message="Email verified successfully! You can now set your transfer PIN.",
-            data={"redirect_to": "/auth/set-transfer-pin"}
+            data={
+                "redirect_to": "/auth/set-transfer-pin",
+                "verification_token": verification_token
+            }
         )
         
     except (NotFoundError, ValidationError, ConflictError):
@@ -168,14 +167,9 @@ async def set_transfer_pin(
     request: SetTransferPinRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """Set transfer PIN for user"""
+    """Set transfer PIN for user with proper authentication"""
     try:
         logger.info(f"Set transfer PIN request for: {request.email}")
-        
-        # Validate PIN format (4 digits)
-        if not request.transfer_pin.isdigit() or len(request.transfer_pin) != 4:
-            logger.warning(f"Invalid PIN format for: {request.email}")
-            raise ValidationError("Transfer PIN must be exactly 4 digits")
         
         # Find user by email
         user = await db.execute(
@@ -192,29 +186,46 @@ async def set_transfer_pin(
             logger.warning(f"Set transfer PIN failed - email not verified: {request.email}")
             raise ValidationError("Please verify your email first")
         
+        # Validate verification token if provided
+        if request.verification_token:
+            # Verify the short-lived token
+            if not user.email_verification_token:
+                logger.warning(f"Set transfer PIN failed - no verification token: {request.email}")
+                raise ValidationError("Invalid verification token")
+            
+            if user.email_verification_token != request.verification_token:
+                logger.warning(f"Set transfer PIN failed - invalid verification token: {request.email}")
+                raise ValidationError("Invalid or expired verification token")
+            
+            if user.email_verification_expires < datetime.utcnow().timestamp():
+                logger.warning(f"Set transfer PIN failed - expired verification token: {request.email}")
+                raise ValidationError("Verification token has expired")
+        
+        # Check if user already has a PIN set
+        if user.transfer_pin:
+            logger.warning(f"Set transfer PIN failed - PIN already set: {request.email}")
+            raise ValidationError("Transfer PIN already set. Please contact support to change.")
+        
+        # Validate PIN format (4 digits)
+        if not request.transfer_pin.isdigit() or len(request.transfer_pin) != 4:
+            logger.warning(f"Invalid PIN format for: {request.email}")
+            raise ValidationError("Transfer PIN must be exactly 4 digits")
+        
         # Hash and store the PIN
         user.transfer_pin = hash_password(request.transfer_pin)
         user.updated_at = datetime.utcnow()
         
-        # Create default accounts for the user
-        try:
-            accounts = await AccountService.create_default_accounts(user.id, user.country, db)
-            for account in accounts:
-                db.add(account)
-            
-            await db.commit()
-            logger.info(f"Created default accounts for user: {user.email}")
-        except Exception as e:
-            logger.error(f"Failed to create accounts: {e}")
-            # Continue with PIN setup even if account creation fails
+        # Clear the verification token after use
+        user.email_verification_token = None
+        user.email_verification_expires = None
         
         await db.commit()
         
         logger.info(f"Transfer PIN set successfully for: {request.email}")
         
-        # Generate authentication tokens for the user
+        # Generate authentication tokens only after successful verification
         access_token = create_access_token({"sub": user.id, "email": user.email})
-        refresh_token = create_refresh_token()
+        refresh_token = create_refresh_token(user_id=user.id)
         
         return AuthResponse(
             success=True,

@@ -32,37 +32,43 @@ export default function LoginPage() {
         password,
       })
 
-      if (response.success && response.data) {
-        // Store tokens in localStorage AND cookie for middleware
-        localStorage.setItem('access_token', response.token.access_token)
-        localStorage.setItem('refresh_token', response.token.refresh_token)
-        
-        // Also set cookie for middleware
-        document.cookie = `accessToken=${response.token.access_token}; path=/; max-age=3600; secure; samesite=strict`
-        
-        // User data is directly in response.data, not response.data.user
-        const userData = {
-          id: response.data.user_id,
-          email: response.data.email,
-          username: response.data.username,
-          first_name: response.data.first_name,
-          last_name: response.data.last_name,
-          phone: undefined,
-          country: 'United States',
-          primary_currency: 'USD',
-          tier: 'premium' as const,
-          email_verified: true,
-          phone_verified: false,
-          identity_verified: false,
-          created_at: new Date().toISOString(),
-          last_login: new Date().toISOString()
+      if (response.success && response.data && response.token) {
+        // Check if token exists before using it
+        if (response.token.access_token && response.token.refresh_token) {
+          // Store tokens in localStorage AND cookie for middleware
+          localStorage.setItem('access_token', response.token.access_token)
+          localStorage.setItem('refresh_token', response.token.refresh_token)
+          
+          // Also set cookie for middleware
+          document.cookie = `accessToken=${response.token.access_token}; path=/; max-age=3600; secure; samesite=strict`
+          
+          // Map user data from server response with fallbacks
+          const userData = {
+            id: response.data.user_id || '',
+            email: response.data.email || '',
+            username: response.data.username || '',
+            first_name: response.data.first_name || '',
+            last_name: response.data.last_name || '',
+            phone: response.data.phone || undefined,
+            country: response.data.country || 'United States',
+            primary_currency: response.data.primary_currency || 'USD',
+            tier: response.data.tier || 'basic',
+            email_verified: response.data.email_verified || false,
+            phone_verified: response.data.phone_verified || false,
+            identity_verified: response.data.identity_verified || false,
+            created_at: response.data.created_at || new Date().toISOString(),
+            last_login: response.data.last_login || new Date().toISOString()
+          }
+          
+          localStorage.setItem('user', JSON.stringify(userData))
+          
+          // Update auth store
+          setUser(userData)
+          setToken(response.token.access_token)
+        } else {
+          // Handle missing token case
+          setError('Login successful but no token received. Please try again.')
         }
-        
-        localStorage.setItem('user', JSON.stringify(userData))
-        
-        // Update auth store
-        setUser(userData)
-        setToken(response.token.access_token)
         
         setLoading(false)
         
@@ -70,6 +76,9 @@ export default function LoginPage() {
         setTimeout(() => {
           window.location.href = '/dashboard'
         }, 500)
+      } else {
+        setLoading(false)
+        setError('Login failed. Please try again.')
       }
     } catch (err: any) {
       setLoading(false)
