@@ -10,8 +10,12 @@ class RegisterRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=50)
     last_name: str = Field(..., min_length=1, max_length=50)
     password: str = Field(..., min_length=8, max_length=100)
-    country: str = Field(..., min_length=2, max_length=2)
+    country: str = Field(..., min_length=2, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
+    street_address: Optional[str] = Field(None, max_length=200)
+    city: Optional[str] = Field(None, max_length=100)
+    state: Optional[str] = Field(None, max_length=100)
+    postal_code: Optional[str] = Field(None, max_length=20)
     
     @validator('username')
     def validate_username(cls, v):
@@ -19,14 +23,16 @@ class RegisterRequest(BaseModel):
             raise ValueError('Username must be alphanumeric')
         return v.lower()
     
-    @validator('country')
-    def validate_country(cls, v):
-        return v.upper()
+    @validator('phone')
+    def validate_phone(cls, v):
+        if v and not v.replace('+', '').replace('-', '').replace(' ', '').replace('(', '').replace(')', '').isdigit():
+            raise ValueError('Phone number must contain only digits and valid symbols')
+        return v
 
 
 class LoginRequest(BaseModel):
     """User login request"""
-    email: EmailStr
+    username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
 
 

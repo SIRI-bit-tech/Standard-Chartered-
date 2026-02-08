@@ -21,7 +21,7 @@ interface CountrySelectorProps {
 export function CountrySelector({ 
   value, 
   onChange, 
-  placeholder = "Select country", 
+  placeholder = "Select your country", 
   className = "" 
 }: CountrySelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -57,7 +57,7 @@ export function CountrySelector({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-left flex items-center justify-between hover:border-primary/50 transition-colors"
+        className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-left flex items-center justify-between hover:border-primary/50 transition-colors text-sm"
       >
         <div className="flex items-center gap-2">
           {selectedCountry ? (
@@ -66,13 +66,12 @@ export function CountrySelector({
                 countryCode={selectedCountry.code} 
                 svg 
                 style={{
-                  width: '1.5rem',
-                  height: '1.5rem',
+                  width: '1.25rem',
+                  height: '1.25rem',
                   marginRight: '0.5rem'
                 }}
               />
-              <span className="text-sm font-medium">{selectedCountry.name}</span>
-              <span className="text-xs text-muted-foreground">({selectedCountry.currency})</span>
+              <span className="text-sm">{selectedCountry.name}</span>
             </>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
@@ -116,13 +115,12 @@ export function CountrySelector({
                     countryCode={country.code} 
                     svg 
                     style={{
-                      width: '1.25rem',
-                      height: '1.25rem',
+                      width: '1.125rem',
+                      height: '1.125rem',
                       marginRight: '0.5rem'
                     }}
                   />
                   <span className="flex-1">{country.name}</span>
-                  <span className="text-xs text-muted-foreground">{country.currency}</span>
                 </button>
               ))
             )}

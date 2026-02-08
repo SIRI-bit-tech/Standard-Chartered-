@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { User, Account, Notification } from '@/types'
 
 interface AuthStore {
@@ -8,6 +9,7 @@ interface AuthStore {
   setUser: (user: User | null) => void
   setToken: (token: string | null) => void
   logout: () => void
+  reinitialize: () => boolean
 }
 
 interface AccountStore {
@@ -28,14 +30,47 @@ interface NotificationStore {
   setUnreadCount: (count: number) => void
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  token: null,
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
-  setToken: (token) => set({ token }),
-  logout: () => set({ user: null, isAuthenticated: false, token: null }),
-}))
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      token: null,
+      setUser: (user) => {
+        set({ user, isAuthenticated: !!user })
+      },
+      setToken: (token) => {
+        set({ token })
+      },
+      logout: () => {
+        set({ user: null, isAuthenticated: false, token: null })
+        // Clear localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('refresh_token')
+          localStorage.removeItem('user')
+          // Also clear the cookie
+          document.cookie = 'accessToken=; path=/; max-age=0; secure; samesite=strict'
+        }
+      },
+      reinitialize: () => {
+        return true
+      }
+    }),
+    {
+      name: 'auth-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+        token: state.token
+      }),
+      onRehydrateStorage: () => (state) => {
+        return state
+      }
+    }
+  )
+)
 
 export const useAccountStore = create<AccountStore>((set) => ({
   accounts: [],

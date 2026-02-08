@@ -16,8 +16,8 @@ export default function LoansPage() {
   const [loading, setLoading] = useState(true)
   const [selectedProduct, setSelectedProduct] = useState<LoanProduct | null>(null)
   const [applicationData, setApplicationData] = useState({
-    amount: 10000,
-    term: 12,
+    amount: 10000 as number,
+    term: 12 as number,
     purpose: '',
   })
   const { user } = useAuthStore()
@@ -31,22 +31,22 @@ export default function LoansPage() {
 
     try {
       // Load products
-      const productsResponse = await apiClient.get(`/api/v1/loans/products?user_tier=${user.tier}`)
-      if (productsResponse.success) {
+      const productsResponse = await apiClient.get<{ success: boolean; data: LoanProduct[] }>(`/api/v1/loans/products?user_tier=${user.tier}`)
+      if (productsResponse.success && productsResponse.data) {
         setProducts(productsResponse.data)
       }
 
       // Load applications
-      const applicationsResponse = await apiClient.get(
+      const applicationsResponse = await apiClient.get<{ success: boolean; data: LoanApplication[] }>(
         `/api/v1/loans/applications?user_id=${user.id}`
       )
-      if (applicationsResponse.success) {
+      if (applicationsResponse.success && applicationsResponse.data) {
         setApplications(applicationsResponse.data)
       }
 
       // Load active loans
-      const loansResponse = await apiClient.get(`/api/v1/loans/accounts?user_id=${user.id}`)
-      if (loansResponse.success) {
+      const loansResponse = await apiClient.get<{ success: boolean; data: Loan[] }>(`/api/v1/loans/accounts?user_id=${user.id}`)
+      if (loansResponse.success && loansResponse.data) {
         setLoans(loansResponse.data)
       }
     } catch (error) {
@@ -62,7 +62,7 @@ export default function LoansPage() {
 
     setLoading(true)
     try {
-      const response = await apiClient.post('/api/v1/loans/apply', {
+      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/loans/apply', {
         user_id: user.id,
         product_id: selectedProduct.id,
         requested_amount: applicationData.amount,
@@ -160,7 +160,7 @@ export default function LoansPage() {
                             onChange={(e) =>
                               setApplicationData({
                                 ...applicationData,
-                                amount: parseFloat(e.target.value),
+                                amount: parseFloat(e.target.value) || 0,
                               })
                             }
                             className="w-full pl-8 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
@@ -186,7 +186,7 @@ export default function LoansPage() {
                             onChange={(e) =>
                               setApplicationData({
                                 ...applicationData,
-                                term: parseInt(e.target.value),
+                                term: parseInt(e.target.value) || 1,
                               })
                             }
                             className="flex-1"
@@ -228,7 +228,7 @@ export default function LoansPage() {
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Amount:</span>
-                        <span className="font-medium">{formatCurrency(applicationData.amount)}</span>
+                        <span className="font-medium">{formatCurrency(applicationData.amount || 0)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Interest Rate:</span>
@@ -242,9 +242,9 @@ export default function LoansPage() {
                         <span className="text-muted-foreground">Est. Monthly Payment:</span>
                         <span className="font-bold text-primary">
                           {formatCurrency(
-                            (applicationData.amount *
+                            ((applicationData.amount || 0) *
                               (selectedProduct.interest_rate / 12 / 100)) /
-                              (1 - Math.pow(1 + selectedProduct.interest_rate / 12 / 100, -applicationData.term))
+                              (1 - Math.pow(1 + selectedProduct.interest_rate / 12 / 100, -(applicationData.term || 1)))
                           )}
                         </span>
                       </div>

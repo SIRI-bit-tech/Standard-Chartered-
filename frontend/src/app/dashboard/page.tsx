@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { Account, Transaction } from '@/types'
 
 type AccountsResponse = {
   success: boolean
+  message: string
   data: Account[]
 }
 
@@ -23,10 +26,22 @@ export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
   const { user } = useAuthStore()
   const { accounts, setAccounts } = useAccountStore()
+  const router = useRouter()
+
+  // Redirect if not authenticated
+  if (!user) {
+    useEffect(() => {
+      router.push('/auth/login')
+    }, [])
+    return null
+  }
 
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    // Only load data if user is authenticated
+    if (user) {
+      loadDashboardData()
+    }
+  }, [user])
 
   const loadDashboardData = async () => {
     try {
@@ -75,22 +90,34 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl p-6 border border-border shadow-sm">
           <p className="text-muted-foreground text-sm font-medium mb-2">Total Balance</p>
-          <p className="text-3xl font-bold text-foreground">
-            {formatCurrency(totalBalance, user?.primary_currency)}
-          </p>
+          {loading ? (
+            <Skeleton className="h-8 w-32" />
+          ) : (
+            <p className="text-3xl font-bold text-foreground">
+              {formatCurrency(totalBalance, user?.primary_currency)}
+            </p>
+          )}
           <p className="text-muted-foreground text-sm mt-2">Across all accounts</p>
         </div>
 
         <div className="bg-white rounded-xl p-6 border border-border shadow-sm">
           <p className="text-muted-foreground text-sm font-medium mb-2">Active Accounts</p>
-          <p className="text-3xl font-bold text-foreground">{accounts.length}</p>
+          {loading ? (
+            <Skeleton className="h-8 w-16" />
+          ) : (
+            <p className="text-3xl font-bold text-foreground">{accounts.length}</p>
+          )}
           <p className="text-muted-foreground text-sm mt-2">Ready to use</p>
         </div>
 
         <div className="bg-white rounded-xl p-6 border border-border shadow-sm">
           <p className="text-muted-foreground text-sm font-medium mb-2">Account Tier</p>
-          <p className="text-3xl font-bold text-primary capitalize">{user?.tier}</p>
-          <p className="text-muted-foreground text-sm mt-2">Premium benefits included</p>
+          {loading ? (
+            <Skeleton className="h-8 w-24" />
+          ) : (
+            <p className="text-3xl font-bold text-yellow-600 capitalize">Premium</p>
+          )}
+          <p className="text-muted-foreground text-sm mt-2">All premium benefits included</p>
         </div>
       </div>
 
@@ -104,7 +131,15 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">Loading accounts...</div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 border border-border rounded-lg">
+                <Skeleton className="h-4 w-3/4 mb-2" />
+                <Skeleton className="h-6 w-1/2 mb-2" />
+                <Skeleton className="h-4 w-1/3" />
+              </div>
+            ))}
+          </div>
         ) : accounts.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {accounts.map((account: Account) => (
@@ -165,7 +200,15 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground">Loading transactions...</div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="p-4 border border-border rounded-lg">
+                <Skeleton className="h-4 w-3/4 mb-2" />
+                <Skeleton className="h-6 w-1/2 mb-2" />
+                <Skeleton className="h-4 w-1/3" />
+              </div>
+            ))}
+          </div>
         ) : recentTransactions.length > 0 ? (
           <div className="space-y-3">
             {recentTransactions.map((transaction: Transaction) => (

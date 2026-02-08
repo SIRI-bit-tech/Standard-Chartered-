@@ -13,7 +13,7 @@ class ApiClient {
   constructor(config: ApiClientConfig) {
     this.client = axios.create({
       baseURL: config.baseURL,
-      timeout: config.timeout || 30000,
+      timeout: config.timeout || 60000, // Increased to 60 seconds
       headers: {
         'Content-Type': 'application/json',
       },
@@ -24,6 +24,9 @@ class ApiClient {
       (response) => response,
       (error: AxiosError) => {
         console.error('[API Error]', error.message)
+        if (error.code === 'ECONNABORTED') {
+          console.error('[API Error] Request timeout - backend not responding')
+        }
         return Promise.reject(error)
       }
     )

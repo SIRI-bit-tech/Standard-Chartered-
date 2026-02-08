@@ -8,6 +8,7 @@ import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
 import { formatCurrency, toTitleCase } from '@/lib/utils'
 import { ACCOUNT_TYPES } from '@/constants'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { Account } from '@/types'
 
 export default function AccountsPage() {
@@ -27,8 +28,8 @@ export default function AccountsPage() {
   const loadAccounts = async () => {
     if (!user) return
     try {
-      const response = await apiClient.get(`/api/v1/accounts?user_id=${user.id}`)
-      if (response.success) {
+      const response = await apiClient.get<{ success: boolean; data: Account[] }>(`/api/v1/accounts?user_id=${user.id}`)
+      if (response.success && response.data) {
         setAccounts(response.data)
       }
     } catch (error) {
@@ -43,14 +44,14 @@ export default function AccountsPage() {
     if (!user) return
 
     try {
-      const response = await apiClient.post('/api/v1/accounts', {
+      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/accounts', {
         user_id: user.id,
         account_type: newAccount.type,
         currency: user.primary_currency,
         nickname: newAccount.nickname,
       })
 
-      if (response.success) {
+      if (response.success && response.data) {
         await loadAccounts()
         setShowCreateModal(false)
         setNewAccount({ type: 'checking', nickname: '' })
@@ -73,7 +74,27 @@ export default function AccountsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12">Loading accounts...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white border border-border rounded-xl p-6 hover:shadow-lg transition">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-24 mb-2" />
+                  <Skeleton className="h-8 w-32 mb-2" />
+                </div>
+                <Skeleton className="h-8 w-8" />
+              </div>
+              <div className="mb-6">
+                <Skeleton className="h-4 w-16 mb-2" />
+                <Skeleton className="h-6 w-full mb-2" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+              <div className="flex justify-end">
+                <Skeleton className="h-10 w-20" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : accounts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {accounts.map((account: Account) => (

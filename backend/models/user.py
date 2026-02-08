@@ -21,12 +21,24 @@ class User(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     phone = Column(String, nullable=True)
+    street_address = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    state = Column(String, nullable=True)
+    postal_code = Column(String, nullable=True)
     date_of_birth = Column(DateTime, nullable=True)
     country = Column(String, nullable=False)  # For currency assignment
     primary_currency = Column(String, nullable=False)  # USD, GBP, EUR, etc.
     
+    # Authentication
+    password_hash = Column(String, nullable=False)
+    transfer_pin = Column(String, nullable=True)  # 4-digit PIN for transfers
+    email_verification_token = Column(String, nullable=True)
+    email_verification_expires = Column(Float, nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    password_reset_expires = Column(Float, nullable=True)
+    
     # Account tier
-    tier = Column(Enum(UserTier), default=UserTier.STANDARD, nullable=False)
+    tier = Column(Enum(UserTier), default=UserTier.PREMIUM, nullable=False)
     
     # Verification
     email_verified = Column(Boolean, default=False, nullable=False)

@@ -22,13 +22,13 @@ export default function AccountDetailPage() {
   const loadAccountDetails = async () => {
     try {
       // Fetch account details
-      const accountResponse = await apiClient.get(`/api/v1/accounts/${accountId}`)
+      const accountResponse = await apiClient.get<{ success: boolean; data: Account }>(`/api/v1/accounts/${accountId}`)
       if (accountResponse.success) {
         setAccount(accountResponse.data)
       }
 
       // Fetch transactions
-      const transactionsResponse = await apiClient.get(
+      const transactionsResponse = await apiClient.get<{ success: boolean; data: Transaction[] }>(
         `/api/v1/accounts/${accountId}/transactions?limit=50`
       )
       if (transactionsResponse.success) {

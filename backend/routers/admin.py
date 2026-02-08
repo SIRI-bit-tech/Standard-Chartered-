@@ -42,7 +42,7 @@ async def admin_register(
             logger.warning(f"Invalid admin code attempted for email: {request.email}")
             raise ValidationError(
                 field="admin_code",
-                message="Invalid admin registration code",
+                message="Invalid admin code",
                 error_code="INVALID_ADMIN_CODE"
             )
         
@@ -119,8 +119,8 @@ async def admin_login(
         # Validate additional admin code if provided
         if request.admin_code and not AdminAuthManager.validate_admin_login_code(request.admin_code):
             raise AuthenticationError(
-                message="Invalid admin login code",
-                error_code="INVALID_LOGIN_CODE"
+                message="Invalid admin code",
+                error_code="INVALID_ADMIN_CODE"
             )
         
         # Update last login

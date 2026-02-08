@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
-from models.user import User
+from models.user import User, UserTier
 from database import get_db
 from schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse, AuthResponse,
     RefreshTokenRequest, ChangePasswordRequest, PasswordResetRequest,
-    PasswordResetConfirm, EmailVerificationRequest
+    PasswordResetConfirm
 )
 from schemas.user import UserResponse
 from utils.auth import (
@@ -22,7 +22,7 @@ from utils.logger import logger
 from config import settings
 import uuid
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter()
 
 # Currency mapping by country - Comprehensive list for all countries
 CURRENCY_MAP = {
@@ -54,16 +54,19 @@ async def register(
 ):
     """Register new user with email verification"""
     try:
+        logger.info(f"Registration attempt for email: {request.email}")
+        
         # Check if user exists
         existing = await db.execute(
             select(User).where((User.email == request.email) | (User.username == request.username))
         )
+        
         if existing.scalar():
+            logger.warning(f"User already exists: {request.email}")
             raise ConflictError(
-                message="This email or username is already registered",
-                error_code="USER_EXISTS"
+                message="This email or username is already registered"
             )
-
+        
         primary_currency = CURRENCY_MAP.get(request.country, "USD")
 
         # Create new user
@@ -75,10 +78,15 @@ async def register(
             last_name=request.last_name,
             country=request.country,
             phone=request.phone,
+            street_address=request.street_address,
+            city=request.city,
+            state=request.state,
+            postal_code=request.postal_code,
             password_hash=hash_password(request.password),
             primary_currency=primary_currency,
+            tier=UserTier.PREMIUM,  # All users get Premium tier
             is_active=False,
-            is_email_verified=False,
+            email_verified=False,
             email_verification_token=generate_verification_token(),
             email_verification_expires=datetime.utcnow().timestamp() + 86400,
             created_at=datetime.utcnow()
@@ -86,32 +94,35 @@ async def register(
 
         db.add(new_user)
         await db.commit()
-        await db.refresh(new_user)
-        
+
+        # TODO: Send verification email
+
         # Generate tokens
         access_token = create_access_token({"sub": new_user.id, "email": new_user.email})
         refresh_token = create_refresh_token(new_user.id)
         
         # Publish notification
         try:
-            AblyRealtimeManager.publish_notification(
-                new_user.id,
-                "account_creation",
-                "Welcome to Standard Chartered",
-                "Your account has been created. Please verify your email."
-            )
+            # Skip Ably notification if API key is not configured
+            if settings.ABLY_API_KEY and settings.ABLY_API_KEY != "your-ably-api-key":
+                AblyRealtimeManager.publish_notification(
+                    new_user.id,
+                    "account_creation",
+                    "Welcome to Standard Chartered",
+                    "Your account has been created. Please verify your email."
+                )
         except Exception as e:
-            logger.warning("Failed to publish notification", error=e)
+            logger.warning(f"Failed to publish notification: {e}")
         
         logger.info(f"User registered successfully: {new_user.email}")
         
         return AuthResponse(
             success=True,
-            message="Registration successful. Please verify your email.",
+            message="Registration successful! Please check your email for verification code.",
             data={
                 "user_id": new_user.id,
-                "email": new_user.email,
-                "verification_required": True
+                "redirect_to": "/auth/verify-email",
+                "email": new_user.email
             },
             token=TokenResponse(
                 access_token=access_token,
@@ -123,6 +134,8 @@ async def register(
         raise
     except Exception as e:
         logger.error("Registration failed", error=e)
+        import traceback
+        traceback.print_exc()
         raise InternalServerError(
             operation="user registration",
             error_code="REGISTRATION_FAILED",
@@ -135,16 +148,16 @@ async def login(
     request: LoginRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """Login user with email and password"""
+    """Login user with username and password"""
     result = await db.execute(
-        select(User).where(User.email == request.email)
+        select(User).where((User.email == request.username) | (User.username == request.username))
     )
     user = result.scalar()
     
     if not user or not verify_password(request.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password"
+            detail="Invalid credentials"
         )
     
     if not user.is_active:
@@ -163,17 +176,29 @@ async def login(
     refresh_token = create_refresh_token(user.id)
     
     # Publish notification
-    AblyRealtimeManager.publish_notification(
-        user.id,
-        "login",
-        "New Login",
-        f"You logged in on {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
-    )
+    try:
+        # Skip Ably notification if API key is not configured
+        if settings.ABLY_API_KEY and settings.ABLY_API_KEY != "your-ably-api-key":
+            AblyRealtimeManager.publish_notification(
+                user.id,
+                "login",
+                "New Login",
+                f"You logged in on {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+            )
+    except Exception as e:
+        logger.warning(f"Failed to publish notification: {e}")
     
     return AuthResponse(
         success=True,
         message="Login successful",
-        data={"user_id": user.id},
+        data={
+            "user_id": user.id,
+            "email": user.email,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "token": access_token
+        },
         token=TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
@@ -213,50 +238,6 @@ async def refresh_access_token(
         access_token=access_token,
         refresh_token=request.refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    )
-
-
-@router.post("/verify-email", response_model=AuthResponse)
-async def verify_email(
-    request: EmailVerificationRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    """Verify email with token"""
-    result = await db.execute(
-        select(User).where(User.email_verification_token == request.token)
-    )
-    user = result.scalar()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid verification token"
-        )
-    
-    if user.email_verification_expires < datetime.utcnow().timestamp():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification token expired"
-        )
-    
-    # Activate user
-    user.is_email_verified = True
-    user.is_active = True
-    user.email_verification_token = None
-    db.add(user)
-    await db.commit()
-    
-    # Publish notification
-    AblyRealtimeManager.publish_notification(
-        user.id,
-        "email_verified",
-        "Email Verified",
-        "Your email has been successfully verified."
-    )
-    
-    return AuthResponse(
-        success=True,
-        message="Email verified successfully"
     )
 
 

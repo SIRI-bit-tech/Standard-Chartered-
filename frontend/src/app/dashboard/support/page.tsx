@@ -33,13 +33,13 @@ export default function SupportPage() {
 
     try {
       // Load tickets
-      const ticketsResponse = await apiClient.get(`/api/v1/support/tickets?user_id=${user.id}&limit=10`)
+      const ticketsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/support/tickets?user_id=${user.id}&limit=10`)
       if (ticketsResponse.success) {
         setTickets(ticketsResponse.data)
       }
 
       // Load chats
-      const chatsResponse = await apiClient.get(`/api/v1/support/chats?user_id=${user.id}`)
+      const chatsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/support/chats?user_id=${user.id}`)
       if (chatsResponse.success) {
         setChats(chatsResponse.data)
       }
@@ -56,7 +56,7 @@ export default function SupportPage() {
 
     setLoading(true)
     try {
-      const response = await apiClient.post('/api/v1/support/ticket', {
+      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/support/ticket', {
         user_id: user.id,
         ...ticketForm,
       })
@@ -79,7 +79,7 @@ export default function SupportPage() {
     if (!user) return
 
     try {
-      const response = await apiClient.post('/api/v1/support/chat/start', {
+      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/support/chat/start', {
         user_id: user.id,
       })
 
@@ -96,7 +96,7 @@ export default function SupportPage() {
     if (!selectedChat || !messageInput.trim() || !user) return
 
     try {
-      const response = await apiClient.post(
+      const response = await apiClient.post<{ success: boolean; data: any }>(
         `/api/v1/support/chat/${selectedChat.id}/message`,
         {
           user_id: user.id,
@@ -107,7 +107,7 @@ export default function SupportPage() {
       if (response.success) {
         setMessageInput('')
         // Reload chat messages
-        const messagesResponse = await apiClient.get(
+        const messagesResponse = await apiClient.get<{ success: boolean; data: any[] }>(
           `/api/v1/support/chat/${selectedChat.id}/messages`
         )
         if (messagesResponse.success) {

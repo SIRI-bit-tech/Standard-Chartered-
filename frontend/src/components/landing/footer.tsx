@@ -2,6 +2,7 @@
 
 import { Facebook, Twitter, Linkedin, Instagram, Youtube } from 'lucide-react'
 import { colors } from '@/types'
+import Link from 'next/link'
 
 const socialLinks = [
   { icon: Facebook, href: '#' },
@@ -27,11 +28,10 @@ const footerLinks = {
     { name: 'Sustainability', href: '#' }
   ],
   legal: [
-    { name: 'Privacy Policy', href: '#' },
-    { name: 'Terms of Service', href: '#' },
-    { name: 'Cookie Policy', href: '#' },
-    { name: 'Security', href: '#' },
-    { name: 'Compliance', href: '#' }
+    { name: 'Privacy Policy', href: '/legal/privacy-policy' },
+    { name: 'Terms of Service', href: '/legal/terms-of-service' },
+    { name: 'Cookie Policy', href: '/legal/cookie-policy' },
+    { name: 'Security', href: '/legal/compliance' }
   ]
 }
 
@@ -71,12 +71,12 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.banking.map((link, index) => (
                 <li key={index}>
-                  <a 
+                  <Link 
                     href={link.href}
                     className="text-gray-400 hover:text-white transition-colors text-sm"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -88,12 +88,12 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.corporate.map((link, index) => (
                 <li key={index}>
-                  <a 
+                  <Link 
                     href={link.href}
                     className="text-gray-400 hover:text-white transition-colors text-sm"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -105,12 +105,12 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.legal.map((link, index) => (
                 <li key={index}>
-                  <a 
+                  <Link 
                     href={link.href}
                     className="text-gray-400 hover:text-white transition-colors text-sm"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
