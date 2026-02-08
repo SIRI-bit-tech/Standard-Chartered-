@@ -29,19 +29,23 @@ export default function DashboardPage() {
   const router = useRouter()
 
   // Redirect if not authenticated
-  if (!user) {
-    useEffect(() => {
-      router.push('/auth/login')
-    }, [])
-    return null
-  }
-
   useEffect(() => {
-    // Only load data if user is authenticated
+    if (!user) {
+      router.push('/auth/login')
+    }
+  }, [user])
+
+  // Load dashboard data when user is authenticated
+  useEffect(() => {
     if (user) {
       loadDashboardData()
     }
   }, [user])
+
+  // Early return guard (after all hooks)
+  if (!user) {
+    return null
+  }
 
   const loadDashboardData = async () => {
     try {

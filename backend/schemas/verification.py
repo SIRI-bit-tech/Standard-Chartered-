@@ -17,6 +17,7 @@ class SetTransferPinRequest(BaseModel):
     """Request model for setting transfer PIN"""
     email: str = Field(..., description="User's email address")
     transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
+    verification_token: Optional[str] = Field(None, description="Short-lived verification token from email verification")
 
 
 class AuthResponse(BaseModel):

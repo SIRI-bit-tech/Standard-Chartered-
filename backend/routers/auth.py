@@ -172,7 +172,7 @@ async def login(
     await db.commit()
     
     # Generate tokens
-    access_token = create_access_token({"sub": user.id, "email": user.email})
+    access_token = create_access_token({"sub": user.id, "email": user.username})
     refresh_token = create_refresh_token(user.id)
     
     # Publish notification
