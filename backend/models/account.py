@@ -27,6 +27,7 @@ class Account(Base):
     
     # Account info
     account_number = Column(String, unique=True, index=True, nullable=False)
+    routing_number = Column(String, nullable=True)  # For US bank transfers
     account_type = Column(Enum(AccountType), nullable=False)
     status = Column(Enum(AccountStatus), default=AccountStatus.ACTIVE, nullable=False)
     

@@ -4,36 +4,76 @@ import React from "react"
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
 
 export default function LoginPage() {
+  // Login page - updated to use username instead of email
+  const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { setUser, setToken } = useAuthStore()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleLogin = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
     setLoading(true)
     setError('')
 
     try {
-      const response = await apiClient.post('/api/v1/auth/login', {
+      const response = await apiClient.post<{ success: boolean; data: any; token: any }>('/api/v1/auth/login', {
         username,
         password,
       })
 
-      if (response.success) {
-        setUser(response.data)
-        setToken(response.data.token)
-        window.location.href = '/dashboard'
+      if (response.success && response.data) {
+        // Store tokens in localStorage AND cookie for middleware
+        localStorage.setItem('access_token', response.token.access_token)
+        localStorage.setItem('refresh_token', response.token.refresh_token)
+        
+        // Also set cookie for middleware
+        document.cookie = `accessToken=${response.token.access_token}; path=/; max-age=3600; secure; samesite=strict`
+        
+        // User data is directly in response.data, not response.data.user
+        const userData = {
+          id: response.data.user_id,
+          email: response.data.email,
+          username: response.data.username,
+          first_name: response.data.first_name,
+          last_name: response.data.last_name,
+          phone: undefined,
+          country: 'United States',
+          primary_currency: 'USD',
+          tier: 'premium' as const,
+          email_verified: true,
+          phone_verified: false,
+          identity_verified: false,
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString()
+        }
+        
+        localStorage.setItem('user', JSON.stringify(userData))
+        
+        // Update auth store
+        setUser(userData)
+        setToken(response.token.access_token)
+        
+        setLoading(false)
+        
+        // Navigate to dashboard after successful login
+        setTimeout(() => {
+          window.location.href = '/dashboard'
+        }, 500)
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.')
-    } finally {
       setLoading(false)
+      setError('Login failed. Please try again.')
     }
   }
 
@@ -48,7 +88,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
             Username
@@ -88,13 +128,14 @@ export default function LoginPage() {
         </div>
 
         <button
-          type="submit"
+          type="button"
+          onClick={handleLogin}
           disabled={loading}
           className="w-full py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-medium disabled:opacity-50"
         >
           {loading ? 'Signing in...' : 'Sign In'}
         </button>
-      </form>
+      </div>
 
       <p className="text-center text-muted-foreground mt-6">
         Don't have an account?{' '}

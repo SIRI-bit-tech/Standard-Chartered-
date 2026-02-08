@@ -29,7 +29,7 @@ export default function ProfilePage() {
 
     try {
       // Load profile
-      const profileResponse = await apiClient.get(`/api/v1/profile?user_id=${user.id}`)
+      const profileResponse = await apiClient.get<{ success: boolean; data: any }>(`/api/v1/profile?user_id=${user.id}`)
       if (profileResponse.success) {
         setProfileData({
           first_name: profileResponse.data.first_name,
@@ -40,7 +40,7 @@ export default function ProfilePage() {
       }
 
       // Load login history
-      const historyResponse = await apiClient.get(
+      const historyResponse = await apiClient.get<{ success: boolean; data: any[] }>(
         `/api/v1/profile/login-history?user_id=${user.id}&limit=10`
       )
       if (historyResponse.success) {
@@ -48,7 +48,7 @@ export default function ProfilePage() {
       }
 
       // Load documents
-      const documentsResponse = await apiClient.get(`/api/v1/profile/documents?user_id=${user.id}`)
+      const documentsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/profile/documents?user_id=${user.id}`)
       if (documentsResponse.success) {
         setDocuments(documentsResponse.data)
       }
@@ -65,7 +65,7 @@ export default function ProfilePage() {
 
     setLoading(true)
     try {
-      const response = await apiClient.put(`/api/v1/profile`, {
+      const response = await apiClient.put<{ success: boolean; data: any }>(`/api/v1/profile`, {
         user_id: user.id,
         ...profileData,
       })

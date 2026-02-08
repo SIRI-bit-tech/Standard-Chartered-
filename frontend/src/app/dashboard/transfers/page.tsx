@@ -6,18 +6,19 @@ import { useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { TRANSFER_TYPES, TRANSFER_FEES } from '@/constants'
+import { TRANSFER_FEES } from '@/constants'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { Transfer } from '@/types'
 
 export default function TransfersPage() {
   const [activeTab, setActiveTab] = useState('new')
-  const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [transfers] = useState<Transfer[]>([])
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     from_account_id: '',
     transfer_type: 'internal',
     recipient: '',
-    amount: 0,
+    amount: 0 as number,
     description: '',
   })
   const { user } = useAuthStore()
@@ -35,7 +36,7 @@ export default function TransfersPage() {
             ? '/api/v1/transfers/domestic'
             : '/api/v1/transfers/international'
 
-      const response = await apiClient.post(endpoint, {
+      const response = await apiClient.post<{ success: boolean; data: any }>(endpoint, {
         from_account_id: formData.from_account_id,
         to_account_id: formData.transfer_type === 'internal' ? formData.recipient : undefined,
         to_account_number: formData.transfer_type === 'domestic' ? formData.recipient : undefined,
@@ -44,7 +45,7 @@ export default function TransfersPage() {
         description: formData.description,
       })
 
-      if (response.success) {
+      if (response && typeof response === 'object' && 'success' in response && response.success) {
         alert('Transfer submitted successfully!')
         setFormData({
           from_account_id: '',
@@ -62,8 +63,9 @@ export default function TransfersPage() {
     }
   }
 
-  const fee = TRANSFER_FEES[formData.transfer_type.toUpperCase() as keyof typeof TRANSFER_FEES] || 0
-  const total = formData.amount + fee
+  const feeKey = formData.transfer_type.toUpperCase() as keyof typeof TRANSFER_FEES
+  const fee = TRANSFER_FEES[feeKey] || 0
+  const total = (formData.amount || 0) + fee
 
   return (
     <div className="space-y-6">
@@ -164,7 +166,7 @@ export default function TransfersPage() {
                     type="number"
                     step="0.01"
                     value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })}
                     placeholder="0.00"
                     className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
                     required
@@ -174,9 +176,9 @@ export default function TransfersPage() {
                   <label className="block text-sm font-medium text-foreground mb-2">Currency</label>
                   <input
                     type="text"
-                    value={user?.primary_currency}
+                    value={user?.primary_currency || 'USD'}
                     disabled
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-border-light"
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-muted"
                   />
                 </div>
               </div>
@@ -208,7 +210,7 @@ export default function TransfersPage() {
               <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Amount:</span>
-                <span className="font-medium">{formatCurrency(formData.amount)}</span>
+                <span className="font-medium">{formatCurrency(formData.amount || 0)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Transfer Fee:</span>
@@ -248,7 +250,15 @@ export default function TransfersPage() {
                 </div>
               ))
             ) : (
-              <div className="text-center py-8 text-muted-foreground">No transfer history</div>
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="p-4 border border-border rounded-lg">
+                    <Skeleton className="h-4 w-3/4 mb-2" />
+                    <Skeleton className="h-6 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-1/3" />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

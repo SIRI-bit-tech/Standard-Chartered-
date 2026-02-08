@@ -31,24 +31,24 @@ export default function BillsPage() {
 
     try {
       // Load payees
-      const payeesResponse = await apiClient.get(`/api/v1/bills/payees?user_id=${user.id}`)
-      if (payeesResponse.success) {
+      const payeesResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/bills/payees?user_id=${user.id}`)
+      if (payeesResponse.success && payeesResponse.data) {
         setPayees(payeesResponse.data)
       }
 
       // Load history
-      const historyResponse = await apiClient.get(
+      const historyResponse = await apiClient.get<{ success: boolean; data: any[] }>(
         `/api/v1/bills/history?user_id=${user.id}&limit=20`
       )
-      if (historyResponse.success) {
+      if (historyResponse.success && historyResponse.data) {
         setHistory(historyResponse.data)
       }
 
       // Load scheduled
-      const scheduledResponse = await apiClient.get(
+      const scheduledResponse = await apiClient.get<{ success: boolean; data: any[] }>(
         `/api/v1/bills/scheduled?user_id=${user.id}`
       )
-      if (scheduledResponse.success) {
+      if (scheduledResponse.success && scheduledResponse.data) {
         setScheduled(scheduledResponse.data)
       }
     } catch (error) {
@@ -64,12 +64,12 @@ export default function BillsPage() {
 
     setLoading(true)
     try {
-      const response = await apiClient.post('/api/v1/bills/payees', {
+      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/bills/payees', {
         user_id: user.id,
         ...payeeForm,
       })
 
-      if (response.success) {
+      if (response.success && response.data) {
         alert('Payee added successfully!')
         setPayeeForm({ name: '', account_number: '', category: '' })
         setShowAddPayee(false)

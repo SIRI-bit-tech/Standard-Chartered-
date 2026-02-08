@@ -77,7 +77,9 @@ Located in `/frontend` directory
 
 6. **Start the server**
    ```bash
-   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+   uvicorn main:app --reload --host 127.0.0.1 --port 8000
+   python main.py
+   taskkill /F /IM python.exe
    ```
 
 ### Frontend Setup

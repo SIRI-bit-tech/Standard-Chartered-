@@ -6,6 +6,7 @@ Each router is responsible for a specific domain (auth, accounts, transfers, etc
 """
 
 from . import auth
+from . import verification
 from . import accounts
 from . import transfers
 from . import loans
@@ -19,6 +20,7 @@ from . import virtual_cards
 
 __all__ = [
     "auth",
+    "verification",
     "accounts",
     "transfers",
     "loans",

@@ -9,15 +9,14 @@ from utils.logger import logger
 class AdminAuthManager:
     """Manage admin authentication"""
     
-    # Admin code from environment - should be set securely
-    ADMIN_CODE = os.getenv("ADMIN_REGISTRATION_CODE", "")
-    ADMIN_LOGIN_CODE = os.getenv("ADMIN_LOGIN_CODE", "")
+    # Single admin code from environment - used for both registration and login
+    ADMIN_CODE = os.getenv("ADMIN_CODE", "")
     
     @staticmethod
     def validate_admin_code(provided_code: str) -> bool:
-        """Validate admin registration code"""
+        """Validate admin code for registration and login"""
         if not AdminAuthManager.ADMIN_CODE:
-            logger.error("ADMIN_REGISTRATION_CODE not configured")
+            logger.error("ADMIN_CODE not configured")
             return False
         
         # Use constant-time comparison to prevent timing attacks
@@ -29,10 +28,12 @@ class AdminAuthManager:
         if not provided_code:
             return True  # Optional
         
-        if not AdminAuthManager.ADMIN_LOGIN_CODE:
-            return True  # Not configured, skip
+        if not AdminAuthManager.ADMIN_CODE:
+            logger.error("ADMIN_CODE not configured")
+            return False
         
-        return secrets.compare_digest(provided_code, AdminAuthManager.ADMIN_LOGIN_CODE)
+        # Use same admin code for login validation
+        return secrets.compare_digest(provided_code, AdminAuthManager.ADMIN_CODE)
     
     @staticmethod
     def hash_password(password: str) -> str:

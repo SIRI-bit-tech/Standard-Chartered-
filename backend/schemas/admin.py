@@ -19,7 +19,7 @@ class AdminRegisterRequest(BaseModel):
     first_name: str = Field(..., max_length=100)
     last_name: str = Field(..., max_length=100)
     password: str = Field(..., min_length=8, max_length=255)
-    admin_code: str = Field(..., description="Secret admin registration code")
+    admin_code: str = Field(..., description="Secret admin code")
     department: Optional[str] = Field(None, max_length=100)
 
     @validator('password')
@@ -35,7 +35,7 @@ class AdminLoginRequest(BaseModel):
     """Admin login request"""
     email: EmailStr
     password: str
-    admin_code: Optional[str] = Field(None, description="Admin code for 2FA")
+    admin_code: Optional[str] = Field(None, description="Admin code for additional security")
 
 
 class AdminResponse(BaseModel):
