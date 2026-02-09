@@ -1,3 +1,5 @@
+import type { ComponentType } from 'react'
+
 // User types
 export interface User {
   id: string
@@ -20,6 +22,7 @@ export interface User {
 export interface Account {
   id: string
   account_number: string
+  routing_number?: string // US accounts only
   type: 'checking' | 'savings' | 'crypto'
   currency: string
   balance: number
@@ -28,6 +31,7 @@ export interface Account {
   nickname?: string
   interest_rate: number
   is_primary: boolean
+  overdraft_limit?: number
   created_at: string
 }
 
@@ -45,6 +49,8 @@ export interface Transaction {
 }
 
 // Transfer types
+export type TransferTypeTab = 'internal' | 'domestic' | 'international' | 'ach'
+
 export interface Transfer {
   id: string
   type: 'internal' | 'domestic' | 'international' | 'ach' | 'wire'
@@ -54,6 +60,65 @@ export interface Transfer {
   reference_number: string
   created_at: string
   description?: string
+}
+
+/** Form state for internal transfer (own accounts) */
+export interface InternalTransferForm {
+  from_account_id: string
+  to_account_id: string
+  amount: number
+  reference_memo: string
+}
+
+/** Form state for domestic wire / transfer to other local accounts */
+export interface DomesticTransferForm {
+  from_account_id: string
+  recipient_name: string
+  routing_number: string
+  account_number: string
+  physical_address: string
+  amount: number
+  memo: string
+}
+
+/** Form state for international wire (SWIFT) */
+export interface InternationalTransferForm {
+  from_account_id: string
+  beneficiary_name: string
+  swift_bic: string
+  country: string
+  iban_or_account: string
+  bank_name: string
+  amount: number
+  purpose: string
+}
+
+/** Form state for ACH bank transfer */
+export interface ACHTransferForm {
+  from_account_id: string
+  recipient_name: string
+  account_type: 'checking' | 'savings'
+  routing_number: string
+  account_number: string
+  amount: number
+  schedule: 'now' | 'future'
+}
+
+/** Transfer summary shown in sidebar (real-time) */
+export interface TransferSummaryState {
+  amount: number
+  fee: number
+  totalToPay: number
+  recipientReceives?: number
+  exchangeRate?: string
+  estimatedDelivery: string
+  currency: string
+}
+
+/** Request payload when confirming transfer (includes PIN) */
+export interface TransferConfirmPayload {
+  transfer_pin: string
+  [key: string]: unknown
 }
 
 // Beneficiary types
@@ -152,6 +217,20 @@ export interface ApiResponse<T> {
   success: boolean
   data: T
   message: string
+}
+
+// Dashboard UI types
+export interface NavItem {
+  href: string
+  label: string
+  icon: ComponentType<{ className?: string; size?: number }>
+}
+
+export interface QuickActionItem {
+  href: string
+  label: string
+  description?: string
+  icon: ComponentType<{ className?: string; size?: number }>
 }
 
 // Color theme variables

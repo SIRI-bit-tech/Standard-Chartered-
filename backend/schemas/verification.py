@@ -20,6 +20,11 @@ class SetTransferPinRequest(BaseModel):
     verification_token: Optional[str] = Field(None, description="Short-lived verification token from email verification")
 
 
+class VerifyTransferPinRequest(BaseModel):
+    """Request model for verifying transfer PIN before a transfer"""
+    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
+
+
 class AuthResponse(BaseModel):
     """Standard response for auth operations"""
     success: bool

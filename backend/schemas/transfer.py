@@ -27,6 +27,7 @@ class BeneficiaryType(str, Enum):
 
 class InternalTransferRequest(BaseModel):
     """Internal transfer request"""
+    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
     from_account_id: str
     to_account_id: str
     amount: float = Field(..., gt=0)
@@ -35,17 +36,16 @@ class InternalTransferRequest(BaseModel):
 
 class DomesticTransferRequest(BaseModel):
     """Domestic transfer request"""
+    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
     from_account_id: str
-    bank_code: str = Field(..., max_length=10)
-    account_number: str = Field(..., max_length=20)
-    account_holder: str = Field(..., max_length=100)
+    to_account_number: str = Field(..., max_length=40)
     amount: float = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=200)
-    reference: Optional[str] = Field(None, max_length=50)
 
 
 class InternationalTransferRequest(BaseModel):
     """International transfer request"""
+    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
     from_account_id: str
     beneficiary_bank_name: str = Field(..., max_length=100)
     beneficiary_account_number: str = Field(..., max_length=30)
@@ -56,7 +56,7 @@ class InternationalTransferRequest(BaseModel):
     swift_code: Optional[str] = Field(None, max_length=11)
     iban: Optional[str] = Field(None, max_length=34)
     purpose: Optional[str] = Field(None, max_length=200)
-    
+
     @validator('target_currency')
     def validate_currency(cls, v):
         return v.upper()
@@ -106,6 +106,7 @@ class TransferFeeResponse(BaseModel):
 
 class ACHTransferRequest(BaseModel):
     """ACH transfer request"""
+    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
     from_account_id: str
     routing_number: str = Field(..., max_length=9)
     account_number: str = Field(..., max_length=20)
@@ -113,7 +114,7 @@ class ACHTransferRequest(BaseModel):
     amount: float = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=200)
     reference: Optional[str] = Field(None, max_length=50)
-    
+
     @validator('routing_number')
     def validate_routing(cls, v):
         if not v.isdigit() or len(v) != 9:
@@ -123,6 +124,7 @@ class ACHTransferRequest(BaseModel):
 
 class WireTransferRequest(BaseModel):
     """Wire transfer request"""
+    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
     from_account_id: str
     bank_name: str = Field(..., max_length=100)
     bank_code: str = Field(..., max_length=10)

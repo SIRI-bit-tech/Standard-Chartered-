@@ -3,9 +3,30 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import {
+  ArrowRightLeft,
+  FileText,
+  ShoppingBag,
+  Building2,
+  CreditCard,
+  Wallet,
+} from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
-import { formatCurrency, formatDate, getTransactionIcon, getTransactionColor } from '@/lib/utils'
+import { useAuthStore } from '@/lib/store'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import { colors } from '@/types'
 import type { Account, Transaction } from '@/types'
+
+const TRANSACTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  payment: ShoppingBag,
+  debit: ShoppingBag,
+  credit: Building2,
+  deposit: Building2,
+  transfer: ArrowRightLeft,
+  withdrawal: Wallet,
+  fee: FileText,
+  interest: Building2,
+}
 
 export default function AccountDetailPage() {
   const params = useParams()
@@ -13,7 +34,9 @@ export default function AccountDetailPage() {
   const [account, setAccount] = useState<Account | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('transactions')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [periodFilter, setPeriodFilter] = useState('30')
+  const { user } = useAuthStore()
 
   useEffect(() => {
     loadAccountDetails()
@@ -21,219 +44,243 @@ export default function AccountDetailPage() {
 
   const loadAccountDetails = async () => {
     try {
-      // Fetch account details
-      const accountResponse = await apiClient.get<{ success: boolean; data: Account }>(`/api/v1/accounts/${accountId}`)
-      if (accountResponse.success) {
-        setAccount(accountResponse.data)
-      }
-
-      // Fetch transactions
-      const transactionsResponse = await apiClient.get<{ success: boolean; data: Transaction[] }>(
-        `/api/v1/accounts/${accountId}/transactions?limit=50`
+      const accountRes = await apiClient.get<{ success: boolean; data: Account }>(
+        `/api/v1/accounts/${accountId}`,
       )
-      if (transactionsResponse.success) {
-        setTransactions(transactionsResponse.data)
-      }
-    } catch (error) {
-      console.error('Failed to load account details:', error)
+      if (accountRes.success) setAccount(accountRes.data)
+
+      const txRes = await apiClient.get<{ success: boolean; data: Transaction[] }>(
+        `/api/v1/accounts/${accountId}/transactions?limit=50`,
+      )
+      if (txRes.success) setTransactions(txRes.data)
+    } catch (e) {
+      console.error('Failed to load account details:', e)
     } finally {
       setLoading(false)
     }
   }
 
+  const filteredTransactions = transactions.filter((t) => {
+    if (typeFilter !== 'all' && t.type !== typeFilter) return false
+    if (periodFilter === '30') {
+      const d = new Date(t.created_at)
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 30)
+      return d >= cutoff
+    }
+    if (periodFilter === '90') {
+      const d = new Date(t.created_at)
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - 90)
+      return d >= cutoff
+    }
+    return true
+  })
+
+  const accountHolderName = user ? `${user.first_name} ${user.last_name}`.trim() || user.email : '—'
+  const isUS = user?.country === 'US'
+
   if (loading) {
-    return <div className="text-center py-12">Loading account details...</div>
+    return (
+      <div className="flex gap-6">
+        <div className="w-64 shrink-0 rounded-xl border p-4" style={{ borderColor: colors.border }}>
+          <div className="h-6 w-24 rounded bg-gray-200 mb-4" />
+          <div className="space-y-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-8 rounded bg-gray-100" />
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 space-y-4">
+          <div className="h-32 rounded-xl bg-gray-100" />
+          <div className="h-96 rounded-xl bg-gray-100" />
+        </div>
+      </div>
+    )
   }
 
   if (!account) {
-    return <div className="text-center py-12">Account not found</div>
+    return (
+      <div className="py-12 text-center">
+        <p style={{ color: colors.textSecondary }}>Account not found</p>
+        <Link href="/dashboard/accounts" className="mt-2 inline-block text-sm font-medium" style={{ color: colors.primary }}>
+          Back to Accounts
+        </Link>
+      </div>
+    )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/accounts" className="text-primary hover:underline">
+    <div className="flex flex-col gap-6 lg:flex-row">
+      {/* Left: Quick Actions + Account Details */}
+      <aside
+        className="w-full shrink-0 rounded-xl border p-6 lg:w-72"
+        style={{ borderColor: colors.border, backgroundColor: colors.white }}
+      >
+        <h2 className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.gray600 }}>
+          Account Details
+        </h2>
+        <dl className="mt-3 space-y-2 text-sm">
+          <div className="flex justify-between">
+            <dt style={{ color: colors.textSecondary }}>Interest Rate</dt>
+            <dd style={{ color: colors.textPrimary }}>{account.interest_rate ?? 0}% p.a.</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt style={{ color: colors.textSecondary }}>Overdraft Limit</dt>
+            <dd style={{ color: colors.textPrimary }}>
+              {account.overdraft_limit != null ? formatCurrency(account.overdraft_limit, account.currency) : '—'}
+            </dd>
+          </div>
+          <div className="flex justify-between">
+            <dt style={{ color: colors.textSecondary }}>Account Holder</dt>
+            <dd style={{ color: colors.textPrimary }}>{accountHolderName}</dd>
+          </div>
+          {isUS && (
+            <div className="flex justify-between">
+              <dt style={{ color: colors.textSecondary }}>Routing Number</dt>
+              <dd className="font-mono" style={{ color: colors.textPrimary }}>
+                {account.routing_number || '—'}
+              </dd>
+            </div>
+          )}
+        </dl>
+      </aside>
+
+      {/* Right: Available Balance + Transaction History */}
+      <div className="min-w-0 flex-1 space-y-6">
+        <Link href="/dashboard/accounts" className="inline-block text-sm font-medium" style={{ color: colors.primary }}>
           ← Back to Accounts
         </Link>
-      </div>
 
-      {/* Account Overview */}
-      <div className="bg-gradient-to-r from-primary to-primary-dark text-white rounded-xl p-8">
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <p className="text-primary-100 mb-2">{account.type.toUpperCase()} ACCOUNT</p>
-            <h1 className="text-3xl font-bold">{account.nickname || 'Account'}</h1>
-          </div>
-          <span className="text-4xl">💳</span>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div>
-            <p className="text-primary-100 text-sm mb-1">Balance</p>
-            <p className="text-2xl font-bold">{formatCurrency(account.balance, account.currency)}</p>
-          </div>
-          <div>
-            <p className="text-primary-100 text-sm mb-1">Available</p>
-            <p className="text-2xl font-bold">
-              {formatCurrency(account.available_balance, account.currency)}
-            </p>
-          </div>
-          <div>
-            <p className="text-primary-100 text-sm mb-1">Account Number</p>
-            <p className="text-lg font-mono">****{account.account_number.slice(-4)}</p>
-          </div>
-          <div>
-            <p className="text-primary-100 text-sm mb-1">Status</p>
-            <p className="text-lg capitalize">{account.status}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white border-b border-border">
-        <div className="flex gap-8 px-6 py-4">
-          <button
-            onClick={() => setActiveTab('transactions')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'transactions'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Transactions
-          </button>
-          <button
-            onClick={() => setActiveTab('details')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'details'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Details
-          </button>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="bg-white rounded-xl p-6 border border-border">
-        {activeTab === 'transactions' && (
-          <div>
-            <h2 className="text-xl font-bold text-foreground mb-6">Recent Transactions</h2>
-            {transactions.length > 0 ? (
-              <div className="space-y-3">
-                {transactions.map((transaction: Transaction) => (
-                  <div key={transaction.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-border-light transition">
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="text-2xl">{getTransactionIcon(transaction.type)}</div>
-                    <div className="flex-1">
-                      <p className="font-medium text-foreground">{transaction.description}</p>
-                      <p className="text-sm text-muted-foreground">
-                          {formatDate(transaction.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`font-bold text-lg ${getTransactionColor(transaction.type)}`}>
-                        {transaction.type === 'debit' || transaction.type === 'withdrawal'
-                          ? '-'
-                          : '+'}
-                        {formatCurrency(transaction.amount, transaction.currency)}
-                      </p>
-                      <p className="text-xs text-muted-foreground capitalize">{transaction.status}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No transactions found for this account
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'details' && (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-semibold text-foreground mb-4">Account Information</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Account Type:</span>
-                  <span className="font-medium text-foreground capitalize">{account.type}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Account Number:</span>
-                  <span className="font-mono font-medium text-foreground">
-                    {account.account_number}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Currency:</span>
-                  <span className="font-medium text-foreground">{account.currency}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Status:</span>
-                  <span className="font-medium text-foreground capitalize">{account.status}</span>
-                </div>
-              </div>
-            </div>
-
-            <hr className="border-border" />
-
-            <div>
-              <h3 className="font-semibold text-foreground mb-4">Account Features</h3>
-              <div className="space-y-2">
-                <label className="flex items-center gap-3">
-                  <input type="checkbox" checked={account.is_primary} readOnly />
-                  <span className="text-muted-foreground">Primary Account</span>
-                </label>
-                <label className="flex items-center gap-3">
-                  <input type="checkbox" checked={account.overdraft_enabled} readOnly />
-                  <span className="text-muted-foreground">Overdraft Protection</span>
-                </label>
-              </div>
-            </div>
-
-            <hr className="border-border" />
-
-            <div className="space-y-3">
-              <button className="w-full py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition">
-                Edit Account
-              </button>
-              <button className="w-full py-2 border border-error text-error rounded-lg hover:bg-error/5 transition">
-                Close Account
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Link
-          href="/dashboard/transfers"
-          className="flex items-center justify-center gap-2 p-4 bg-white border border-border rounded-lg hover:border-primary transition"
+        <div
+          className="rounded-xl border p-6"
+          style={{ borderColor: colors.border, backgroundColor: colors.white }}
         >
-          <span className="text-2xl">↔️</span>
-          <span className="font-medium">Transfer</span>
-        </Link>
-        <Link
-          href="/dashboard/bills"
-          className="flex items-center justify-center gap-2 p-4 bg-white border border-border rounded-lg hover:border-primary transition"
+          <p className="text-sm font-medium" style={{ color: colors.textSecondary }}>
+            Available Balance
+          </p>
+          <p className="mt-1 text-3xl font-bold" style={{ color: colors.primary }}>
+            {formatCurrency(account.available_balance, account.currency)}
+          </p>
+          <p className="mt-2 flex items-center gap-2 text-sm" style={{ color: colors.textSecondary }}>
+            <span className="inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: colors.success }} />
+            Active Account • {account.currency}
+          </p>
+        </div>
+
+        <div
+          className="rounded-xl border p-6"
+          style={{ borderColor: colors.border, backgroundColor: colors.white }}
         >
-          <span className="text-2xl">📄</span>
-          <span className="font-medium">Pay Bills</span>
-        </Link>
-        <button className="flex items-center justify-center gap-2 p-4 bg-white border border-border rounded-lg hover:border-primary transition">
-          <span className="text-2xl">📥</span>
-          <span className="font-medium">Deposit</span>
-        </button>
-        <button className="flex items-center justify-center gap-2 p-4 bg-white border border-border rounded-lg hover:border-primary transition">
-          <span className="text-2xl">📤</span>
-          <span className="font-medium">Withdraw</span>
-        </button>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold" style={{ color: colors.textPrimary }}>
+              Transaction History
+            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                className="rounded-lg border px-3 py-1.5 text-sm"
+                style={{ borderColor: colors.border }}
+              >
+                <option value="all">All Types</option>
+                <option value="debit">Debit</option>
+                <option value="credit">Credit</option>
+                <option value="transfer">Transfer</option>
+                <option value="payment">Payment</option>
+                <option value="deposit">Deposit</option>
+                <option value="withdrawal">Withdrawal</option>
+              </select>
+              <select
+                value={periodFilter}
+                onChange={(e) => setPeriodFilter(e.target.value)}
+                className="rounded-lg border px-3 py-1.5 text-sm"
+                style={{ borderColor: colors.border }}
+              >
+                <option value="30">Last 30 Days</option>
+                <option value="90">Last 90 Days</option>
+                <option value="all">All Time</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs font-medium uppercase" style={{ borderColor: colors.border, color: colors.textSecondary }}>
+                  <th className="pb-3 pr-4">Date</th>
+                  <th className="pb-3 pr-4">Description</th>
+                  <th className="pb-3 pr-4">Status</th>
+                  <th className="pb-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center" style={{ color: colors.textSecondary }}>
+                      No transactions found
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTransactions.map((tx) => {
+                    const IconComponent = TRANSACTION_ICONS[tx.type] || CreditCard
+                    const isDebit = tx.type === 'debit' || tx.type === 'withdrawal'
+                    const statusColor =
+                      tx.status === 'completed'
+                        ? colors.success
+                        : tx.status === 'pending'
+                          ? colors.warning
+                          : colors.textSecondary
+                    return (
+                      <tr
+                        key={tx.id}
+                        className="border-b" style={{ borderColor: colors.border }}
+                      >
+                        <td className="py-3 pr-4" style={{ color: colors.textPrimary }}>
+                          {formatDate(tx.created_at)}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <div className="flex items-center gap-2">
+                            <IconComponent className="h-4 w-4 shrink-0" style={{ color: colors.textSecondary }} />
+                            <div>
+                              <p className="font-medium" style={{ color: colors.textPrimary }}>{tx.description}</p>
+                              <p className="text-xs" style={{ color: colors.textSecondary }}>
+                                {tx.type.charAt(0).toUpperCase() + tx.type.slice(1)} - ID: {tx.id.slice(-5)}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span
+                            className="rounded-full px-2 py-0.5 text-xs font-medium"
+                            style={{ backgroundColor: `${statusColor}20`, color: statusColor }}
+                          >
+                            {tx.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right font-semibold" style={{ color: isDebit ? colors.error : colors.success }}>
+                          {isDebit ? '-' : '+'}{formatCurrency(tx.amount, tx.currency)}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredTransactions.length > 0 && (
+            <div className="mt-4 text-center">
+              <Link
+                href={`/dashboard/accounts/${accountId}`}
+                className="text-sm font-medium"
+                style={{ color: colors.primary }}
+              >
+                View More Transactions
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
