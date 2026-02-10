@@ -33,13 +33,13 @@ export default function SupportPage() {
 
     try {
       // Load tickets
-      const ticketsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/support/tickets?user_id=${user.id}&limit=10`)
+      const ticketsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/support/tickets?limit=10`)
       if (ticketsResponse.success) {
         setTickets(ticketsResponse.data)
       }
 
       // Load chats
-      const chatsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/support/chats?user_id=${user.id}`)
+      const chatsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/support/chats`)
       if (chatsResponse.success) {
         setChats(chatsResponse.data)
       }
@@ -57,7 +57,6 @@ export default function SupportPage() {
     setLoading(true)
     try {
       const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/support/ticket', {
-        user_id: user.id,
         ...ticketForm,
       })
 
@@ -79,9 +78,7 @@ export default function SupportPage() {
     if (!user) return
 
     try {
-      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/support/chat/start', {
-        user_id: user.id,
-      })
+      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/support/chat/start', {})
 
       if (response.success) {
         await loadSupportData()
@@ -99,7 +96,6 @@ export default function SupportPage() {
       const response = await apiClient.post<{ success: boolean; data: any }>(
         `/api/v1/support/chat/${selectedChat.id}/message`,
         {
-          user_id: user.id,
           message: messageInput,
         }
       )

@@ -28,9 +28,13 @@ function CopyButton({
 
   const handleCopy = async () => {
     if (!copyValue) return
-    await navigator.clipboard.writeText(copyValue)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(copyValue)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err)
+    }
   }
 
   if (!copyValue) return null
@@ -72,9 +76,13 @@ function AccountNumberWithVisibility({
 
   const handleCopy = async () => {
     if (!fullNumber) return
-    await navigator.clipboard.writeText(fullNumber)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(fullNumber)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err)
+    }
   }
 
   if (!fullNumber) return null

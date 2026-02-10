@@ -5,15 +5,19 @@ from models.user import User
 from models.support import LoginHistory
 from database import get_db
 from datetime import datetime
+from utils.auth import get_current_user_id
 
 router = APIRouter()
 
 
 @router.get("")
-async def get_profile(user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
+async def get_profile(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
     """Get user profile"""
     result = await db.execute(
-        select(User).where(User.id == user_id)
+        select(User).where(User.id == current_user_id)
     )
     user = result.scalar()
     
@@ -42,7 +46,7 @@ async def get_profile(user_id: str = Query(...), db: AsyncSession = Depends(get_
 
 @router.put("")
 async def update_profile(
-    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     first_name: str = None,
     last_name: str = None,
     phone: str = None,
@@ -51,7 +55,7 @@ async def update_profile(
 ):
     """Update profile"""
     result = await db.execute(
-        select(User).where(User.id == user_id)
+        select(User).where(User.id == current_user_id)
     )
     user = result.scalar()
     
@@ -79,7 +83,7 @@ async def update_profile(
 
 
 @router.get("/settings")
-async def get_settings(user_id: str = Query(...)):
+async def get_settings(current_user_id: str = Depends(get_current_user_id)):
     """Get user settings"""
     return {
         "success": True,
@@ -93,7 +97,11 @@ async def get_settings(user_id: str = Query(...)):
 
 
 @router.put("/settings")
-async def update_settings(user_id: str, theme: str = None, language: str = None):
+async def update_settings(
+    current_user_id: str = Depends(get_current_user_id),
+    theme: str = None,
+    language: str = None
+):
     """Update settings"""
     return {
         "success": True,
@@ -104,9 +112,9 @@ async def update_settings(user_id: str, theme: str = None, language: str = None)
 
 @router.post("/documents/upload")
 async def upload_document(
-    user_id: str,
     document_type: str,
-    file_url: str
+    file_url: str,
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Upload ID document"""
     return {
@@ -118,13 +126,13 @@ async def upload_document(
 
 @router.get("/documents")
 async def get_documents(
-    user_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get uploaded documents"""
     from models.document import Document
     result = await db.execute(
-        select(Document).where(Document.user_id == user_id)
+        select(Document).where(Document.user_id == current_user_id)
     )
     documents = result.scalars().all()
     
@@ -146,14 +154,14 @@ async def get_documents(
 
 @router.get("/login-history")
 async def get_login_history(
-    user_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
     limit: int = Query(20),
     db: AsyncSession = Depends(get_db)
 ):
     """Get login history"""
     result = await db.execute(
         select(LoginHistory)
-        .where(LoginHistory.user_id == user_id)
+        .where(LoginHistory.user_id == current_user_id)
         .order_by(LoginHistory.created_at.desc())
         .limit(limit)
     )

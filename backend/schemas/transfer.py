@@ -3,6 +3,8 @@ from typing import Optional
 from datetime import datetime
 from enum import Enum
 
+from schemas.pin_policy import validate_transfer_pin_strength
+
 
 class TransferType(str, Enum):
     INTERNAL = "internal"
@@ -27,25 +29,33 @@ class BeneficiaryType(str, Enum):
 
 class InternalTransferRequest(BaseModel):
     """Internal transfer request"""
-    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
+    transfer_pin: str = Field(..., regex=r"^\d{4}$", description="4-digit transfer PIN")
     from_account_id: str
     to_account_id: str
     amount: float = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=200)
 
+    @validator("transfer_pin")
+    def validate_transfer_pin_strength(cls, v: str) -> str:
+        return validate_transfer_pin_strength(v)
+
 
 class DomesticTransferRequest(BaseModel):
     """Domestic transfer request"""
-    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
+    transfer_pin: str = Field(..., regex=r"^\d{4}$", description="4-digit transfer PIN")
     from_account_id: str
     to_account_number: str = Field(..., max_length=40)
     amount: float = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=200)
 
+    @validator("transfer_pin")
+    def validate_transfer_pin_strength(cls, v: str) -> str:
+        return validate_transfer_pin_strength(v)
+
 
 class InternationalTransferRequest(BaseModel):
     """International transfer request"""
-    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
+    transfer_pin: str = Field(..., regex=r"^\d{4}$", description="4-digit transfer PIN")
     from_account_id: str
     beneficiary_bank_name: str = Field(..., max_length=100)
     beneficiary_account_number: str = Field(..., max_length=30)
@@ -56,6 +66,10 @@ class InternationalTransferRequest(BaseModel):
     swift_code: Optional[str] = Field(None, max_length=11)
     iban: Optional[str] = Field(None, max_length=34)
     purpose: Optional[str] = Field(None, max_length=200)
+
+    @validator("transfer_pin")
+    def validate_transfer_pin_strength(cls, v: str) -> str:
+        return validate_transfer_pin_strength(v)
 
     @validator('target_currency')
     def validate_currency(cls, v):
@@ -106,7 +120,7 @@ class TransferFeeResponse(BaseModel):
 
 class ACHTransferRequest(BaseModel):
     """ACH transfer request"""
-    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
+    transfer_pin: str = Field(..., regex=r"^\d{4}$", description="4-digit transfer PIN")
     from_account_id: str
     routing_number: str = Field(..., max_length=9)
     account_number: str = Field(..., max_length=20)
@@ -114,6 +128,10 @@ class ACHTransferRequest(BaseModel):
     amount: float = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=200)
     reference: Optional[str] = Field(None, max_length=50)
+
+    @validator("transfer_pin")
+    def validate_transfer_pin_strength(cls, v: str) -> str:
+        return validate_transfer_pin_strength(v)
 
     @validator('routing_number')
     def validate_routing(cls, v):
@@ -124,7 +142,7 @@ class ACHTransferRequest(BaseModel):
 
 class WireTransferRequest(BaseModel):
     """Wire transfer request"""
-    transfer_pin: str = Field(..., min_length=4, max_length=4, description="4-digit transfer PIN")
+    transfer_pin: str = Field(..., regex=r"^\d{4}$", description="4-digit transfer PIN")
     from_account_id: str
     bank_name: str = Field(..., max_length=100)
     bank_code: str = Field(..., max_length=10)
@@ -137,21 +155,9 @@ class WireTransferRequest(BaseModel):
     swift_code: Optional[str] = Field(None, max_length=11)
     iban: Optional[str] = Field(None, max_length=34)
 
-
-class TransferResponse(BaseModel):
-    """Transfer response"""
-    id: str
-    type: str
-    status: str
-    amount: float
-    currency: str
-    fee_amount: float
-    total_amount: float
-    reference_number: str
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    @validator("transfer_pin")
+    def validate_transfer_pin_strength(cls, v: str) -> str:
+        return validate_transfer_pin_strength(v)
 
 
 class TransferStatusUpdateResponse(BaseModel):

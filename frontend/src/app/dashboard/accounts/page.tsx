@@ -30,7 +30,7 @@ export default function AccountsPage() {
     if (!user) return
     try {
       const res = await apiClient.get<{ success: boolean; data: Account[] }>(
-        `/api/v1/accounts?user_id=${user.id}`,
+        `/api/v1/accounts`,
       )
       if (res.success && res.data) setAccounts(res.data)
     } catch (e) {

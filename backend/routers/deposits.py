@@ -14,14 +14,15 @@ from schemas.deposit import (
     DepositListResponse, DepositVerificationRequest, DepositStatusUpdateResponse
 )
 from utils.ably import AblyRealtimeManager
+from utils.auth import get_current_user_id
 
 router = APIRouter(prefix="/deposits", tags=["deposits"])
 
 
 @router.post("/check-deposit", response_model=DepositStatusUpdateResponse)
 async def initiate_check_deposit(
-    user_id: str,
     request: CheckDepositRequest,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Initiate mobile check deposit"""
@@ -31,7 +32,7 @@ async def initiate_check_deposit(
         )
         account = account_result.scalar()
         
-        if not account or account.user_id != user_id:
+        if not account or account.user_id != current_user_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account not found"
@@ -42,7 +43,7 @@ async def initiate_check_deposit(
         deposit = Deposit(
             id=str(uuid.uuid4()),
             account_id=request.account_id,
-            user_id=user_id,
+            user_id=current_user_id,
             type=DepositType.MOBILE_CHECK_DEPOSIT,
             status=DepositStatus.PENDING,
             amount=request.amount,
@@ -59,7 +60,7 @@ async def initiate_check_deposit(
         await db.refresh(deposit)
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "check_deposit_initiated",
             "Check Deposit Initiated",
             f"Check deposit of {request.currency} {request.amount} initiated. Verification code sent."
@@ -82,15 +83,15 @@ async def initiate_check_deposit(
 
 @router.post("/verify-check-deposit", response_model=DepositStatusUpdateResponse)
 async def verify_check_deposit(
-    user_id: str,
     request: DepositVerificationRequest,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Verify check deposit with verification code"""
     try:
         deposit_result = await db.execute(
             select(Deposit).where(
-                (Deposit.id == request.deposit_id) & (Deposit.user_id == user_id)
+                (Deposit.id == request.deposit_id) & (Deposit.user_id == current_user_id)
             )
         )
         deposit = deposit_result.scalar()
@@ -114,7 +115,7 @@ async def verify_check_deposit(
         await db.commit()
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "check_deposit_verified",
             "Check Verified",
             f"Check deposit of {deposit.currency} {deposit.amount} has been verified and is being processed."
@@ -137,8 +138,8 @@ async def verify_check_deposit(
 
 @router.post("/direct-deposit/setup", response_model=DepositStatusUpdateResponse)
 async def setup_direct_deposit(
-    user_id: str,
     request: DirectDepositSetupRequest,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Setup direct deposit"""
@@ -148,7 +149,7 @@ async def setup_direct_deposit(
         )
         account = account_result.scalar()
         
-        if not account or account.user_id != user_id:
+        if not account or account.user_id != current_user_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account not found"
@@ -157,7 +158,7 @@ async def setup_direct_deposit(
         deposit = Deposit(
             id=str(uuid.uuid4()),
             account_id=request.account_id,
-            user_id=user_id,
+            user_id=current_user_id,
             type=DepositType.DIRECT_DEPOSIT,
             status=DepositStatus.COMPLETED,
             amount=0.0,
@@ -177,7 +178,7 @@ async def setup_direct_deposit(
         await db.refresh(deposit)
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "direct_deposit_setup",
             "Direct Deposit Setup",
             "Direct deposit has been setup successfully. You can now receive employer payments."
@@ -200,13 +201,13 @@ async def setup_direct_deposit(
 
 @router.get("/list", response_model=DepositListResponse)
 async def list_deposits(
-    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """List all deposits for user"""
     try:
         deposits_result = await db.execute(
-            select(Deposit).where(Deposit.user_id == user_id)
+            select(Deposit).where(Deposit.user_id == current_user_id)
         )
         deposits = deposits_result.scalars().all()
         
@@ -228,15 +229,15 @@ async def list_deposits(
 
 @router.get("/{deposit_id}", response_model=DepositResponse)
 async def get_deposit(
-    user_id: str,
     deposit_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get deposit details"""
     try:
         deposit_result = await db.execute(
             select(Deposit).where(
-                (Deposit.id == deposit_id) & (Deposit.user_id == user_id)
+                (Deposit.id == deposit_id) & (Deposit.user_id == current_user_id)
             )
         )
         deposit = deposit_result.scalar()
@@ -259,15 +260,15 @@ async def get_deposit(
 
 @router.delete("/{deposit_id}")
 async def cancel_deposit(
-    user_id: str,
     deposit_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Cancel pending deposit"""
     try:
         deposit_result = await db.execute(
             select(Deposit).where(
-                (Deposit.id == deposit_id) & (Deposit.user_id == user_id)
+                (Deposit.id == deposit_id) & (Deposit.user_id == current_user_id)
             )
         )
         deposit = deposit_result.scalar()
@@ -289,7 +290,7 @@ async def cancel_deposit(
         await db.commit()
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "deposit_cancelled",
             "Deposit Cancelled",
             f"Deposit {deposit.reference_number} has been cancelled."

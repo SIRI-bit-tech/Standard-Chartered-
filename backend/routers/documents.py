@@ -11,6 +11,7 @@ from schemas.document import (
 )
 from utils.cloudinary import CloudinaryManager
 from utils.ably import AblyRealtimeManager
+from utils.auth import get_current_user_id
 import os
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -26,12 +27,12 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 async def get_upload_url(
     document_type: str,
     file_name: str,
-    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get signed upload URL for direct client-side upload"""
     try:
-        result = await db.execute(select(User).where(User.id == user_id))
+        result = await db.execute(select(User).where(User.id == current_user_id))
         if not result.scalar():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -58,14 +59,14 @@ async def get_upload_url(
 
 @router.post("/upload")
 async def upload_document(
-    user_id: str,
     document_type: str,
     file: UploadFile = File(...),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Upload document with server-side processing"""
     try:
-        result = await db.execute(select(User).where(User.id == user_id))
+        result = await db.execute(select(User).where(User.id == current_user_id))
         user = result.scalar()
         if not user:
             raise HTTPException(
@@ -101,12 +102,12 @@ async def upload_document(
             cloudinary_response = CloudinaryManager.upload_document(
                 temp_path,
                 document_type,
-                user_id
+                current_user_id
             )
             
             document = Document(
                 id=str(uuid.uuid4()),
-                user_id=user_id,
+                user_id=current_user_id,
                 document_type=document_type,
                 file_name=file.filename,
                 file_url=cloudinary_response["url"],
@@ -119,7 +120,7 @@ async def upload_document(
             await db.refresh(document)
             
             AblyRealtimeManager.publish_notification(
-                user_id,
+                current_user_id,
                 "document_uploaded",
                 "Document Uploaded",
                 f"Your {document_type} document uploaded successfully."
@@ -144,13 +145,13 @@ async def upload_document(
 
 @router.get("/list", response_model=DocumentListResponse)
 async def list_documents(
-    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """List all user documents"""
     try:
         result = await db.execute(
-            select(Document).where(Document.user_id == user_id)
+            select(Document).where(Document.user_id == current_user_id)
         )
         documents = result.scalars().all()
         
@@ -168,14 +169,14 @@ async def list_documents(
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: str,
-    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get document details"""
     try:
         result = await db.execute(
             select(Document).where(
-                (Document.id == document_id) & (Document.user_id == user_id)
+                (Document.id == document_id) & (Document.user_id == current_user_id)
             )
         )
         document = result.scalar()
@@ -199,14 +200,14 @@ async def get_document(
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: str,
-    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Delete document"""
     try:
         result = await db.execute(
             select(Document).where(
-                (Document.id == document_id) & (Document.user_id == user_id)
+                (Document.id == document_id) & (Document.user_id == current_user_id)
             )
         )
         document = result.scalar()
@@ -221,7 +222,7 @@ async def delete_document(
         await db.commit()
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "document_deleted",
             "Document Deleted",
             f"Your {document.document_type} has been deleted."

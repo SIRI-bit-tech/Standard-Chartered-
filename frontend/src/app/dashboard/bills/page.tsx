@@ -31,14 +31,14 @@ export default function BillsPage() {
 
     try {
       // Load payees
-      const payeesResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/bills/payees?user_id=${user.id}`)
+      const payeesResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/bills/payees`)
       if (payeesResponse.success && payeesResponse.data) {
         setPayees(payeesResponse.data)
       }
 
       // Load history
       const historyResponse = await apiClient.get<{ success: boolean; data: any[] }>(
-        `/api/v1/bills/history?user_id=${user.id}&limit=20`
+        `/api/v1/bills/history?limit=20`
       )
       if (historyResponse.success && historyResponse.data) {
         setHistory(historyResponse.data)
@@ -46,7 +46,7 @@ export default function BillsPage() {
 
       // Load scheduled
       const scheduledResponse = await apiClient.get<{ success: boolean; data: any[] }>(
-        `/api/v1/bills/scheduled?user_id=${user.id}`
+        `/api/v1/bills/scheduled`
       )
       if (scheduledResponse.success && scheduledResponse.data) {
         setScheduled(scheduledResponse.data)
@@ -65,7 +65,6 @@ export default function BillsPage() {
     setLoading(true)
     try {
       const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/bills/payees', {
-        user_id: user.id,
         ...payeeForm,
       })
 

@@ -9,9 +9,23 @@ import { CreateVirtualCardForm } from '@/components/cards/create-virtual-card-fo
 import { VirtualCardList } from '@/components/cards/virtual-card-list';
 import { PlusIcon, CreditCard } from 'lucide-react';
 
+interface VirtualCard {
+  id: string;
+  card_name: string;
+  card_number: string;
+  expiry_month: number;
+  expiry_year: number;
+  status: string;
+  card_type: string;
+  spending_limit?: number;
+  spent_this_month: number;
+  total_transactions: number;
+  created_at: string;
+}
+
 export default function VirtualCardsPage() {
   const { user } = useAuth();
-  const [cards, setCards] = useState([]);
+  const [cards, setCards] = useState<VirtualCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -22,9 +36,23 @@ export default function VirtualCardsPage() {
   async function fetchCards() {
     try {
       if (!user?.id) return;
-      const response = await apiClient.get(`/api/v1/cards/list?user_id=${user.id}`);
-      if (response.data.success) {
-        setCards(response.data.cards);
+      const response = await apiClient.get<{ success: boolean; cards: Array<Partial<VirtualCard>> }>(`/api/v1/cards/list`);
+      if (response.success) {
+        setCards(
+          (response.cards ?? []).map((c) => ({
+            id: c.id ?? '',
+            card_name: c.card_name ?? '',
+            card_number: c.card_number ?? '',
+            expiry_month: c.expiry_month ?? 0,
+            expiry_year: c.expiry_year ?? 0,
+            status: c.status ?? 'inactive',
+            card_type: c.card_type ?? 'virtual',
+            spending_limit: c.spending_limit,
+            spent_this_month: c.spent_this_month ?? 0,
+            total_transactions: c.total_transactions ?? 0,
+            created_at: c.created_at ?? '',
+          }))
+        );
       }
     } catch (error) {
       console.error('Failed to fetch virtual cards:', error);

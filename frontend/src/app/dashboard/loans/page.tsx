@@ -38,14 +38,14 @@ export default function LoansPage() {
 
       // Load applications
       const applicationsResponse = await apiClient.get<{ success: boolean; data: LoanApplication[] }>(
-        `/api/v1/loans/applications?user_id=${user.id}`
+        `/api/v1/loans/applications`
       )
       if (applicationsResponse.success && applicationsResponse.data) {
         setApplications(applicationsResponse.data)
       }
 
       // Load active loans
-      const loansResponse = await apiClient.get<{ success: boolean; data: Loan[] }>(`/api/v1/loans/accounts?user_id=${user.id}`)
+      const loansResponse = await apiClient.get<{ success: boolean; data: Loan[] }>(`/api/v1/loans/accounts`)
       if (loansResponse.success && loansResponse.data) {
         setLoans(loansResponse.data)
       }
@@ -63,7 +63,6 @@ export default function LoansPage() {
     setLoading(true)
     try {
       const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/loans/apply', {
-        user_id: user.id,
         product_id: selectedProduct.id,
         requested_amount: applicationData.amount,
         requested_term: applicationData.term,

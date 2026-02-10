@@ -13,6 +13,7 @@ interface TransferSummaryCardProps {
   disclaimer?: string
   secureMessage?: string
   loading?: boolean
+  confirmDisabled?: boolean
   className?: string
 }
 
@@ -24,6 +25,7 @@ export function TransferSummaryCard({
   disclaimer,
   secureMessage,
   loading,
+  confirmDisabled,
   className,
 }: TransferSummaryCardProps) {
   return (
@@ -80,7 +82,7 @@ export function TransferSummaryCard({
       <Button
         className="mt-4 w-full"
         onClick={onConfirm}
-        disabled={loading || summary.amount <= 0}
+        disabled={loading || summary.amount <= 0 || confirmDisabled}
       >
         {loading ? 'Processing...' : confirmLabel}
         <ChevronRight className="ml-2 h-4 w-4" />

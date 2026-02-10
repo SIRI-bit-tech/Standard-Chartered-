@@ -5,17 +5,21 @@ from models.support import SupportTicket, TicketMessage, Chat, ChatMessage
 from database import get_db
 import uuid
 from datetime import datetime
+from utils.auth import get_current_user_id
 
 router = APIRouter()
 
 
 # Chat endpoints
 @router.post("/chat/start")
-async def start_chat(user_id: str, db: AsyncSession = Depends(get_db)):
+async def start_chat(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
     """Start chat with relationship manager"""
     new_chat = Chat(
         id=str(uuid.uuid4()),
-        user_id=user_id,
+        user_id=current_user_id,
         status="active",
         created_at=datetime.utcnow()
     )
@@ -33,16 +37,21 @@ async def start_chat(user_id: str, db: AsyncSession = Depends(get_db)):
 @router.post("/chat/{chat_id}/message")
 async def send_chat_message(
     chat_id: str,
-    user_id: str,
     message: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Send message in chat"""
+    chat_result = await db.execute(select(Chat).where(Chat.id == chat_id))
+    chat = chat_result.scalar()
+    if not chat or chat.user_id != current_user_id:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
     new_message = ChatMessage(
         id=str(uuid.uuid4()),
         chat_id=chat_id,
-        user_id=user_id,
-        sender_id=user_id,
+        user_id=current_user_id,
+        sender_id=current_user_id,
         message=message,
         is_from_agent=False,
         created_at=datetime.utcnow()
@@ -62,9 +71,15 @@ async def send_chat_message(
 async def get_chat_messages(
     chat_id: str,
     limit: int = Query(50),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get chat messages"""
+    chat_result = await db.execute(select(Chat).where(Chat.id == chat_id))
+    chat = chat_result.scalar()
+    if not chat or chat.user_id != current_user_id:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
     result = await db.execute(
         select(ChatMessage)
         .where(ChatMessage.chat_id == chat_id)
@@ -90,11 +105,14 @@ async def get_chat_messages(
 
 
 @router.get("/chats")
-async def get_chats(user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
+async def get_chats(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
     """Get all chat sessions"""
     result = await db.execute(
         select(Chat)
-        .where(Chat.user_id == user_id)
+        .where(Chat.user_id == current_user_id)
         .order_by(Chat.created_at.desc())
     )
     chats = result.scalars().all()
@@ -116,17 +134,17 @@ async def get_chats(user_id: str = Query(...), db: AsyncSession = Depends(get_db
 # Support ticket endpoints
 @router.post("/ticket")
 async def create_support_ticket(
-    user_id: str,
     subject: str,
     description: str,
     category: str = None,
     priority: str = "medium",
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Create support ticket"""
     new_ticket = SupportTicket(
         id=str(uuid.uuid4()),
-        user_id=user_id,
+        user_id=current_user_id,
         ticket_number=f"TKT{str(uuid.uuid4())[:8].upper()}",
         subject=subject,
         description=description,
@@ -148,14 +166,14 @@ async def create_support_ticket(
 
 @router.get("/tickets")
 async def get_support_tickets(
-    user_id: str = Query(...),
     limit: int = Query(20),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get user support tickets"""
     result = await db.execute(
         select(SupportTicket)
-        .where(SupportTicket.user_id == user_id)
+        .where(SupportTicket.user_id == current_user_id)
         .order_by(SupportTicket.created_at.desc())
         .limit(limit)
     )

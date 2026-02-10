@@ -4,16 +4,26 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { apiClient } from '@/lib/api-client';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckDepositForm } from '@/components/deposits/check-deposit-form';
 import { DirectDepositForm } from '@/components/deposits/direct-deposit-form';
 import { DepositList } from '@/components/deposits/deposit-list';
 import { ArrowDownLeft, Zap } from 'lucide-react';
 
+interface Deposit {
+  id: string;
+  type: string;
+  status: string;
+  amount: number;
+  currency: string;
+  reference_number: string;
+  created_at: string;
+  is_verified?: boolean;
+}
+
 export default function DepositsPage() {
   const { user } = useAuth();
-  const [deposits, setDeposits] = useState([]);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState('check');
 
@@ -24,9 +34,9 @@ export default function DepositsPage() {
   async function fetchDeposits() {
     try {
       if (!user?.id) return;
-      const response = await apiClient.get(`/api/v1/deposits/list?user_id=${user.id}`);
-      if (response.data.success) {
-        setDeposits(response.data.deposits);
+      const response = await apiClient.get<{ success: boolean; deposits: Deposit[] }>(`/api/v1/deposits/list`);
+      if (response.success) {
+        setDeposits(response.deposits);
       }
     } catch (error) {
       console.error('Failed to fetch deposits:', error);

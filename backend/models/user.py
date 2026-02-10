@@ -32,6 +32,8 @@ class User(Base):
     # Authentication
     password_hash = Column(String, nullable=False)
     transfer_pin = Column(String, nullable=True)  # 4-digit PIN for transfers
+    transfer_pin_failed_attempts = Column(Integer, default=0, nullable=False)
+    transfer_pin_locked_until = Column(DateTime, nullable=True)
     email_verification_token = Column(String, nullable=True)
     email_verification_expires = Column(Float, nullable=True)
     password_reset_token = Column(String, nullable=True)
