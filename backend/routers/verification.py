@@ -9,14 +9,22 @@ import logging
 from database import get_db
 from models.user import User
 from schemas.verification import (
-    EmailVerificationRequest, 
-    ResendVerificationRequest, 
+    EmailVerificationRequest,
+    ResendVerificationRequest,
     SetTransferPinRequest,
-    AuthResponse
+    VerifyTransferPinRequest,
+    AuthResponse,
 )
 from services.email import email_service
 from services.account import AccountService
-from utils.auth import hash_password, verify_password, create_access_token, create_refresh_token, verify_token
+from utils.auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    verify_token,
+    get_current_user_id,
+)
 from utils.errors import NotFoundError, ValidationError, ConflictError
 
 logger = logging.getLogger(__name__)
@@ -253,3 +261,24 @@ async def set_transfer_pin(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to set transfer PIN. Please try again."
         )
+
+
+@router.post("/verify-transfer-pin", response_model=AuthResponse)
+async def verify_transfer_pin(
+    request: VerifyTransferPinRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify transfer PIN before initiating a transfer. Requires Bearer token."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.transfer_pin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Transfer PIN not set. Please set your PIN first.",
+        )
+    if not verify_password(request.transfer_pin, user.transfer_pin):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid transfer PIN")
+    return AuthResponse(success=True, message="PIN verified", data=None)

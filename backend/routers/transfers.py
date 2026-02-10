@@ -1,12 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from models.transfer import Transfer, TransferStatus, TransferType
+from models.transfer import Transfer, TransferStatus, TransferType, Beneficiary
 from models.account import Account
+from models.user import User
 from database import get_db
 from schemas.transfer import (
-    ACHTransferRequest, WireTransferRequest, TransferResponse, TransferStatusUpdateResponse
+    InternalTransferRequest,
+    DomesticTransferRequest,
+    InternationalTransferRequest,
+    ACHTransferRequest,
+    WireTransferRequest,
+    TransferResponse,
+    TransferStatusUpdateResponse,
 )
+from utils.auth import get_current_user_id, verify_password
 from utils.ably import AblyRealtimeManager
 import uuid
 from datetime import datetime
@@ -14,87 +22,98 @@ from datetime import datetime
 router = APIRouter(prefix="/transfers", tags=["transfers"])
 
 
+async def _verify_transfer_pin(db: AsyncSession, user_id: str, transfer_pin: str) -> None:
+    """Verify user's transfer PIN; raises HTTPException if invalid."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.transfer_pin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Transfer PIN not set. Please set your PIN first.",
+        )
+    if not verify_password(transfer_pin, user.transfer_pin):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid transfer PIN")
+
+
 @router.post("/internal")
 async def internal_transfer(
-    from_account_id: str,
-    to_account_id: str,
-    amount: float,
-    description: str = None,
-    db: AsyncSession = Depends(get_db)
+    request: InternalTransferRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Internal transfer between own accounts"""
+    """Internal transfer between own accounts. Requires PIN."""
+    await _verify_transfer_pin(db, user_id, request.transfer_pin)
     new_transfer = Transfer(
         id=str(uuid.uuid4()),
-        from_account_id=from_account_id,
-        to_account_id=to_account_id,
+        from_account_id=request.from_account_id,
+        from_user_id=user_id,
+        to_account_id=request.to_account_id,
         type=TransferType.INTERNAL,
-        amount=amount,
+        amount=request.amount,
         currency="USD",
         fee_amount=0.0,
-        total_amount=amount,
+        total_amount=request.amount,
         reference_number=str(uuid.uuid4())[:12].upper(),
-        description=description or "Internal Transfer",
+        description=request.description or "Internal Transfer",
         status=TransferStatus.COMPLETED,
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
-    
     db.add(new_transfer)
     await db.commit()
-    
     return {
         "success": True,
         "data": {"transfer_id": new_transfer.id, "reference": new_transfer.reference_number},
-        "message": "Internal transfer completed successfully"
+        "message": "Internal transfer completed successfully",
     }
 
 
 @router.post("/domestic")
 async def domestic_transfer(
-    from_account_id: str,
-    to_account_number: str,
-    amount: float,
-    description: str = None,
-    db: AsyncSession = Depends(get_db)
+    request: DomesticTransferRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Domestic transfer to other SC accounts"""
+    """Domestic transfer to other accounts. Requires PIN."""
+    await _verify_transfer_pin(db, user_id, request.transfer_pin)
     new_transfer = Transfer(
         id=str(uuid.uuid4()),
-        from_account_id=from_account_id,
-        to_account_number=to_account_number,
+        from_account_id=request.from_account_id,
+        from_user_id=user_id,
+        to_account_number=request.to_account_number,
         type=TransferType.DOMESTIC,
-        amount=amount,
+        amount=request.amount,
         currency="USD",
         fee_amount=2.50,
-        total_amount=amount + 2.50,
+        total_amount=request.amount + 2.50,
         reference_number=str(uuid.uuid4())[:12].upper(),
-        description=description or "Domestic Transfer",
+        description=request.description or "Domestic Transfer",
         status=TransferStatus.PROCESSING,
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
-    
     db.add(new_transfer)
     await db.commit()
-    
     return {
         "success": True,
         "data": {"transfer_id": new_transfer.id, "reference": new_transfer.reference_number},
-        "message": "Domestic transfer submitted"
+        "message": "Domestic transfer submitted",
     }
 
 
 @router.post("/ach", response_model=TransferStatusUpdateResponse)
 async def ach_transfer(
-    user_id: str,
     request: ACHTransferRequest,
-    db: AsyncSession = Depends(get_db)
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
-    """ACH transfer to external bank account"""
+    """ACH transfer to external bank account. Requires PIN."""
+    await _verify_transfer_pin(db, user_id, request.transfer_pin)
     try:
         account_result = await db.execute(
             select(Account).where(Account.id == request.from_account_id)
         )
         account = account_result.scalar()
-        
         if not account or account.user_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -144,17 +163,17 @@ async def ach_transfer(
 
 @router.post("/wire", response_model=TransferStatusUpdateResponse)
 async def wire_transfer(
-    user_id: str,
     request: WireTransferRequest,
-    db: AsyncSession = Depends(get_db)
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Wire transfer to external bank account"""
+    """Wire transfer to external bank account. Requires PIN."""
+    await _verify_transfer_pin(db, user_id, request.transfer_pin)
     try:
         account_result = await db.execute(
             select(Account).where(Account.id == request.from_account_id)
         )
         account = account_result.scalar()
-        
         if not account or account.user_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -205,36 +224,34 @@ async def wire_transfer(
 
 @router.post("/international")
 async def international_transfer(
-    from_account_id: str,
-    beneficiary_id: str,
-    amount: float,
-    description: str = None,
-    db: AsyncSession = Depends(get_db)
+    request: InternationalTransferRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
 ):
-    """International wire transfer (SWIFT)"""
+    """International wire transfer (SWIFT). Requires PIN."""
+    await _verify_transfer_pin(db, user_id, request.transfer_pin)
     new_transfer = Transfer(
         id=str(uuid.uuid4()),
-        from_account_id=from_account_id,
-        to_beneficiary_id=beneficiary_id,
+        from_account_id=request.from_account_id,
+        from_user_id=user_id,
+        to_beneficiary_id=None,
         type=TransferType.INTERNATIONAL,
-        amount=amount,
+        amount=request.amount,
         currency="USD",
         fee_amount=25.00,
-        total_amount=amount + 25.00,
+        total_amount=request.amount + 25.00,
         reference_number=str(uuid.uuid4())[:12].upper(),
-        description=description or "International Transfer",
+        description=request.purpose or "International Transfer",
         status=TransferStatus.PENDING,
         requires_mfa=True,
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
-    
     db.add(new_transfer)
     await db.commit()
-    
     return {
         "success": True,
         "data": {"transfer_id": new_transfer.id, "reference": new_transfer.reference_number},
-        "message": "International transfer submitted for approval"
+        "message": "International transfer submitted for approval",
     }
 
 
@@ -265,11 +282,11 @@ async def get_transfer(transfer_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.get("/history")
 async def get_transfer_history(
-    user_id: str = Query(...),
+    user_id: str = Depends(get_current_user_id),
     limit: int = Query(20, le=100),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    """Get transfer history"""
+    """Get transfer history. Requires auth."""
     result = await db.execute(
         select(Transfer)
         .where(Transfer.from_user_id == user_id)
@@ -320,8 +337,11 @@ async def cancel_transfer(transfer_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/beneficiaries")
-async def get_beneficiaries(user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
-    """Get saved beneficiaries"""
+async def get_beneficiaries(
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get saved beneficiaries. Requires auth."""
     result = await db.execute(
         select(Beneficiary)
         .where(Beneficiary.user_id == user_id)
@@ -345,13 +365,13 @@ async def get_beneficiaries(user_id: str = Query(...), db: AsyncSession = Depend
 
 @router.post("/beneficiaries")
 async def add_beneficiary(
-    user_id: str,
-    name: str,
-    account_number: str,
-    transfer_type: str,
-    db: AsyncSession = Depends(get_db)
+    user_id: str = Depends(get_current_user_id),
+    name: str = Query(...),
+    account_number: str = Query(...),
+    transfer_type: str = Query(...),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Add new beneficiary"""
+    """Add new beneficiary. Requires auth."""
     new_beneficiary = Beneficiary(
         id=str(uuid.uuid4()),
         user_id=user_id,

@@ -3,6 +3,7 @@ from jose.exceptions import ExpiredSignatureError, JWTError
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from passlib.context import CryptContext
+from fastapi import Request, HTTPException, status
 from config import settings
 import secrets
 
@@ -77,6 +78,24 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
         return None
     except JWTError:
         return None
+
+
+async def get_current_user_id(request: Request) -> str:
+    """Extract and verify JWT from Authorization header; return user id (sub)."""
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid authorization header",
+        )
+    token = auth.split(" ", 1)[1]
+    payload = verify_token(token)
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+    return str(payload["sub"])
 
 
 def generate_verification_token() -> str:

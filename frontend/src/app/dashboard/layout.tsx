@@ -1,73 +1,38 @@
 'use client'
 
-import React from 'react'
-import { useState } from 'react'
-import Link from 'next/link'
-import { Menu, X } from 'lucide-react'
-import TopHeader from '@/components/navigation/top-header'
+import { useState, useEffect } from 'react'
+import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { DashboardSidebar } from '@/components/dashboard/dashboard-sidebar'
 import BottomNavbar from '@/components/navigation/bottom-navbar'
-
-const navigationItems = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/dashboard/accounts', label: 'Accounts' },
-  { href: '/dashboard/transfers', label: 'Transfers' },
-  { href: '/dashboard/loans', label: 'Loans' },
-  { href: '/dashboard/bills', label: 'Bills' },
-  { href: '/dashboard/deposits', label: 'Deposits' },
-  { href: '/dashboard/virtual-cards', label: 'Cards' },
-  { href: '/dashboard/support', label: 'Support' },
-  { href: '/dashboard/profile', label: 'Profile' },
-]
+import { apiClient } from '@/lib/api-client'
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Ensure API client sends Bearer token for authenticated requests (e.g. transfers with PIN)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('access_token')
+      if (token) apiClient.setAuthToken(token)
+    }
+  }, [])
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Desktop Sidebar - Hidden on mobile */}
-      <div
-        className={`${
-          sidebarOpen ? 'w-64' : 'w-20'
-        } bg-primary text-white transition-all duration-300 border-r border-primary-dark hidden lg:flex flex-col`}
-      >
-        <div className="p-6 flex items-center justify-between">
-          {sidebarOpen && <span className="text-xl font-bold">SC Bank</span>}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1 hover:bg-primary-dark rounded"
-          >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-2">
-          {navigationItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-primary-dark transition text-sm"
-            >
-              {sidebarOpen && <span>{item.label}</span>}
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex flex-col md:pb-0 pb-20">
-        <TopHeader />
-
-        {/* Content */}
+      <DashboardSidebar
+        mobileOpen={mobileMenuOpen}
+        onMobileOpenChange={setMobileMenuOpen}
+      />
+      <div className="flex flex-1 flex-col min-w-0 md:pb-0 pb-20">
+        <DashboardHeader onOpenMobileMenu={() => setMobileMenuOpen(true)} />
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>
-
-      {/* Mobile Bottom Navigation - Hidden on desktop */}
       <BottomNavbar />
     </div>
   )
