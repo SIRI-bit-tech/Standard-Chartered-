@@ -5,20 +5,21 @@ from models.notification import Notification, NotificationPreference
 from database import get_db
 import uuid
 from datetime import datetime
+from utils.auth import get_current_user_id
 
 router = APIRouter()
 
 
 @router.get("")
 async def get_notifications(
-    user_id: str = Query(...),
     limit: int = Query(20),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get user notifications"""
     result = await db.execute(
         select(Notification)
-        .where(Notification.user_id == user_id)
+        .where(Notification.user_id == current_user_id)
         .order_by(Notification.created_at.desc())
         .limit(limit)
     )
@@ -44,6 +45,7 @@ async def get_notifications(
 @router.put("/{notification_id}/read")
 async def mark_as_read(
     notification_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Mark notification as read"""
@@ -53,6 +55,9 @@ async def mark_as_read(
     notification = result.scalar()
     
     if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    if notification.user_id != current_user_id:
         raise HTTPException(status_code=404, detail="Notification not found")
     
     notification.status = "read"
@@ -68,11 +73,14 @@ async def mark_as_read(
 
 
 @router.put("/read-all")
-async def mark_all_read(user_id: str = Query(...), db: AsyncSession = Depends(get_db)):
+async def mark_all_read(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
     """Mark all notifications as read"""
     result = await db.execute(
         select(Notification)
-        .where(Notification.user_id == user_id)
+        .where(Notification.user_id == current_user_id)
         .where(Notification.status == "unread")
     )
     notifications = result.scalars().all()
@@ -93,13 +101,13 @@ async def mark_all_read(user_id: str = Query(...), db: AsyncSession = Depends(ge
 
 @router.get("/settings")
 async def get_notification_settings(
-    user_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get notification preferences"""
     result = await db.execute(
         select(NotificationPreference)
-        .where(NotificationPreference.user_id == user_id)
+        .where(NotificationPreference.user_id == current_user_id)
     )
     preferences = result.scalar()
     
@@ -130,24 +138,24 @@ async def get_notification_settings(
 
 @router.put("/settings")
 async def update_notification_settings(
-    user_id: str,
     email_transactions: bool = None,
     email_security: bool = None,
     sms_transactions: bool = None,
     push_alerts: bool = None,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Update notification preferences"""
     result = await db.execute(
         select(NotificationPreference)
-        .where(NotificationPreference.user_id == user_id)
+        .where(NotificationPreference.user_id == current_user_id)
     )
     preferences = result.scalar()
     
     if not preferences:
         preferences = NotificationPreference(
             id=str(uuid.uuid4()),
-            user_id=user_id,
+            user_id=current_user_id,
             created_at=datetime.utcnow()
         )
         db.add(preferences)

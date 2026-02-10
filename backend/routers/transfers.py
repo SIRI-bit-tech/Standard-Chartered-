@@ -17,14 +17,20 @@ from schemas.transfer import (
 from utils.auth import get_current_user_id, verify_password
 from utils.ably import AblyRealtimeManager
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/transfers", tags=["transfers"])
 
 
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_DURATION = timedelta(hours=1)
+
+
 async def _verify_transfer_pin(db: AsyncSession, user_id: str, transfer_pin: str) -> None:
     """Verify user's transfer PIN; raises HTTPException if invalid."""
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(
+        select(User).where(User.id == user_id).with_for_update()
+    )
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -33,8 +39,35 @@ async def _verify_transfer_pin(db: AsyncSession, user_id: str, transfer_pin: str
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Transfer PIN not set. Please set your PIN first.",
         )
+
+    now = datetime.utcnow()
+    if user.transfer_pin_locked_until and user.transfer_pin_locked_until > now:
+        retry_after = int((user.transfer_pin_locked_until - now).total_seconds())
+        raise HTTPException(
+            status_code=423,
+            detail=f"Transfer PIN locked. Try again in {retry_after} seconds.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     if not verify_password(transfer_pin, user.transfer_pin):
+        user.transfer_pin_failed_attempts = (user.transfer_pin_failed_attempts or 0) + 1
+        if user.transfer_pin_failed_attempts >= MAX_FAILED_ATTEMPTS:
+            user.transfer_pin_locked_until = now + LOCKOUT_DURATION
+            await db.commit()
+            retry_after = int(LOCKOUT_DURATION.total_seconds())
+            raise HTTPException(
+                status_code=423,
+                detail=f"Transfer PIN locked. Try again in {retry_after} seconds.",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+        await db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid transfer PIN")
+
+    if user.transfer_pin_failed_attempts or user.transfer_pin_locked_until:
+        user.transfer_pin_failed_attempts = 0
+        user.transfer_pin_locked_until = None
+        await db.commit()
 
 
 @router.post("/internal")
@@ -44,29 +77,123 @@ async def internal_transfer(
     db: AsyncSession = Depends(get_db),
 ):
     """Internal transfer between own accounts. Requires PIN."""
-    await _verify_transfer_pin(db, user_id, request.transfer_pin)
-    new_transfer = Transfer(
-        id=str(uuid.uuid4()),
-        from_account_id=request.from_account_id,
-        from_user_id=user_id,
-        to_account_id=request.to_account_id,
-        type=TransferType.INTERNAL,
-        amount=request.amount,
-        currency="USD",
-        fee_amount=0.0,
-        total_amount=request.amount,
-        reference_number=str(uuid.uuid4())[:12].upper(),
-        description=request.description or "Internal Transfer",
-        status=TransferStatus.COMPLETED,
-        created_at=datetime.utcnow(),
+    from_account_check = await db.execute(
+        select(Account).where(Account.id == request.from_account_id)
     )
-    db.add(new_transfer)
-    await db.commit()
-    return {
-        "success": True,
-        "data": {"transfer_id": new_transfer.id, "reference": new_transfer.reference_number},
-        "message": "Internal transfer completed successfully",
-    }
+    from_account_preview = from_account_check.scalar_one_or_none()
+    if not from_account_preview:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    if from_account_preview.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    to_account_check = await db.execute(
+        select(Account).where(Account.id == request.to_account_id)
+    )
+    to_account_preview = to_account_check.scalar_one_or_none()
+    if not to_account_preview:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Destination account not found")
+    if to_account_preview.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    await _verify_transfer_pin(db, user_id, request.transfer_pin)
+
+    transfer_id = str(uuid.uuid4())
+    reference_number = str(uuid.uuid4())[:12].upper()
+    fee_amount = 0.0
+    total_amount = request.amount + fee_amount
+
+    try:
+        async with db.begin():
+            from_account_result = await db.execute(
+                select(Account)
+                .where(Account.id == request.from_account_id)
+                .with_for_update()
+            )
+            from_account = from_account_result.scalar_one_or_none()
+            if not from_account:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+
+            to_account_result = await db.execute(
+                select(Account)
+                .where(Account.id == request.to_account_id)
+                .with_for_update()
+            )
+            to_account = to_account_result.scalar_one_or_none()
+            if not to_account:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Destination account not found")
+
+            if from_account.currency != to_account.currency:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Currency mismatch between accounts",
+                )
+
+            if from_account.available_balance < total_amount:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Insufficient funds",
+                )
+
+            from_account.balance -= total_amount
+            from_account.available_balance -= total_amount
+            from_account.updated_at = datetime.utcnow()
+
+            to_account.balance += request.amount
+            to_account.available_balance += request.amount
+            to_account.updated_at = datetime.utcnow()
+
+            new_transfer = Transfer(
+                id=transfer_id,
+                from_account_id=from_account.id,
+                from_user_id=user_id,
+                to_account_id=to_account.id,
+                type=TransferType.INTERNAL,
+                amount=request.amount,
+                currency=from_account.currency,
+                fee_amount=fee_amount,
+                total_amount=total_amount,
+                reference_number=reference_number,
+                description=request.description or "Internal Transfer",
+                status=TransferStatus.COMPLETED,
+                processed_at=datetime.utcnow(),
+                created_at=datetime.utcnow(),
+            )
+            db.add(new_transfer)
+
+        return {
+            "success": True,
+            "data": {"transfer_id": transfer_id, "reference": reference_number},
+            "message": "Internal transfer completed successfully",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        try:
+            db.add(
+                Transfer(
+                    id=transfer_id,
+                    from_account_id=request.from_account_id,
+                    from_user_id=user_id,
+                    to_account_id=request.to_account_id,
+                    type=TransferType.INTERNAL,
+                    amount=request.amount,
+                    currency=from_account_preview.currency,
+                    fee_amount=fee_amount,
+                    total_amount=total_amount,
+                    reference_number=reference_number,
+                    description=request.description or "Internal Transfer",
+                    status=TransferStatus.FAILED,
+                    created_at=datetime.utcnow(),
+                )
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal transfer failed: {str(e)}",
+        )
 
 
 @router.post("/domestic")
@@ -76,6 +203,15 @@ async def domestic_transfer(
     db: AsyncSession = Depends(get_db),
 ):
     """Domestic transfer to other accounts. Requires PIN."""
+    account_result = await db.execute(
+        select(Account).where(Account.id == request.from_account_id)
+    )
+    account = account_result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    if account.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     new_transfer = Transfer(
         id=str(uuid.uuid4()),
@@ -229,6 +365,15 @@ async def international_transfer(
     db: AsyncSession = Depends(get_db),
 ):
     """International wire transfer (SWIFT). Requires PIN."""
+    account_result = await db.execute(
+        select(Account).where(Account.id == request.from_account_id)
+    )
+    account = account_result.scalar_one_or_none()
+    if not account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
+    if account.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     new_transfer = Transfer(
         id=str(uuid.uuid4()),

@@ -5,19 +5,20 @@ from models.bill_payment import BillPayee, BillPayment, ScheduledPayment
 from database import get_db
 import uuid
 from datetime import datetime
+from utils.auth import get_current_user_id
 
 router = APIRouter()
 
 
 @router.get("/payees")
 async def get_bill_payees(
-    user_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get bill payees"""
     result = await db.execute(
         select(BillPayee)
-        .where((BillPayee.user_id == user_id) & (BillPayee.is_active == True))
+        .where((BillPayee.user_id == current_user_id) & (BillPayee.is_active == True))
     )
     payees = result.scalars().all()
     
@@ -37,16 +38,16 @@ async def get_bill_payees(
 
 @router.post("/payees")
 async def add_bill_payee(
-    user_id: str,
     name: str,
     account_number: str,
     category: str = None,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Add new bill payee"""
     new_payee = BillPayee(
         id=str(uuid.uuid4()),
-        user_id=user_id,
+        user_id=current_user_id,
         name=name,
         account_number=account_number,
         category=category,
@@ -66,18 +67,18 @@ async def add_bill_payee(
 
 @router.post("/pay")
 async def pay_bill(
-    user_id: str,
     account_id: str,
     payee_id: str,
     amount: float,
     payment_date: str,
     reference: str = None,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Pay bill"""
     new_payment = BillPayment(
         id=str(uuid.uuid4()),
-        user_id=user_id,
+        user_id=current_user_id,
         account_id=account_id,
         payee_id=payee_id,
         amount=amount,
@@ -100,14 +101,14 @@ async def pay_bill(
 
 @router.get("/history")
 async def get_payment_history(
-    user_id: str = Query(...),
     limit: int = Query(20),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get bill payment history"""
     result = await db.execute(
         select(BillPayment)
-        .where(BillPayment.user_id == user_id)
+        .where(BillPayment.user_id == current_user_id)
         .order_by(BillPayment.created_at.desc())
         .limit(limit)
     )
@@ -132,19 +133,19 @@ async def get_payment_history(
 
 @router.post("/schedule")
 async def schedule_payment(
-    user_id: str,
     account_id: str,
     payee_id: str,
     amount: float,
     frequency: str,
     start_date: str,
     end_date: str = None,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Schedule recurring bill payment"""
     new_schedule = ScheduledPayment(
         id=str(uuid.uuid4()),
-        user_id=user_id,
+        user_id=current_user_id,
         account_id=account_id,
         payee_id=payee_id,
         amount=amount,
@@ -169,13 +170,13 @@ async def schedule_payment(
 
 @router.get("/scheduled")
 async def get_scheduled_payments(
-    user_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get scheduled payments"""
     result = await db.execute(
         select(ScheduledPayment)
-        .where((ScheduledPayment.user_id == user_id) & (ScheduledPayment.is_active == True))
+        .where((ScheduledPayment.user_id == current_user_id) & (ScheduledPayment.is_active == True))
     )
     scheduled = result.scalars().all()
     

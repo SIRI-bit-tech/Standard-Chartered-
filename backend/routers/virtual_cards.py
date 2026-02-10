@@ -16,6 +16,7 @@ from schemas.virtual_card import (
     VirtualCardBlockRequest, VirtualCardLimitUsageResponse
 )
 from utils.ably import AblyRealtimeManager
+from utils.auth import get_current_user_id
 
 router = APIRouter(prefix="/virtual-cards", tags=["virtual-cards"])
 
@@ -39,8 +40,8 @@ def get_expiry_dates():
 
 @router.post("/create", response_model=VirtualCardDetailResponse)
 async def create_virtual_card(
-    user_id: str,
     request: CreateVirtualCardRequest,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new virtual card"""
@@ -50,7 +51,7 @@ async def create_virtual_card(
         )
         account = account_result.scalar()
         
-        if not account or account.user_id != user_id:
+        if not account or account.user_id != current_user_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account not found"
@@ -60,7 +61,7 @@ async def create_virtual_card(
         
         virtual_card = VirtualCard(
             id=str(uuid.uuid4()),
-            user_id=user_id,
+            user_id=current_user_id,
             account_id=request.account_id,
             card_number=generate_virtual_card_number(),
             card_type=request.card_type,
@@ -86,7 +87,7 @@ async def create_virtual_card(
         await db.refresh(virtual_card)
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "virtual_card_created",
             "Virtual Card Created",
             f"Your virtual card '{request.card_name}' has been created successfully."
@@ -104,13 +105,13 @@ async def create_virtual_card(
 
 @router.get("/list", response_model=VirtualCardListResponse)
 async def list_virtual_cards(
-    user_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """List all virtual cards for user"""
     try:
         cards_result = await db.execute(
-            select(VirtualCard).where(VirtualCard.user_id == user_id)
+            select(VirtualCard).where(VirtualCard.user_id == current_user_id)
         )
         cards = cards_result.scalars().all()
         
@@ -132,15 +133,15 @@ async def list_virtual_cards(
 
 @router.get("/{card_id}", response_model=VirtualCardDetailResponse)
 async def get_virtual_card(
-    user_id: str,
     card_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get virtual card details"""
     try:
         card_result = await db.execute(
             select(VirtualCard).where(
-                (VirtualCard.id == card_id) & (VirtualCard.user_id == user_id)
+                (VirtualCard.id == card_id) & (VirtualCard.user_id == current_user_id)
             )
         )
         card = card_result.scalar()
@@ -163,16 +164,16 @@ async def get_virtual_card(
 
 @router.patch("/{card_id}", response_model=VirtualCardResponse)
 async def update_virtual_card(
-    user_id: str,
     card_id: str,
     request: UpdateVirtualCardRequest,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Update virtual card"""
     try:
         card_result = await db.execute(
             select(VirtualCard).where(
-                (VirtualCard.id == card_id) & (VirtualCard.user_id == user_id)
+                (VirtualCard.id == card_id) & (VirtualCard.user_id == current_user_id)
             )
         )
         card = card_result.scalar()
@@ -206,7 +207,7 @@ async def update_virtual_card(
         await db.refresh(card)
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "virtual_card_updated",
             "Virtual Card Updated",
             f"Virtual card '{card.card_name}' has been updated."
@@ -224,16 +225,16 @@ async def update_virtual_card(
 
 @router.post("/{card_id}/block", response_model=VirtualCardResponse)
 async def block_virtual_card(
-    user_id: str,
     card_id: str,
     request: VirtualCardBlockRequest,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Block virtual card"""
     try:
         card_result = await db.execute(
             select(VirtualCard).where(
-                (VirtualCard.id == card_id) & (VirtualCard.user_id == user_id)
+                (VirtualCard.id == card_id) & (VirtualCard.user_id == current_user_id)
             )
         )
         card = card_result.scalar()
@@ -251,7 +252,7 @@ async def block_virtual_card(
         await db.refresh(card)
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "virtual_card_blocked",
             "Virtual Card Blocked",
             f"Virtual card '{card.card_name}' has been blocked."
@@ -269,15 +270,15 @@ async def block_virtual_card(
 
 @router.post("/{card_id}/unblock", response_model=VirtualCardResponse)
 async def unblock_virtual_card(
-    user_id: str,
     card_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Unblock virtual card"""
     try:
         card_result = await db.execute(
             select(VirtualCard).where(
-                (VirtualCard.id == card_id) & (VirtualCard.user_id == user_id)
+                (VirtualCard.id == card_id) & (VirtualCard.user_id == current_user_id)
             )
         )
         card = card_result.scalar()
@@ -295,7 +296,7 @@ async def unblock_virtual_card(
         await db.refresh(card)
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "virtual_card_unblocked",
             "Virtual Card Unblocked",
             f"Virtual card '{card.card_name}' has been unblocked."
@@ -313,15 +314,15 @@ async def unblock_virtual_card(
 
 @router.delete("/{card_id}")
 async def delete_virtual_card(
-    user_id: str,
     card_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Cancel/delete virtual card"""
     try:
         card_result = await db.execute(
             select(VirtualCard).where(
-                (VirtualCard.id == card_id) & (VirtualCard.user_id == user_id)
+                (VirtualCard.id == card_id) & (VirtualCard.user_id == current_user_id)
             )
         )
         card = card_result.scalar()
@@ -338,7 +339,7 @@ async def delete_virtual_card(
         await db.commit()
         
         AblyRealtimeManager.publish_notification(
-            user_id,
+            current_user_id,
             "virtual_card_cancelled",
             "Virtual Card Cancelled",
             f"Virtual card '{card.card_name}' has been cancelled."
@@ -359,15 +360,15 @@ async def delete_virtual_card(
 
 @router.get("/{card_id}/limit-usage", response_model=VirtualCardLimitUsageResponse)
 async def get_card_limit_usage(
-    user_id: str,
     card_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get card spending limit usage"""
     try:
         card_result = await db.execute(
             select(VirtualCard).where(
-                (VirtualCard.id == card_id) & (VirtualCard.user_id == user_id)
+                (VirtualCard.id == card_id) & (VirtualCard.user_id == current_user_id)
             )
         )
         card = card_result.scalar()

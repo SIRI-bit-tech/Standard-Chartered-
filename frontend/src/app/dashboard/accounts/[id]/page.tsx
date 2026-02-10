@@ -28,12 +28,51 @@ const TRANSACTION_ICONS: Record<string, React.ComponentType<{ className?: string
   interest: Building2,
 }
 
+const format_account_status = (status: Account['status']) => {
+  switch (status) {
+    case 'active':
+      return 'Active'
+    case 'frozen':
+      return 'Frozen'
+    case 'closed':
+      return 'Closed'
+    case 'pending':
+      return 'Pending'
+    default:
+      return 'Unknown'
+  }
+}
+
+const OUTGOING_TRANSACTION_TYPES = new Set<Transaction['type']>([
+  'debit',
+  'withdrawal',
+  'payment',
+  'fee',
+])
+
+const get_account_status_color = (status: Account['status']) => {
+  switch (status) {
+    case 'active':
+      return colors.success
+    case 'pending':
+      return colors.warning
+    case 'frozen':
+      return colors.error
+    case 'closed':
+      return colors.textSecondary
+    default:
+      return colors.textSecondary
+  }
+}
+
 export default function AccountDetailPage() {
   const params = useParams()
   const accountId = params.id as string
   const [account, setAccount] = useState<Account | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [txLimit, setTxLimit] = useState(50)
   const [typeFilter, setTypeFilter] = useState('all')
   const [periodFilter, setPeriodFilter] = useState('30')
   const { user } = useAuthStore()
@@ -50,13 +89,31 @@ export default function AccountDetailPage() {
       if (accountRes.success) setAccount(accountRes.data)
 
       const txRes = await apiClient.get<{ success: boolean; data: Transaction[] }>(
-        `/api/v1/accounts/${accountId}/transactions?limit=50`,
+        `/api/v1/accounts/${accountId}/transactions?limit=${txLimit}`,
       )
       if (txRes.success) setTransactions(txRes.data)
     } catch (e) {
       console.error('Failed to load account details:', e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleLoadMoreTransactions = async () => {
+    const nextLimit = txLimit + 50
+    setLoadingMore(true)
+    try {
+      const txRes = await apiClient.get<{ success: boolean; data: Transaction[] }>(
+        `/api/v1/accounts/${accountId}/transactions?limit=${nextLimit}`,
+      )
+      if (txRes.success) {
+        setTransactions(txRes.data)
+        setTxLimit(nextLimit)
+      }
+    } catch (e) {
+      console.error('Failed to load more transactions:', e)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -163,8 +220,11 @@ export default function AccountDetailPage() {
             {formatCurrency(account.available_balance, account.currency)}
           </p>
           <p className="mt-2 flex items-center gap-2 text-sm" style={{ color: colors.textSecondary }}>
-            <span className="inline-flex h-2 w-2 rounded-full" style={{ backgroundColor: colors.success }} />
-            Active Account • {account.currency}
+            <span
+              className="inline-flex h-2 w-2 rounded-full"
+              style={{ backgroundColor: get_account_status_color(account.status) }}
+            />
+            {format_account_status(account.status)} Account • {account.currency}
           </p>
         </div>
 
@@ -224,7 +284,7 @@ export default function AccountDetailPage() {
                 ) : (
                   filteredTransactions.map((tx) => {
                     const IconComponent = TRANSACTION_ICONS[tx.type] || CreditCard
-                    const isDebit = tx.type === 'debit' || tx.type === 'withdrawal'
+                    const isDebit = OUTGOING_TRANSACTION_TYPES.has(tx.type)
                     const statusColor =
                       tx.status === 'completed'
                         ? colors.success
@@ -241,7 +301,9 @@ export default function AccountDetailPage() {
                         </td>
                         <td className="py-3 pr-4">
                           <div className="flex items-center gap-2">
-                            <IconComponent className="h-4 w-4 shrink-0" style={{ color: colors.textSecondary }} />
+                            <span style={{ color: colors.textSecondary }}>
+                              <IconComponent className="h-4 w-4 shrink-0" />
+                            </span>
                             <div>
                               <p className="font-medium" style={{ color: colors.textPrimary }}>{tx.description}</p>
                               <p className="text-xs" style={{ color: colors.textSecondary }}>
@@ -269,15 +331,17 @@ export default function AccountDetailPage() {
             </table>
           </div>
 
-          {filteredTransactions.length > 0 && (
+          {transactions.length >= txLimit && (
             <div className="mt-4 text-center">
-              <Link
-                href={`/dashboard/accounts/${accountId}`}
-                className="text-sm font-medium"
+              <button
+                type="button"
+                onClick={handleLoadMoreTransactions}
+                disabled={loadingMore}
+                className="text-sm font-medium disabled:opacity-50"
                 style={{ color: colors.primary }}
               >
-                View More Transactions
-              </Link>
+                {loadingMore ? 'Loading…' : 'View More Transactions'}
+              </button>
             </div>
           )}
         </div>

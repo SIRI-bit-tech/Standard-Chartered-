@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties } from 'react'
 import Link from 'next/link'
 import { QUICK_ACTIONS } from '@/constants/dashboard'
 import { cn } from '@/lib/utils'
@@ -16,15 +17,16 @@ export function QuickActionsGrid() {
             href={action.href}
             className={cn(
               'flex flex-col items-center justify-center rounded-xl border p-6 transition-colors',
+              'border-[color:var(--qa-border-color)]',
               'hover:border-primary hover:bg-primary/5',
             )}
-            style={{ borderColor: colors.border }}
+            style={{ ['--qa-border-color' as any]: colors.border } as CSSProperties}
           >
             <div
               className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg"
-              style={{ backgroundColor: colors.primaryLight }}
+              style={{ backgroundColor: colors.primaryLight, color: colors.primary }}
             >
-              <Icon className="h-5 w-5" style={{ color: colors.primary }} />
+              <Icon className="h-5 w-5" />
             </div>
             <span className="text-center text-sm font-medium" style={{ color: colors.textPrimary }}>
               {action.label}

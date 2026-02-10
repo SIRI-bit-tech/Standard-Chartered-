@@ -6,6 +6,7 @@ from models.account import Account
 from database import get_db
 import uuid
 from datetime import datetime, timedelta
+from utils.auth import get_current_user_id
 
 router = APIRouter()
 
@@ -51,11 +52,11 @@ async def get_loan_products(
 
 @router.post("/apply")
 async def apply_for_loan(
-    user_id: str,
     product_id: str,
     requested_amount: float,
     requested_term: int,
     purpose: str = None,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Apply for loan"""
@@ -74,7 +75,7 @@ async def apply_for_loan(
     
     new_application = LoanApplication(
         id=str(uuid.uuid4()),
-        user_id=user_id,
+        user_id=current_user_id,
         product_id=product_id,
         requested_amount=requested_amount,
         requested_term_months=requested_term,
@@ -96,13 +97,13 @@ async def apply_for_loan(
 
 @router.get("/applications")
 async def get_applications(
-    user_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get loan applications"""
     result = await db.execute(
         select(LoanApplication)
-        .where(LoanApplication.user_id == user_id)
+        .where(LoanApplication.user_id == current_user_id)
         .order_by(LoanApplication.created_at.desc())
     )
     applications = result.scalars().all()
@@ -152,13 +153,13 @@ async def get_application_details(
 
 @router.get("/accounts")
 async def get_loan_accounts(
-    user_id: str = Query(...),
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get active loan accounts"""
     result = await db.execute(
         select(Loan)
-        .where(Loan.user_id == user_id)
+        .where(Loan.user_id == current_user_id)
     )
     loans = result.scalars().all()
     
@@ -260,7 +261,10 @@ async def get_loan_statements(loan_id: str):
 
 
 @router.post("/balance-transfer")
-async def balance_transfer_request(user_id: str, amount: float):
+async def balance_transfer_request(
+    amount: float,
+    current_user_id: str = Depends(get_current_user_id)
+):
     """Request balance transfer"""
     return {
         "success": True,

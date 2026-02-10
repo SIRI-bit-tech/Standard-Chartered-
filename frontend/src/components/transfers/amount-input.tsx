@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { colors } from '@/types'
@@ -14,6 +15,22 @@ interface AmountInputProps {
   className?: string
 }
 
+function getCurrencySymbol(currencyCode: string) {
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: currencyCode,
+      currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).formatToParts(0)
+
+    return parts.find((p) => p.type === 'currency')?.value ?? ''
+  } catch {
+    return ''
+  }
+}
+
 /** Reusable amount input with currency prefix/suffix. Real-time value for summary. */
 export function AmountInput({
   value,
@@ -24,13 +41,22 @@ export function AmountInput({
   disabled,
   className,
 }: AmountInputProps) {
+  const [rawValue, setRawValue] = useState('')
+  const currencySymbol = getCurrencySymbol(currency)
+
+  useEffect(() => {
+    if (value === 0) setRawValue('')
+  }, [value])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^0-9.]/g, '')
+    setRawValue(raw)
     const num = parseFloat(raw) || 0
     onChange(num)
   }
 
-  const displayValue = value === 0 ? '' : (value % 1 === 0 ? value.toString() : value.toFixed(2))
+  const formattedValue = value === 0 ? '' : (value % 1 === 0 ? value.toString() : value.toFixed(2))
+  const displayValue = rawValue !== '' ? rawValue : formattedValue
 
   return (
     <div className={className}>
@@ -41,7 +67,7 @@ export function AmountInput({
         className="mt-1.5 flex items-center rounded-lg border bg-white"
         style={{ borderColor: colors.border }}
       >
-        <span className="pl-3 text-muted-foreground">$</span>
+        <span className="pl-3 text-muted-foreground">{currencySymbol}</span>
         <Input
           type="text"
           inputMode="decimal"

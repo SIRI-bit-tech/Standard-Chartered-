@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { TRANSFER_FEES } from '@/constants'
+import { COUNTRIES, TRANSFER_FEES } from '@/constants'
+import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -52,16 +53,19 @@ const ESTIMATED_DELIVERY: Record<TransferTypeTab, string> = {
 
 export default function TransfersPage() {
   const { user } = useAuthStore()
-  const { accounts, setAccounts } = useAccountStore()
+  const { setAccounts } = useAccountStore()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new')
   const [transferType, setTransferType] = useState<TransferTypeTab>('internal')
   const [accountsList, setAccountsList] = useState<Account[]>([])
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(true)
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [historyError, setHistoryError] = useState<string>('')
   const [submitting, setSubmitting] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState('')
+  const [transferError, setTransferError] = useState('')
 
   // Form state per type (single design: one active form at a time)
   const [internalForm, setInternalForm] = useState<InternalTransferForm>({
@@ -107,7 +111,7 @@ export default function TransfersPage() {
       setLoadingAccounts(true)
       try {
         const res = await apiClient.get<{ success: boolean; data: Account[] }>(
-          `/api/v1/accounts?user_id=${user.id}`,
+          `/api/v1/accounts`,
         )
         if (cancelled) return
         if (res.success && Array.isArray(res.data)) {
@@ -126,15 +130,34 @@ export default function TransfersPage() {
 
   // Load transfer history when history tab is active
   useEffect(() => {
-    if (activeTab !== "history" || !user?.id) return
+    if (activeTab !== 'history' || !user?.id) return
+    let cancelled = false
+
+    setHistoryError('')
     setLoadingHistory(true)
     apiClient
       .get<{ success: boolean; data: Transfer[] }>(`/api/v1/transfers/history?limit=50`)
       .then((res) => {
+        if (cancelled) return
         if (res.success && Array.isArray(res.data)) setTransfers(res.data)
       })
-      .catch(() => {})
-      .finally(() => setLoadingHistory(false))
+      .catch((err) => {
+        console.error('Failed to load transfer history:', err)
+        if (cancelled) return
+        setHistoryError('Failed to load transfer history. Please try again.')
+        toast({
+          title: 'Error',
+          description: 'Failed to load transfer history. Please try again.',
+          variant: 'destructive',
+        })
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingHistory(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [activeTab, user?.id])
 
   // Sync "from account" into each form when switching type
@@ -175,14 +198,67 @@ export default function TransfersPage() {
     currency,
   }
 
+  const validateBeforeReview = (): string | null => {
+    if (amount <= 0) return 'Enter a valid amount.'
+
+    if (transferType === 'internal') {
+      if (!internalForm.from_account_id) return 'Select a “From” account.'
+      if (!internalForm.to_account_id) return 'Select a “To” account.'
+      if (internalForm.from_account_id === internalForm.to_account_id)
+        return 'From and To accounts must be different.'
+      return null
+    }
+
+    if (transferType === 'domestic') {
+      if (!domesticForm.from_account_id) return 'Select a “From” account.'
+      if (!domesticForm.recipient_name.trim()) return 'Enter the recipient name.'
+      if (!domesticForm.routing_number.trim()) return 'Enter a routing number.'
+      if (!/^\d{9}$/.test(domesticForm.routing_number.trim()))
+        return 'Routing number must be 9 digits.'
+      if (!domesticForm.account_number.trim()) return 'Enter an account number.'
+      if (!/^[0-9]{4,17}$/.test(domesticForm.account_number.trim()))
+        return 'Account number must be 4-17 digits.'
+      return null
+    }
+
+    if (transferType === 'international') {
+      if (!internationalForm.from_account_id) return 'Select a “From” account.'
+      if (!internationalForm.beneficiary_name.trim()) return 'Enter the beneficiary name.'
+      if (!internationalForm.country.trim()) return 'Select the beneficiary country.'
+      if (!internationalForm.iban_or_account.trim()) return 'Enter the IBAN or account number.'
+      if (!internationalForm.swift_bic.trim() && !internationalForm.iban_or_account.trim())
+        return 'Enter a SWIFT/BIC or IBAN/account number.'
+      return null
+    }
+
+    // ACH
+    if (!achForm.from_account_id) return 'Select a “From” account.'
+    if (!achForm.recipient_name.trim()) return 'Enter the recipient name.'
+    if (!achForm.routing_number.trim()) return 'Enter a routing number.'
+    if (!/^\d{9}$/.test(achForm.routing_number.trim())) return 'Routing number must be 9 digits.'
+    if (!achForm.account_number.trim()) return 'Enter an account number.'
+    if (!/^[0-9]{4,17}$/.test(achForm.account_number.trim())) return 'Account number must be 4-17 digits.'
+    return null
+  }
+
+  const confirmDisabled = validateBeforeReview() != null
+
   // Open PIN modal when user clicks Review/Confirm (no header/breadcrumb as per requirements)
   const handleReviewTransfer = () => {
+    const validationError = validateBeforeReview()
+    if (validationError) {
+      setPinError(validationError)
+      return
+    }
+
+    setTransferError('')
     setPinError('')
     setPinModalOpen(true)
   }
 
   const handlePinConfirm = async (pin: string) => {
     setPinError('')
+    setTransferError('')
     setSubmitting(true)
     try {
       await apiClient.post('/api/v1/auth/verify-transfer-pin', { transfer_pin: pin })
@@ -296,7 +372,7 @@ export default function TransfersPage() {
     } catch (err) {
       console.error('Transfer failed:', err)
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setPinError(detail ?? 'Transfer failed. Please try again.')
+      setTransferError(detail ?? 'Transfer failed. Please try again.')
       throw err
     } finally {
       setSubmitting(false)
@@ -316,6 +392,15 @@ export default function TransfersPage() {
           Transfer between your accounts or to other recipients.
         </p>
       </div>
+
+      {transferError ? (
+        <div
+          className="rounded-xl border p-4 text-sm"
+          style={{ borderColor: colors.error, backgroundColor: colors.white, color: colors.error }}
+        >
+          {transferError}
+        </div>
+      ) : null}
 
       {/* New transfer vs History tabs */}
       <div className="flex gap-4 border-b" style={{ borderColor: colors.border }}>
@@ -551,12 +636,11 @@ export default function TransfersPage() {
                                 <SelectValue placeholder="Select destination country" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="US">United States</SelectItem>
-                                <SelectItem value="GB">United Kingdom</SelectItem>
-                                <SelectItem value="DE">Germany</SelectItem>
-                                <SelectItem value="FR">France</SelectItem>
-                                <SelectItem value="SG">Singapore</SelectItem>
-                                <SelectItem value="AE">UAE</SelectItem>
+                                {COUNTRIES.map((c) => (
+                                  <SelectItem key={c.code} value={c.code}>
+                                    {c.name}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </div>
@@ -746,6 +830,7 @@ export default function TransfersPage() {
                   disclaimer="Rates are subject to market volatility. Final conversion at execution. Fees may vary by destination."
                   secureMessage="Secure transaction handled by 256-bit SSL."
                   loading={submitting}
+                  confirmDisabled={confirmDisabled}
                 />
               </div>
             </div>
@@ -771,6 +856,10 @@ export default function TransfersPage() {
               [1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-16 w-full rounded-lg" />
               ))
+            ) : historyError ? (
+              <p className="py-8 text-center text-sm" style={{ color: colors.error }}>
+                {historyError}
+              </p>
             ) : transfers.length > 0 ? (
               transfers.map((t) => (
                 <div

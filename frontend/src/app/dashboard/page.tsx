@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Clock } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { AccountCards } from '@/components/dashboard/account-cards'
 import { AccountSummaryCard } from '@/components/dashboard/account-summary-card'
 import { QuickActionsGrid } from '@/components/dashboard/quick-actions-grid'
@@ -41,16 +41,19 @@ export default function DashboardPage() {
     try {
       if (!user) return
       const accountsResponse: AccountsResponse = await apiClient.get<AccountsResponse>(
-        `/api/v1/accounts?user_id=${user.id}`,
+        `/api/v1/accounts`,
       )
       if (accountsResponse.success) {
         setAccounts(accountsResponse.data)
         setTotalBalance(
           accountsResponse.data.reduce((sum: number, acc: Account) => sum + acc.balance, 0),
         )
-        if (accountsResponse.data.length > 0) {
+        const selectedPrimaryAccount =
+          accountsResponse.data.find((a) => a.is_primary) ?? accountsResponse.data[0]
+
+        if (selectedPrimaryAccount) {
           const txRes: TransactionsResponse = await apiClient.get<TransactionsResponse>(
-            `/api/v1/accounts/${accountsResponse.data[0].id}/transactions?limit=5`,
+            `/api/v1/accounts/${selectedPrimaryAccount.id}/transactions?limit=5`,
           )
           if (txRes.success) setRecentTransactions(txRes.data)
         }

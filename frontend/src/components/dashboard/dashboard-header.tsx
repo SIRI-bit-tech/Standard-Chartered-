@@ -131,7 +131,7 @@ export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/dashboard/profile" className="flex items-center gap-2">
+              <Link href="/dashboard/settings" className="flex items-center gap-2">
                 <Settings className="h-4 w-4" />
                 Settings
               </Link>
