@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { colors } from '@/types'
@@ -43,14 +43,16 @@ export function AmountInput({
 }: AmountInputProps) {
   const [rawValue, setRawValue] = useState('')
   const currencySymbol = getCurrencySymbol(currency)
+  const prevValueRef = useRef(value)
 
   useEffect(() => {
-    // Clear rawValue when external value changes and differs from current display
-    const currentDisplayValue = rawValue !== '' ? (parseFloat(rawValue) || 0) : 0
-    if (value !== currentDisplayValue) {
+    // Only run when external value changes, not on user typing
+    if (value !== prevValueRef.current) {
+      // External value changed, clear user input
       setRawValue('')
+      prevValueRef.current = value
     }
-  }, [value, rawValue])
+  }, [value])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let raw = e.target.value.replace(/[^0-9.]/g, '')

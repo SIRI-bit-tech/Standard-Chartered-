@@ -178,7 +178,23 @@ async def download_statement(
     statement = await _get_statement_by_id(db, statement_id, account_id)
     
     # Generate download URL using the statement's document_url
-    download_url = statement.document_url or f"https://example.com/statements/{statement_id}.pdf"
+    download_url = statement.document_url
+    
+    if not download_url:
+        return {
+            "success": False,
+            "error": "Statement document not available",
+            "data": {
+                "download_url": None, 
+                "statement_id": statement_id,
+                "statement_date": statement.statement_date.isoformat(),
+                "period": {
+                    "start": statement.start_date.isoformat(),
+                    "end": statement.end_date.isoformat()
+                }
+            },
+            "message": "Statement document is not available for download",
+        }
     
     return {
         "success": True,
