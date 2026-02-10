@@ -16,10 +16,13 @@ from schemas.transfer import (
 )
 from utils.auth import get_current_user_id, verify_password
 from utils.ably import AblyRealtimeManager
+import logging
 import uuid
 from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/transfers", tags=["transfers"])
+
+logger = logging.getLogger(__name__)
 
 
 MAX_FAILED_ATTEMPTS = 5
@@ -190,9 +193,13 @@ async def internal_transfer(
         except Exception:
             await db.rollback()
 
+        logger.exception(
+            "Internal transfer failed - transfer_id: %s, from_account: %s, to_account: %s, user_id: %s, amount: %s",
+            transfer_id, request.from_account_id, request.to_account_id, user_id, request.amount
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal transfer failed: {str(e)}",
+            detail="Internal server error processing transfer",
         )
 
 
@@ -290,10 +297,14 @@ async def ach_transfer(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        logger.exception(
+            "ACH transfer failed - user_id: %s, from_account: %s, amount: %s, beneficiary: %s",
+            user_id, request.from_account_id, request.amount, request.beneficiary_id
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initiate ACH transfer: {str(e)}"
+            detail="Internal server error processing transfer"
         )
 
 
@@ -351,10 +362,14 @@ async def wire_transfer(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
+        logger.exception(
+            "Wire transfer failed - user_id: %s, from_account: %s, amount: %s, currency: %s, beneficiary: %s",
+            user_id, request.from_account_id, request.amount, request.currency, request.beneficiary_id
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to initiate wire transfer: {str(e)}"
+            detail="Internal server error processing transfer"
         )
 
 

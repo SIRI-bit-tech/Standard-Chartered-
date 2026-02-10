@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 from schemas.pin_policy import validate_transfer_pin_strength
@@ -18,20 +18,20 @@ class ResendVerificationRequest(BaseModel):
 class SetTransferPinRequest(BaseModel):
     """Request model for setting transfer PIN"""
     email: str = Field(..., description="User's email address")
-    transfer_pin: str = Field(..., regex=r"^\d{4}$", description="4-digit transfer PIN")
+    transfer_pin: str = Field(..., pattern=r"^\d{4}$", description="4-digit transfer PIN")
     verification_token: Optional[str] = Field(None, description="Short-lived verification token from email verification")
 
-    @validator("transfer_pin")
-    def validate_transfer_pin_strength(cls, v: str) -> str:
+    @field_validator("transfer_pin")
+    def check_pin_strength(cls, v: str) -> str:
         return validate_transfer_pin_strength(v)
 
 
 class VerifyTransferPinRequest(BaseModel):
     """Request model for verifying transfer PIN before a transfer"""
-    transfer_pin: str = Field(..., regex=r"^\d{4}$", description="4-digit transfer PIN")
+    transfer_pin: str = Field(..., pattern=r"^\d{4}$", description="4-digit transfer PIN")
 
-    @validator("transfer_pin")
-    def validate_transfer_pin_strength(cls, v: str) -> str:
+    @field_validator("transfer_pin")
+    def check_pin_strength(cls, v: str) -> str:
         return validate_transfer_pin_strength(v)
 
 

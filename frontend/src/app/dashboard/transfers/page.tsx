@@ -225,7 +225,6 @@ export default function TransfersPage() {
       if (!internationalForm.from_account_id) return 'Select a “From” account.'
       if (!internationalForm.beneficiary_name.trim()) return 'Enter the beneficiary name.'
       if (!internationalForm.country.trim()) return 'Select the beneficiary country.'
-      if (!internationalForm.iban_or_account.trim()) return 'Enter the IBAN or account number.'
       if (!internationalForm.swift_bic.trim() && !internationalForm.iban_or_account.trim())
         return 'Enter a SWIFT/BIC or IBAN/account number.'
       return null
@@ -247,7 +246,8 @@ export default function TransfersPage() {
   const handleReviewTransfer = () => {
     const validationError = validateBeforeReview()
     if (validationError) {
-      setPinError(validationError)
+      setTransferError(validationError)
+      setPinError('')
       return
     }
 
