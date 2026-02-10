@@ -299,8 +299,8 @@ async def ach_transfer(
         raise
     except Exception:
         logger.exception(
-            "ACH transfer failed - user_id: %s, from_account: %s, amount: %s, beneficiary: %s",
-            user_id, request.from_account_id, request.amount, request.beneficiary_id
+            "ACH transfer failed - user_id: %s, from_account: %s, amount: %s, account_holder: %s",
+            user_id, request.from_account_id, request.amount, request.account_holder
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -364,8 +364,8 @@ async def wire_transfer(
         raise
     except Exception:
         logger.exception(
-            "Wire transfer failed - user_id: %s, from_account: %s, amount: %s, currency: %s, beneficiary: %s",
-            user_id, request.from_account_id, request.amount, request.currency, request.beneficiary_id
+            "Wire transfer failed - user_id: %s, from_account: %s, amount: %s, currency: %s",
+            user_id, request.from_account_id, request.amount, request.currency
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

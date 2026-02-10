@@ -290,12 +290,12 @@ export default function AccountDetailPage() {
                     // For transfers, determine direction from description patterns
                     if (tx.type === 'transfer') {
                       const description = tx.description.toLowerCase()
-                      // Outgoing transfer patterns
-                      isDebit = description.includes('to') || 
-                               description.includes('sent') || 
-                               description.includes('outgoing') ||
-                               description.includes('debit') ||
-                               description.includes('from') && !description.includes('received')
+                      // Outgoing transfer patterns - use word boundaries for stricter matching
+                      isDebit = /\bto\b/i.test(description) || 
+                               /\bsent\b/i.test(description) || 
+                               /\boutgoing\b/i.test(description) ||
+                               /\bdebit\b/i.test(description) ||
+                               (/\bfrom\b/i.test(description) && !/\breceived\b/i.test(description))
                     }
                     
                     const statusColor =
