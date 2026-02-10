@@ -42,15 +42,8 @@ export function AccountCards({
         style={{ borderColor: colors.border }}
       >
         <p className="text-sm" style={{ color: colors.textSecondary }}>
-          No accounts yet
+          No accounts yet. Your accounts will be opened through the standard banking process.
         </p>
-        <Link
-          href="/dashboard/accounts"
-          className="mt-2 inline-block text-sm font-medium"
-          style={{ color: colors.primary }}
-        >
-          Create an account
-        </Link>
       </div>
     )
   }

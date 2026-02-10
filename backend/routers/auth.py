@@ -15,11 +15,10 @@ from utils.auth import (
     verify_token, generate_verification_token, generate_reset_token
 )
 from utils.ably import AblyRealtimeManager
-from utils.errors import (
-    ValidationError, AuthenticationError, NotFoundError, ConflictError, InternalServerError
-)
 from utils.logger import logger
 from config import settings
+from services.account import AccountService
+from utils.email import send_verification_email
 import uuid
 
 router = APIRouter()
@@ -95,9 +94,44 @@ async def register(
         db.add(new_user)
         await db.commit()
 
-        # TODO: Send verification email
+        # Create default accounts for new user (checking, savings, crypto)
+        try:
+            default_accounts = await AccountService.create_default_accounts(
+                user_id=new_user.id,
+                user_country=request.country,
+                db=db
+            )
+            
+            for account in default_accounts:
+                db.add(account)
+            
+            await db.commit()
+            logger.info(f"Created {len(default_accounts)} default accounts for user {new_user.email}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create default accounts for user {new_user.email}: {e}")
+            # Don't fail registration if account creation fails
+            pass
+
+        # Commit all changes in a single transaction
+        await db.commit()
+
+        # Send verification email
+        try:
+            from utils.email import send_verification_email
+            await send_verification_email(
+                email=new_user.email,
+                verification_token=new_user.email_verification_token,
+                first_name=new_user.first_name
+            )
+            logger.info(f"Verification email sent to {new_user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send verification email: {e}")
+            # Don't fail registration if email fails
+            pass
 
         # Generate tokens
+
         access_token = create_access_token({"sub": new_user.id, "email": new_user.email})
         refresh_token = create_refresh_token(new_user.id)
         

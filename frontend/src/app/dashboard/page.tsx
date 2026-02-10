@@ -76,7 +76,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <section>
         <h1 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>
-          Welcome back, {user.first_name}
+          Welcome back, {user.username}!
         </h1>
         <p className="mt-1 flex items-center gap-1.5 text-sm" style={{ color: colors.textSecondary }}>
           <Clock className="h-4 w-4" />

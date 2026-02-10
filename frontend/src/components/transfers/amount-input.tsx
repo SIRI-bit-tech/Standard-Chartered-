@@ -44,17 +44,23 @@ export function AmountInput({
   const [rawValue, setRawValue] = useState('')
   const currencySymbol = getCurrencySymbol(currency)
   const prevValueRef = useRef(value)
+  const isLocalChangeRef = useRef(false)
 
   useEffect(() => {
     // Only run when external value changes, not on user typing
-    if (value !== prevValueRef.current) {
+    if (value !== prevValueRef.current && !isLocalChangeRef.current) {
       // External value changed, clear user input
       setRawValue('')
       prevValueRef.current = value
     }
+    // Reset local change flag after handling
+    isLocalChangeRef.current = false
   }, [value])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Mark as local change to distinguish from parent updates
+    isLocalChangeRef.current = true
+    
     let raw = e.target.value.replace(/[^0-9.]/g, '')
     
     // Keep only the first decimal point

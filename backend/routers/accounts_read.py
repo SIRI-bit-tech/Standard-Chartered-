@@ -11,7 +11,7 @@ from utils.account_helpers import _get_owned_account, _get_statement_by_id
 router = APIRouter()
 
 
-@router.get("")
+@router.get("/")
 async def get_accounts(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),

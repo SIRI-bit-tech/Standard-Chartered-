@@ -76,7 +76,7 @@ class AccountService:
     def generate_account_number(country: str = "United States") -> str:
         """Generate a country-specific account number using cryptographically secure method"""
         length = AccountService.ACCOUNT_LENGTHS.get(country, 12)  # Default to 12 digits
-        return ''.join(secrets.choice(string.digits, k=length))
+        return ''.join(secrets.choice(string.digits) for _ in range(length))
     
     @staticmethod
     def generate_routing_number() -> str:
