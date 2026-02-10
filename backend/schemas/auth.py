@@ -21,7 +21,7 @@ class RegisterRequest(BaseModel):
     def validate_username(cls, v):
         if not v.replace('_', '').replace('-', '').isalnum():
             raise ValueError('Username must be alphanumeric')
-        return v.lower()
+        return v
     
     @validator('phone')
     def validate_phone(cls, v):

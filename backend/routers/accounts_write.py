@@ -12,7 +12,7 @@ from datetime import datetime
 router = APIRouter()
 
 
-@router.post("")
+@router.post("/")
 async def create_account(
     account_type: str,
     currency: str,
