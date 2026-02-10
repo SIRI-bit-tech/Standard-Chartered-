@@ -6,18 +6,9 @@ from models.account import Account, Statement
 from models.transaction import Transaction
 from database import get_db
 from utils.auth import get_current_user_id
+from utils.account_helpers import _get_owned_account, _get_statement_by_id
 
 router = APIRouter()
-
-
-async def _get_owned_account(db: AsyncSession, account_id: str, user_id: str) -> Account:
-    result = await db.execute(select(Account).where(Account.id == account_id))
-    account = result.scalar_one_or_none()
-    if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-    if account.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    return account
 
 
 @router.get("")
@@ -40,7 +31,7 @@ async def get_accounts(
                 "balance": acc.balance,
                 "available_balance": acc.available_balance,
                 "status": acc.status,
-                "nickname": acc.nickname or f"{acc.account_type.value} Account",
+                "nickname": acc.nickname or f"{getattr(acc.account_type, 'value', 'Account')} Account",
                 "interest_rate": acc.interest_rate,
                 "is_primary": acc.is_primary,
                 "overdraft_limit": acc.overdraft_limit,
@@ -172,7 +163,7 @@ async def get_statements(
     }
 
 
-@router.post("/{account_id}/statements/download")
+@router.get("/{account_id}/statements/{statement_id}/download")
 async def download_statement(
     account_id: str,
     statement_id: str,
@@ -180,10 +171,25 @@ async def download_statement(
     db: AsyncSession = Depends(get_db),
 ):
     """Download eStatement (authenticated + owned account only)"""
+    # Verify account ownership
     await _get_owned_account(db, account_id, user_id)
-
+    
+    # Verify statement exists and belongs to the account
+    statement = await _get_statement_by_id(db, statement_id, account_id)
+    
+    # Generate download URL using the statement's document_url
+    download_url = statement.document_url or f"https://example.com/statements/{statement_id}.pdf"
+    
     return {
         "success": True,
-        "data": {"download_url": "https://example.com/statement.pdf", "statement_id": statement_id},
-        "message": "Statement download initiated",
+        "data": {
+            "download_url": download_url, 
+            "statement_id": statement_id,
+            "statement_date": statement.statement_date.isoformat(),
+            "period": {
+                "start": statement.start_date.isoformat(),
+                "end": statement.end_date.isoformat()
+            }
+        },
+        "message": "Statement download URL generated",
     }

@@ -36,7 +36,7 @@ export default function DepositsPage() {
       if (!user?.id) return;
       const response = await apiClient.get<{ success: boolean; deposits: Deposit[] }>(`/api/v1/deposits/list`);
       if (response.success) {
-        setDeposits(response.deposits);
+        setDeposits(response.deposits ?? []);
       }
     } catch (error) {
       console.error('Failed to fetch deposits:', error);

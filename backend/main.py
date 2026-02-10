@@ -44,6 +44,12 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS transfer_pin VARCHAR"
             ))
             await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS transfer_pin_failed_attempts INTEGER DEFAULT 0 NOT NULL"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS transfer_pin_locked_until TIMESTAMP"
+            ))
+            await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR"
             ))
             await conn.execute(text(

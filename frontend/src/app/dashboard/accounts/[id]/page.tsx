@@ -284,7 +284,20 @@ export default function AccountDetailPage() {
                 ) : (
                   filteredTransactions.map((tx) => {
                     const IconComponent = TRANSACTION_ICONS[tx.type] || CreditCard
-                    const isDebit = OUTGOING_TRANSACTION_TYPES.has(tx.type)
+                    // Check if transaction is outgoing (debit) or incoming (credit)
+                    let isDebit = OUTGOING_TRANSACTION_TYPES.has(tx.type)
+                    
+                    // For transfers, determine direction from description patterns
+                    if (tx.type === 'transfer') {
+                      const description = tx.description.toLowerCase()
+                      // Outgoing transfer patterns
+                      isDebit = description.includes('to') || 
+                               description.includes('sent') || 
+                               description.includes('outgoing') ||
+                               description.includes('debit') ||
+                               description.includes('from') && !description.includes('received')
+                    }
+                    
                     const statusColor =
                       tx.status === 'completed'
                         ? colors.success
@@ -333,11 +346,16 @@ export default function AccountDetailPage() {
 
           {transactions.length >= txLimit && (
             <div className="mt-4 text-center">
+              {filteredTransactions.length < transactions.length && (
+                <p className="mb-2 text-xs" style={{ color: colors.textSecondary }}>
+                  Some results are hidden by your filters
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleLoadMoreTransactions}
                 disabled={loadingMore}
-                className="text-sm font-medium disabled:opacity-50"
+                className="text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ color: colors.primary }}
               >
                 {loadingMore ? 'Loading…' : 'View More Transactions'}

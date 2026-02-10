@@ -5,20 +5,11 @@ from sqlalchemy import select
 from models.account import Account, AccountType, AccountStatus
 from database import get_db
 from utils.auth import get_current_user_id
+from utils.account_helpers import _get_owned_account
 import uuid
 from datetime import datetime
 
 router = APIRouter()
-
-
-async def _get_owned_account(db: AsyncSession, account_id: str, user_id: str) -> Account:
-    result = await db.execute(select(Account).where(Account.id == account_id))
-    account = result.scalar_one_or_none()
-    if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-    if account.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    return account
 
 
 @router.post("")
@@ -30,11 +21,19 @@ async def create_account(
     db: AsyncSession = Depends(get_db),
 ):
     """Create new account for authenticated user"""
+    try:
+        account_type_enum = AccountType(account_type)
+    except ValueError:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Invalid account type '{account_type}'. Valid types are: {[t.value for t in AccountType]}"
+        )
+    
     new_account = Account(
         id=str(uuid.uuid4()),
         user_id=user_id,
         account_number=f"SC{str(uuid.uuid4())[:12].upper()}",
-        account_type=AccountType(account_type),
+        account_type=account_type_enum,
         currency=currency,
         status=AccountStatus.ACTIVE,
         nickname=nickname,
@@ -69,7 +68,7 @@ async def update_account(
     """Update account settings (owned account only)"""
     account = await _get_owned_account(db, account_id, user_id)
 
-    if nickname:
+    if nickname is not None:
         account.nickname = nickname
 
     account.updated_at = datetime.utcnow()

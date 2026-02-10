@@ -45,14 +45,32 @@ export function AmountInput({
   const currencySymbol = getCurrencySymbol(currency)
 
   useEffect(() => {
-    if (value === 0) setRawValue('')
-  }, [value])
+    // Clear rawValue when external value changes and differs from current display
+    const currentDisplayValue = rawValue !== '' ? (parseFloat(rawValue) || 0) : 0
+    if (value !== currentDisplayValue) {
+      setRawValue('')
+    }
+  }, [value, rawValue])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/[^0-9.]/g, '')
+    let raw = e.target.value.replace(/[^0-9.]/g, '')
+    
+    // Keep only the first decimal point
+    const firstDotIndex = raw.indexOf('.')
+    if (firstDotIndex !== -1) {
+      // Remove all dots after the first one
+      const beforeDot = raw.substring(0, firstDotIndex + 1)
+      const afterDot = raw.substring(firstDotIndex + 1).replace(/\./g, '')
+      raw = beforeDot + afterDot
+    }
+    
+    // Normalize leading dot to '0.'
+    if (raw.startsWith('.')) {
+      raw = '0.' + raw.substring(1)
+    }
+    
     setRawValue(raw)
-    const num = parseFloat(raw) || 0
-    onChange(num)
+    onChange(parseFloat(raw) || 0)
   }
 
   const formattedValue = value === 0 ? '' : (value % 1 === 0 ? value.toString() : value.toFixed(2))
