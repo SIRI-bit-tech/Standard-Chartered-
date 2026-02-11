@@ -91,11 +91,11 @@ async def register(
             created_at=datetime.utcnow()
         )
 
-        db.add(new_user)
-        await db.commit()
-
-        # Create default accounts for new user (checking, savings, crypto)
+        # Create user and accounts in a single transaction
         try:
+            db.add(new_user)
+            
+            # Create default accounts for new user (checking, savings, crypto)
             default_accounts = await AccountService.create_default_accounts(
                 user_id=new_user.id,
                 user_country=request.country,
@@ -106,15 +106,15 @@ async def register(
                 db.add(account)
             
             await db.commit()
-            logger.info(f"Created {len(default_accounts)} default accounts for user {new_user.email}")
+            logger.info(f"User registered successfully with {len(default_accounts)} accounts: {new_user.email}")
             
         except Exception as e:
-            logger.error(f"Failed to create default accounts for user {new_user.email}: {e}")
-            # Don't fail registration if account creation fails
-            pass
-
-        # Commit all changes in a single transaction
-        await db.commit()
+            await db.rollback()
+            logger.error(f"Failed to register user {new_user.email}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Registration failed. Please try again."
+            )
 
         # Send verification email
         try:
