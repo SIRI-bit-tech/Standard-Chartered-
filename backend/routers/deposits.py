@@ -6,7 +6,7 @@ import uuid
 import random
 
 from models.deposit import Deposit, DepositType, DepositStatus
-from models.account import Account
+from models.account import Account, AccountStatus
 from models.user import User
 from database import get_db
 from schemas.deposit import (
@@ -18,6 +18,14 @@ from utils.auth import get_current_user_id
 
 router = APIRouter(prefix="/deposits", tags=["deposits"])
 
+async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
+
 
 @router.post("/check-deposit", response_model=DepositStatusUpdateResponse)
 async def initiate_check_deposit(
@@ -27,6 +35,7 @@ async def initiate_check_deposit(
 ):
     """Initiate mobile check deposit"""
     try:
+        await _ensure_user_active(db, current_user_id)
         account_result = await db.execute(
             select(Account).where(Account.id == request.account_id)
         )
@@ -36,6 +45,11 @@ async def initiate_check_deposit(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account not found"
+            )
+        if getattr(account, "status", None) and account.status != AccountStatus.ACTIVE:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account inactive"
             )
         
         verification_code = str(random.randint(100000, 999999))

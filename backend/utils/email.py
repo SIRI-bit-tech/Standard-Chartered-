@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import html
+from urllib.parse import quote
 from typing import Optional
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -24,32 +25,19 @@ async def send_verification_email(email: str, verification_token: str, first_nam
     """Send verification email to user"""
     try:
         # Create email message
-        verification_url = f"{settings.FRONTEND_URL}/dashboard/verify-email?token={verification_token}"
+        encoded_token = quote(verification_token, safe='')
+        verification_url = f"{settings.FRONTEND_URL}/dashboard/verify-email?token={encoded_token}"
         
         # HTML-escape user-controlled input to prevent XSS
         escaped_first_name = html.escape(first_name or "Valued Customer")
         
-        html_content = f"""
-        <html>
-            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 20px;">
-                <div style="background-color: white; padding: 30px; border-radius: 8px; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #333;">Welcome to Standard Chartered</h2>
-                    <p style="color: #666; font-size: 16px;">Dear {escaped_first_name},</p>
-                    <p style="color: #666; font-size: 16px;">Thank you for registering with Standard Chartered. Your account has been created successfully.</p>
-                    <p style="color: #666; font-size: 16px;">To complete your registration, please verify your email address by clicking the link below:</p>
-                    <p style="color: #666; font-size: 16px;"><a href="{verification_url}" style="color: #007bff; text-decoration: none; font-weight: bold;">Verify Email Address</a></p>
-                    <p style="color: #666; font-size: 16px;">This verification link will expire in 24 hours.</p>
-                    <p style="color: #999; font-size: 14px;">If you did not request this verification, please contact our support team.</p>
-                    <p style="color: #666; font-size: 16px;">Best regards,<br>Standard Chartered Team</p>
-                </div>
-            </body>
-        </html>
-        """
+        # Clean display name for email header (prevent injection)
+        safe_display_name = (first_name or "Valued Customer").replace('\r', '').replace('\n', '').strip()
         
         # Create email message
         msg = MIMEMultipart()
         msg['From'] = settings.SMTP_USER
-        msg['To'] = formataddr((escaped_first_name, email))
+        msg['To'] = formataddr((safe_display_name, email))
         msg['Subject'] = "Verify Your Standard Chartered Account"
         
         # Attach HTML content

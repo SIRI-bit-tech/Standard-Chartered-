@@ -4,13 +4,14 @@ from datetime import datetime, timedelta
 from typing import Optional
 from utils.auth import hash_password, verify_password, create_access_token as create_user_token
 from utils.logger import logger
+from config import settings
 
 
 class AdminAuthManager:
     """Manage admin authentication"""
     
     # Single admin code from environment - used for both registration and login
-    ADMIN_CODE = os.getenv("ADMIN_CODE", "")
+    ADMIN_CODE = settings.ADMIN_CODE
     
     @staticmethod
     def validate_admin_code(provided_code: str) -> bool:

@@ -161,6 +161,54 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send welcome email to {to_email}: {e}")
             return False
+    
+    def send_card_ready_email(self, to_email: str, card_name: str, card_type: str, expiry_month: int, expiry_year: int) -> bool:
+        try:
+            subject = "Your Virtual Card Is Ready"
+            html_content = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #00875A; padding: 20px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Standard Chartered Bank</h1>
+                    </div>
+                    <div style="padding: 30px; background-color: #f8f9fa;">
+                        <h2 style="color: #333;">Virtual Card Generated</h2>
+                        <p style="color: #666; line-height: 1.6;">
+                            Your virtual card is now active and ready to use.
+                        </p>
+                        <div style="background-color: #E8F5E9; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #28a745;">
+                            <p style="color: #155724; margin: 0;">
+                                <strong>Name:</strong> {card_name}<br/>
+                                <strong>Type:</strong> {card_type.title()}<br/>
+                                <strong>Expiry:</strong> {expiry_month:02d}/{expiry_year}
+                            </p>
+                        </div>
+                        <p style="color: #666; line-height: 1.6;">
+                            For security, we do not include card numbers in email. View details in your dashboard.
+                        </p>
+                        <a href="{settings.FRONTEND_URL}/dashboard/virtual-cards" style="display:inline-block;background:#00875A;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">View Card</a>
+                    </div>
+                    <div style="background-color: #333; color: white; padding: 20px; text-align: center;">
+                        <p style="margin: 0; font-size: 12px;">
+                            © 2026 Standard Chartered Bank. All rights reserved.
+                        </p>
+                    </div>
+                </body>
+            </html>
+            """
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = f"Standard Chartered Bank <{self.from_email}>"
+            msg['To'] = to_email
+            html_part = MIMEText(html_content, 'html')
+            msg.attach(html_part)
+            with self._create_connection() as server:
+                server.send_message(msg)
+            logger.info(f"Card ready email sent to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send card ready email to {to_email}: {e}")
+            return False
 
 
 # Global email service instance

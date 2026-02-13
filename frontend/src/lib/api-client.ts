@@ -23,9 +23,12 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
-        console.error('[API Error]', error.message)
-        if (error.code === 'ECONNABORTED') {
-          console.error('[API Error] Request timeout - backend not responding')
+        const status = error.response?.status
+        if (!status || status >= 500) {
+          console.error('[API Error]', error.message)
+          if (error.code === 'ECONNABORTED') {
+            console.error('[API Error] Request timeout - backend not responding')
+          }
         }
         return Promise.reject(error)
       }

@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 const protectedRoutes = ["/dashboard", "/dashboard/*"]
 const publicRoutes = ["/", "/auth/login", "/auth/register", "/auth/forgot-password"]
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const accessToken = request.cookies.get("accessToken")?.value
 

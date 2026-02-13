@@ -41,13 +41,14 @@ class InternalTransferRequest(BaseModel):
 
 
 class DomesticTransferRequest(BaseModel):
-    """Domestic transfer request"""
+    """Domestic transfer request - name-based transfers only"""
     transfer_pin: str = Field(..., pattern=r"^\d{4}$", description="4-digit transfer PIN")
     from_account_id: str
-    to_account_number: str = Field(..., max_length=40)
+    recipient_id: str = Field(..., description="Recipient user ID (required for name-based transfer)")
+    to_account_id: Optional[str] = Field(None, description="Recipient account ID (optional, for backward compatibility)")
     amount: float = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=200)
-
+    
     @validator("transfer_pin")
     def validate_transfer_pin_strength(cls, v: str) -> str:
         return validate_transfer_pin_strength(v)

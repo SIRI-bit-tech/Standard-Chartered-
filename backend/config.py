@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"
     
+    # Admin
+    ADMIN_CODE: str
+    
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = False

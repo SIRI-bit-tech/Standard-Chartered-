@@ -121,6 +121,73 @@ export interface TransferConfirmPayload {
   [key: string]: unknown
 }
 
+// Admin types
+export type AdminUserRole = 'super_admin' | 'manager' | 'moderator' | 'support'
+
+export interface AdminSession {
+  admin_id: string
+  email: string
+  role: AdminUserRole
+  access_token: string
+  refresh_token: string
+}
+
+export interface AdminDashboardKpis {
+  total_users: number
+  total_accounts: number
+  monthly_transactions: number
+  pending_verifications: number
+}
+
+export interface AdminTimeSeriesPoint {
+  label: string // e.g. "Jan"
+  value: number
+}
+
+export interface AdminActivityItem {
+  id: string
+  event: string // e.g. "KYC Verification #4920"
+  actor: string // e.g. "System (Auto)"
+  time: string // display string (e.g. "2m ago")
+  status: 'verified' | 'flagged' | 'complete' | 'deployed' | 'notice'
+}
+
+export interface AdminSystemAlert {
+  id: string
+  title: string
+  message: string
+  severity: 'critical' | 'warning' | 'notice'
+  cta?: { label: string; action: string }
+}
+
+export interface AdminDashboardOverviewResponse {
+  kpis: AdminDashboardKpis
+  transaction_volume: AdminTimeSeriesPoint[]
+  user_growth: AdminTimeSeriesPoint[]
+  activity_feed: AdminActivityItem[]
+  system_alerts: AdminSystemAlert[]
+}
+
+export type AdminUserStatus = 'active' | 'suspended' | 'inactive'
+export type AdminVerificationStatus = 'verified' | 'pending' | 'needs_review'
+
+export interface AdminUserRow {
+  id: string
+  user_id: string // e.g. "SC-882104"
+  name: string
+  country: string
+  email: string
+  status: AdminUserStatus
+  verification: AdminVerificationStatus
+}
+
+export interface AdminUsersListResponse {
+  items: AdminUserRow[]
+  total: number
+  page: number
+  page_size: number
+}
+
 // Beneficiary types
 export interface Beneficiary {
   id: string
@@ -184,6 +251,28 @@ export interface Document {
   filename: string
   status: 'uploaded' | 'verified' | 'rejected' | 'expired'
   created_at: string
+}
+
+// Virtual card types
+export type VirtualCardType = 'debit' | 'credit'
+export type VirtualCardStatus = 'pending' | 'active' | 'suspended' | 'blocked' | 'expired' | 'cancelled'
+export interface VirtualCardSummary {
+  id: string
+  account_id: string
+  card_type: VirtualCardType
+  status: VirtualCardStatus
+  card_name: string
+  card_number: string
+  expiry_month: number
+  expiry_year: number
+  spending_limit?: number
+  daily_limit?: number
+  monthly_limit?: number
+  spent_today: number
+  spent_this_month: number
+  total_transactions: number
+  created_at: string
+  updated_at: string
 }
 
 // Support types

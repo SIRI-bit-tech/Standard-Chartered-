@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { getInitials, formatDate } from '@/lib/utils'
 import { colors } from '@/types'
 import type { Notification } from '@/types'
+import { useUserRealtime } from '@/hooks/use-user-realtime'
 
 interface DashboardHeaderProps {
   onOpenMobileMenu?: () => void
@@ -26,9 +27,25 @@ export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
   const router = useRouter()
   const isMobile = useIsMobile()
   const { user, logout } = useAuthStore()
-  const { notifications, setNotifications } = useNotificationStore()
+  const { notifications, setNotifications, addNotification } = useNotificationStore()
   const hasUnread = notifications.some((n) => n.status === 'unread')
 
+  const notifChannel = user?.id ? `banking:notifications:${user.id}` : undefined
+  useUserRealtime(notifChannel as string, (payload) => {
+    if (payload?.title && payload?.message) {
+      const id = payload?.data?.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`
+      const created_at = payload?.data?.created_at || new Date().toISOString()
+      const newNotif: Notification = {
+        id,
+        title: payload.title,
+        message: payload.message,
+        type: payload.type,
+        status: 'unread',
+        created_at,
+      }
+      addNotification(newNotif)
+    }
+  })
   const handleLogout = () => {
     logout()
     router.push('/auth/login')

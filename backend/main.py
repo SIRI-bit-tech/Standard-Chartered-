@@ -121,7 +121,7 @@ app.include_router(documents.router, prefix="/api/v1/documents", tags=["Document
 app.include_router(bill_payments.router, prefix="/api/v1/bills", tags=["Bill Payments"])
 app.include_router(deposits.router, prefix="/api/v1/deposits", tags=["Deposits"])
 app.include_router(virtual_cards.router, prefix="/api/v1/cards", tags=["Virtual Cards"])
-app.include_router(admin.router, prefix="/api/v1", tags=["Admin"])
+app.include_router(admin.router, tags=["Admin"])
 
 
 @app.exception_handler(RequestValidationError)

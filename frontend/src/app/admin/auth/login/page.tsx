@@ -30,14 +30,40 @@ export default function AdminLoginPage() {
         email,
         password,
         admin_code: adminCode || undefined
-      })
+      }) as {
+        success: boolean
+        message: string
+        data: {
+          admin_id: string
+          email: string
+          first_name?: string
+          last_name?: string
+          role: string
+        }
+        token: {
+          access_token: string
+          refresh_token: string
+        }
+      }
 
-      if (response.data.success) {
-        const { token } = response.data
-        localStorage.setItem('admin_token', token.access_token)
-        localStorage.setItem('admin_refresh_token', token.refresh_token)
+      console.log('Login: Full response:', response)
+      console.log('Login: response.success:', response.success)
+
+      if (response.success) {
+        localStorage.setItem('admin_token', response.token.access_token)
+        localStorage.setItem('admin_refresh_token', response.token.refresh_token)
+        localStorage.setItem('admin_id', response.data.admin_id)
+        const fullName = `${response.data.first_name || ''} ${response.data.last_name || ''}`.trim()
+        if (fullName) {
+          localStorage.setItem('admin_name', fullName)
+        }
+        localStorage.setItem('admin_email', response.data.email)
+        console.log('Login: Stored admin_id:', response.data.admin_id)
+        console.log('Login: Redirecting to dashboard...')
         logger.debug('Admin logged in successfully')
         router.push('/admin/dashboard')
+      } else {
+        console.log('Login: Failed - response.success is false')
       }
     } catch (err: any) {
       logger.error('Admin login error', { error: err })
@@ -96,17 +122,18 @@ export default function AdminLoginPage() {
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
-            Admin Code (Optional)
+            Admin Code (Required)
           </label>
           <Input
             type="password"
             value={adminCode}
             onChange={(e) => setAdminCode(e.target.value)}
-            placeholder="••••••••"
+            placeholder="•••••••"
+            required
             disabled={loading}
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Required if 2FA is enabled
+            Required for admin authentication
           </p>
         </div>
 

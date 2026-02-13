@@ -1,9 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Boolean, Text, Enum as SQLEnum
-from sqlalchemy.ext.declarative import declarative_base
+from database import Base
 from datetime import datetime
 import enum
-
-Base = declarative_base()
 
 
 class AdminRole(str, enum.Enum):

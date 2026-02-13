@@ -18,7 +18,8 @@ from schemas.virtual_card import (
 from utils.ably import AblyRealtimeManager
 from utils.auth import get_current_user_id
 
-router = APIRouter(prefix="/virtual-cards", tags=["virtual-cards"])
+# Mounted in main.py at prefix="/api/v1/cards". No local prefix to avoid double-prefix.
+router = APIRouter(tags=["virtual-cards"])
 
 
 def generate_virtual_card_number() -> str:
@@ -56,6 +57,17 @@ async def create_virtual_card(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account not found"
             )
+        # Enforce only DEBIT and CREDIT types and maximum of 2 cards per user (one per type)
+        if request.card_type not in (VirtualCardType.DEBIT, VirtualCardType.CREDIT):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only debit or credit cards are allowed")
+        existing_result = await db.execute(select(VirtualCard).where(VirtualCard.user_id == current_user_id))
+        existing_cards = existing_result.scalars().all()
+        has_debit = any(c.card_type == VirtualCardType.DEBIT and c.status != VirtualCardStatus.CANCELLED for c in existing_cards)
+        has_credit = any(c.card_type == VirtualCardType.CREDIT and c.status != VirtualCardStatus.CANCELLED for c in existing_cards)
+        if (request.card_type == VirtualCardType.DEBIT and has_debit) or (request.card_type == VirtualCardType.CREDIT and has_credit):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already have this card type")
+        if sum(1 for c in existing_cards if c.status != VirtualCardStatus.CANCELLED) >= 2:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum of two cards allowed")
         
         expiry_month, expiry_year = get_expiry_dates()
         
@@ -65,7 +77,7 @@ async def create_virtual_card(
             account_id=request.account_id,
             card_number=generate_virtual_card_number(),
             card_type=request.card_type,
-            status=VirtualCardStatus.ACTIVE,
+            status=VirtualCardStatus.PENDING,
             expiry_month=expiry_month,
             expiry_year=expiry_year,
             cvv=generate_cvv(),
