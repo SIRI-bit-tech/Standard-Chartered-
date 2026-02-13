@@ -59,7 +59,14 @@ export default function UsersPage() {
         // Minimal export: download current page as CSV.
         const header = ['User ID', 'Name', 'Country', 'Email', 'Status', 'Verification']
         const rows = items.map((u) => [u.user_id, u.name, u.country, u.email, u.status, u.verification])
-        const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+        const csv = [header, ...rows].map((r) => r.map((c) => {
+          const str = String(c)
+          // Detect potential formula injection
+          if (str.startsWith('=') || str.startsWith('+') || str.startsWith('-') || str.startsWith('@')) {
+            return `"'"${str.replace(/"/g, '""')}"`
+          }
+          return `"${str.replace(/"/g, '""')}"`
+        }).join(',')).join('\n')
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')

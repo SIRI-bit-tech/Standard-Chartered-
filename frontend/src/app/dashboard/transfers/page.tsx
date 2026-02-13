@@ -277,13 +277,8 @@ export default function TransfersPage() {
 
     if (transferType === 'domestic') {
       if (!domesticForm.from_account_id) return 'Select a “From” account.'
-      if (!domesticForm.recipient_name.trim()) return 'Enter the recipient name.'
-      if (!domesticForm.routing_number.trim()) return 'Enter a routing number.'
-      if (!/^\d{9}$/.test(domesticForm.routing_number.trim()))
-        return 'Routing number must be 9 digits.'
-      if (!domesticForm.account_number.trim()) return 'Enter an account number.'
-      if (!/^[0-9]{4,17}$/.test(domesticForm.account_number.trim()))
-        return 'Account number must be 4-17 digits.'
+      if (!selectedRecipient) return 'Please select a recipient from the search results.'
+      if (selectedRecipient && (!selectedRecipient.accounts || selectedRecipient.accounts.length === 0)) return 'Recipient has no available accounts.'
       return null
     }
 
@@ -354,17 +349,11 @@ export default function TransfersPage() {
           alert(res.message ?? 'Transfer completed successfully.')
         }
       } else if (transferType === 'domestic') {
-        // Validate recipient selection
-        if (!selectedRecipient) {
-          alert('Please select a recipient from the search results.')
-          return
-        }
-        
         const payload = {
           transfer_pin: pin,
           from_account_id: domesticForm.from_account_id,
-          recipient_id: selectedRecipient.user_id,
-          to_account_id: selectedRecipient.selectedAccount?.id || selectedRecipient.accounts.find((acc) => acc.is_primary)?.id,
+          recipient_id: selectedRecipient?.user_id,
+          to_account_id: selectedRecipient?.selectedAccount?.id ?? selectedRecipient?.accounts.find(acc => acc.is_primary)?.id ?? selectedRecipient?.accounts[0]?.id,
           amount: domesticForm.amount,
           description: domesticForm.memo || undefined,
         }
@@ -660,7 +649,7 @@ export default function TransfersPage() {
                                 <div className="mt-2">
                                   <Label className="text-xs">Select Account</Label>
                                   <select
-                                    value={selectedRecipient.accounts.find((acc) => acc.is_primary)?.id || ''}
+                                    value={selectedRecipient?.selectedAccount?.id ?? selectedRecipient?.accounts.find((acc) => acc.is_primary)?.id ?? ''}
                                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                                   if (selectedRecipient) {
                                     setSelectedRecipient({

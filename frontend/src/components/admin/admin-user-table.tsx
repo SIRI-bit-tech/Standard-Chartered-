@@ -103,7 +103,7 @@
                             }
                             const qs = new URLSearchParams({ admin_id: adminId })
                             await apiClient.put(`/admin/users/edit?${qs.toString()}`, {
-                              user_id: u.id,
+                              user_id: u.user_id,
                               is_active: u.status !== 'active',
                             })
                             window.location.reload()
@@ -127,7 +127,7 @@
                               window.location.href = '/admin/auth/login'
                               return
                             }
-                            const qs = new URLSearchParams({ admin_id: adminId, user_id: u.id })
+                            const qs = new URLSearchParams({ admin_id: adminId, user_id: u.user_id })
                             await apiClient.delete(`/admin/users/delete?${qs.toString()}`)
                             window.location.reload()
                           } catch (err: any) {

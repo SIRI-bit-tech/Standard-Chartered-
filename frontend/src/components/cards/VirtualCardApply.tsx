@@ -88,7 +88,7 @@
             <SelectContent>
               {accounts.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
-                  {a.account_number} • {a.currency} • {a.balance.toFixed(2)}
+                  {a.account_number} • {a.currency} • {Number.isFinite(Number(a.balance)) ? Number(a.balance).toFixed(2) : '0.00'}
                 </SelectItem>
               ))}
             </SelectContent>
