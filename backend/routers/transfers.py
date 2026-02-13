@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from models.transfer import Transfer, TransferStatus, TransferType, Beneficiary
-from models.account import Account
+from models.account import Account, AccountStatus
 from models.user import User
 from database import get_db
 from schemas.transfer import (
@@ -23,6 +23,78 @@ from datetime import datetime, timedelta
 router = APIRouter(prefix="/transfers", tags=["transfers"])
 
 logger = logging.getLogger(__name__)
+
+async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
+
+
+@router.get("/recipients/search")
+async def search_recipients(
+    query: str = Query(..., min_length=2, description="Search query for recipients"),
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Search for recipients by partial name matching"""
+    try:
+        # Search users by first name, last name, or username
+        search_pattern = f"%{query}%"
+        
+        users = await db.execute(
+            select(User).where(
+                or_(
+                    User.first_name.ilike(search_pattern),
+                    User.last_name.ilike(search_pattern),
+                    User.username.ilike(search_pattern)
+                )
+            ).limit(10)  # Limit results for performance
+        )
+        users = users.scalars().all()
+        
+        # Get accounts for each user
+        recipients = []
+        for user in users:
+            user_accounts = await db.execute(
+                select(Account).where(Account.user_id == user.id)
+            )
+            accounts = user_accounts.scalars().all()
+            
+            # Format accounts for display (masked account numbers)
+            formatted_accounts = []
+            for account in accounts:
+                formatted_accounts.append({
+                    "id": account.id,
+                    "type": account.account_type.value,
+                    "currency": account.currency,
+                    "last_four": account.account_number[-4:],  # Mask: show only last 4 digits
+                    "is_primary": account.is_primary,
+                    "status": account.status.value
+                })
+            
+            recipients.append({
+                "user_id": user.id,
+                "display_name": f"{user.first_name} {user.last_name}".strip(),
+                "username": user.username,
+                "email": user.email,
+                "accounts": formatted_accounts
+            })
+        
+        return {
+            "success": True,
+            "data": recipients,
+            "message": f"Found {len(recipients)} recipients"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to search recipients: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to search recipients"
+        )
 
 
 MAX_FAILED_ATTEMPTS = 5
@@ -80,6 +152,7 @@ async def internal_transfer(
     db: AsyncSession = Depends(get_db),
 ):
     """Internal transfer between own accounts. Requires PIN."""
+    await _ensure_user_active(db, user_id)
     from_account_check = await db.execute(
         select(Account).where(Account.id == request.from_account_id)
     )
@@ -88,6 +161,8 @@ async def internal_transfer(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     if from_account_preview.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if getattr(from_account_preview, "status", None) and from_account_preview.status != AccountStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
 
     to_account_check = await db.execute(
         select(Account).where(Account.id == request.to_account_id)
@@ -209,25 +284,81 @@ async def domestic_transfer(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Domestic transfer to other accounts. Requires PIN."""
+    """Domestic transfer to other accounts. Supports both account number and recipient name."""
+    await _ensure_user_active(db, user_id)
+    # Verify from account ownership and balance
     account_result = await db.execute(
         select(Account).where(Account.id == request.from_account_id)
     )
-    account = account_result.scalar_one_or_none()
-    if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-    if account.user_id != user_id:
+    from_account = account_result.scalar_one_or_none()
+    if not from_account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source account not found")
+    if from_account.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if getattr(from_account, "status", None) and from_account.status != AccountStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
+    
+    # Handle recipient - prioritized name-based transfers with optional account number fallback
+    to_account = None
+    recipient_info = None
+    
+    if request.recipient_id:
+        # Primary: Modern name-based transfer using recipient_id
+        # First verify recipient exists and get their accounts
+        recipient_result = await db.execute(
+            select(User).where(User.id == request.recipient_id)
+        )
+        recipient_user = recipient_result.scalar_one_or_none()
+        if not recipient_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipient not found")
+        
+        # Get recipient's primary account for transfer
+        recipient_accounts = await db.execute(
+            select(Account).where(
+                Account.user_id == request.recipient_id,
+                Account.is_primary == True
+            )
+        )
+        to_account = recipient_accounts.scalar_one_or_none()
+        if not to_account:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipient has no primary account")
+        
+        recipient_info = f"{recipient_user.first_name} {recipient_user.last_name}"
+        
+    elif request.to_account_id:
+        # Fallback: Traditional account ID transfer (backward compatibility)
+        to_account_result = await db.execute(
+            select(Account).where(Account.id == request.to_account_id)
+        )
+        to_account = to_account_result.scalar_one_or_none()
+        if not to_account:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipient account not found")
+        
+        recipient_info = f"Account ending in {to_account.account_number[-4:]}"
+        
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="recipient_id is required for domestic transfers"
+        )
+    
+    # Verify sufficient funds
+    total_amount = request.amount + 2.50  # Include domestic transfer fee
+    if from_account.balance < total_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Insufficient funds"
+        )
 
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     new_transfer = Transfer(
         id=str(uuid.uuid4()),
         from_account_id=request.from_account_id,
         from_user_id=user_id,
-        to_account_number=request.to_account_number,
+        to_account_id=to_account.id,  # Use account ID, not account number
         type=TransferType.DOMESTIC,
         amount=request.amount,
-        currency="USD",
+        currency=from_account.currency,
         fee_amount=2.50,
         total_amount=request.amount + 2.50,
         reference_number=str(uuid.uuid4())[:12].upper(),
@@ -251,6 +382,7 @@ async def ach_transfer(
     db: AsyncSession = Depends(get_db),
 ):
     """ACH transfer to external bank account. Requires PIN."""
+    await _ensure_user_active(db, user_id)
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     try:
         account_result = await db.execute(
@@ -262,6 +394,8 @@ async def ach_transfer(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account not found"
             )
+        if getattr(account, "status", None) and account.status != AccountStatus.ACTIVE:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
         
         new_transfer = Transfer(
             id=str(uuid.uuid4()),
@@ -315,6 +449,7 @@ async def wire_transfer(
     db: AsyncSession = Depends(get_db),
 ):
     """Wire transfer to external bank account. Requires PIN."""
+    await _ensure_user_active(db, user_id)
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     try:
         account_result = await db.execute(
@@ -380,6 +515,7 @@ async def international_transfer(
     db: AsyncSession = Depends(get_db),
 ):
     """International wire transfer (SWIFT). Requires PIN."""
+    await _ensure_user_active(db, user_id)
     account_result = await db.execute(
         select(Account).where(Account.id == request.from_account_id)
     )
@@ -388,6 +524,8 @@ async def international_transfer(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     if account.user_id != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if getattr(account, "status", None) and account.status != AccountStatus.ACTIVE:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
 
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     new_transfer = Transfer(

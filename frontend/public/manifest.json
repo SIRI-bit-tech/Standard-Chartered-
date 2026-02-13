@@ -1,0 +1,16 @@
+{
+  "name": "Standard Chartered Admin Dashboard",
+  "short_name": "SC Admin",
+  "description": "Standard Chartered Banking Admin Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0066cc",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

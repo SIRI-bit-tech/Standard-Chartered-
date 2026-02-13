@@ -10,6 +10,8 @@ class VirtualCardType(str, enum.Enum):
     TIME_LIMITED = "time_limited"
     SUBSCRIPTION = "subscription"
     RECURRING = "recurring"
+    DEBIT = "debit"
+    CREDIT = "credit"
 
 
 class VirtualCardStatus(str, enum.Enum):
@@ -19,6 +21,7 @@ class VirtualCardStatus(str, enum.Enum):
     EXPIRED = "expired"
     CANCELLED = "cancelled"
     SUSPENDED = "suspended"
+    PENDING = "pending"
 
 
 class VirtualCard(Base):

@@ -1,109 +1,157 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect,useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { logger } from '@/lib/logger'
-import { Card } from '@/components/ui/card'
 import { Loader2 } from 'lucide-react'
-
-interface Statistics {
-  total_users: number
-  active_users: number
-  total_transfers: number
-  pending_transfers: number
-  total_deposits: number
-  pending_deposits: number
-  total_loans: number
-  pending_loans: number
-  total_virtual_cards: number
-  pending_cards: number
-}
-
-const StatCard = ({ label, value, pending = null }: { label: string; value: number; pending?: number | null }) => (
-  <Card className="p-6 bg-white">
-    <p className="text-sm text-muted-foreground mb-2">{label}</p>
-    <p className="text-3xl font-bold text-foreground">{value}</p>
-    {pending !== null && (
-      <p className="text-xs text-warning mt-2">
-        {pending} pending
-      </p>
-    )}
-  </Card>
-)
+import { AdminKpiCard } from '@/components/admin/admin-kpi-card'
+import { AdminLineChart } from '@/components/admin/admin-line-chart'
+import { AdminActivityFeed, AdminSystemAlerts } from '@/components/admin/admin-dashboard-panels'
+import { colors } from '@/types'
+import type { AdminDashboardOverviewResponse } from '@/types'
+import { Users, CreditCard, ArrowLeftRight, ClipboardCheck } from 'lucide-react'
+import { useAdminRealtime } from '@/hooks/use-admin-realtime'
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<Statistics | null>(null)
+  const [data, setData] = useState<AdminDashboardOverviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const adminId = localStorage.getItem('admin_id')
-        const response = await apiClient.get(`/admin/statistics?admin_id=${adminId}`)
-        setStats(response.data.data)
-      } catch (err: any) {
-        logger.error('Failed to fetch statistics', { error: err })
-      } finally {
-        setLoading(false)
+  async function fetchOverview() {
+    try {
+      const adminId = localStorage.getItem('admin_id')
+      if (!adminId) {
+        window.location.href = '/admin/auth/login'
+        return
       }
+      const response = await apiClient.get<{ success: boolean; data: AdminDashboardOverviewResponse }>(
+        `/admin/dashboard/overview?admin_id=${adminId}`,
+      )
+      if (response.success) setData(response.data)
+    } catch (err: any) {
+      logger.error('Failed to fetch admin overview', { error: err })
+      if (err.response?.status === 403) {
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_refresh_token')
+        localStorage.removeItem('admin_id')
+        window.location.href = '/admin/auth/login'
+      }
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchStats()
+  useEffect(() => {
+    fetchOverview()
   }, [])
+  useAdminRealtime('admin:dashboard', () => {
+    fetchOverview()
+  })
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="animate-spin text-primary" size={40} />
+        <p className="ml-4">Loading dashboard...</p>
       </div>
     )
   }
 
+  if (!data) {
+    return (
+      <div className="py-10 text-center text-sm" style={{ color: colors.textSecondary }}>
+        No dashboard data available.
+      </div>
+    )
+  }
+
+  const k = data.kpis
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground mb-6">Dashboard Overview</h2>
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <AdminKpiCard
+          title="Total Users"
+          value={k.total_users.toLocaleString()}
+          icon={<Users className="h-5 w-5" style={{ color: colors.primary }} />}
+        />
+        <AdminKpiCard
+          title="Total Accounts"
+          value={k.total_accounts.toLocaleString()}
+          icon={<CreditCard className="h-5 w-5" style={{ color: colors.primary }} />}
+        />
+        <AdminKpiCard
+          title="Monthly Transactions"
+          value={k.monthly_transactions.toLocaleString()}
+          icon={<ArrowLeftRight className="h-5 w-5" style={{ color: colors.primary }} />}
+        />
+        <AdminKpiCard
+          title="Pending Verifications"
+          value={k.pending_verifications.toLocaleString()}
+          tone="warning"
+          icon={<ClipboardCheck className="h-5 w-5" style={{ color: colors.warning }} />}
+          subtitle="Users without completed KYC"
+        />
       </div>
 
-      {/* Users */}
-      <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">Users</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <StatCard label="Total Users" value={stats?.total_users || 0} />
-          <StatCard label="Active Users" value={stats?.active_users || 0} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="rounded-xl border bg-white p-5 lg:col-span-2" style={{ borderColor: colors.border }}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+                Transaction Volume
+              </h3>
+              <p className="mt-0.5 text-xs" style={{ color: colors.textSecondary }}>
+                Global settlement activity across all regions
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button className="rounded-md bg-muted px-3 py-1 text-xs font-medium">24h</button>
+              <button className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground">7d</button>
+              <button className="rounded-md px-3 py-1 text-xs font-medium text-muted-foreground">30d</button>
+            </div>
+          </div>
+          <div className="mt-4">
+            <AdminLineChart data={data.transaction_volume} />
+          </div>
+        </div>
+
+        <div className="rounded-xl border bg-white p-5" style={{ borderColor: colors.border }}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+                User Growth
+              </h3>
+              <p className="mt-0.5 text-xs" style={{ color: colors.textSecondary }}>
+                New monthly registrations
+              </p>
+            </div>
+            <button className="text-muted-foreground">⋮</button>
+          </div>
+          <div className="mt-4">
+            <AdminLineChart data={data.user_growth} height={180} />
+          </div>
+          <div className="mt-4 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] uppercase" style={{ color: colors.textSecondary }}>
+                Total Users
+              </p>
+              <p className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
+                {k.total_users.toLocaleString()}
+              </p>
+            </div>
+            <span
+              className="rounded-md px-2 py-1 text-[11px] font-semibold"
+              style={{ backgroundColor: `${colors.primary}10`, color: colors.primary }}
+            >
+              Live
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Transfers */}
-      <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">Transfers</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <StatCard label="Total Transfers" value={stats?.total_transfers || 0} pending={stats?.pending_transfers} />
-        </div>
-      </div>
-
-      {/* Deposits */}
-      <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">Deposits</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <StatCard label="Total Deposits" value={stats?.total_deposits || 0} pending={stats?.pending_deposits} />
-        </div>
-      </div>
-
-      {/* Loans */}
-      <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">Loans</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <StatCard label="Total Loans" value={stats?.total_loans || 0} pending={stats?.pending_loans} />
-        </div>
-      </div>
-
-      {/* Virtual Cards */}
-      <div>
-        <h3 className="text-lg font-semibold text-foreground mb-4">Virtual Cards</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <StatCard label="Total Cards" value={stats?.total_virtual_cards || 0} pending={stats?.pending_cards} />
-        </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AdminActivityFeed items={data.activity_feed} />
+        <AdminSystemAlerts items={data.system_alerts} />
       </div>
     </div>
   )

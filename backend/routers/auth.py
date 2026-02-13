@@ -114,7 +114,7 @@ async def register(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Registration failed. Please try again."
-            )
+            ) from e
 
         # Send verification email
         try:
@@ -165,6 +165,8 @@ async def register(
             )
         )
     except ConflictError:
+        raise
+    except HTTPException:
         raise
     except Exception as e:
         logger.error("Registration failed", error=e)

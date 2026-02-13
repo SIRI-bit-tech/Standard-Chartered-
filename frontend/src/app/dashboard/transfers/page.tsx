@@ -51,12 +51,73 @@ const ESTIMATED_DELIVERY: Record<TransferTypeTab, string> = {
   ach: '1-3 business days',
 }
 
+// Interface for recipient search response
+interface RecipientSearchResponse {
+  success: boolean
+  data: Array<{
+    user_id: string
+    display_name: string
+    username: string
+    email: string
+    accounts: Array<{
+      id: string
+      type: string
+      currency: string
+      last_four: string
+      is_primary: boolean
+      status: string
+    }>
+  }>
+  message: string
+}
+
+// Interface for recipient account (simplified version of Account)
+interface RecipientAccount {
+  id: string
+  type: string
+  currency: string
+  last_four: string
+  is_primary: boolean
+  status: string
+}
+
 export default function TransfersPage() {
   const { user } = useAuthStore()
   const { setAccounts } = useAccountStore()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new')
   const [transferType, setTransferType] = useState<TransferTypeTab>('internal')
+  
+  // State for recipient search and selection
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<RecipientSearchResponse['data']>([])
+  const [selectedRecipient, setSelectedRecipient] = useState<RecipientSearchResponse['data'][0] | null>(null)
+  const [loading, setLoading] = useState(false)
+  
+  // Handler functions
+  const handleRecipientSearch = async (query: string) => {
+    if (!query.trim()) return
+    
+    setLoading(true)
+    try {
+      const response = await apiClient.get('/transfers/recipients/search', { params: { q: query } }) as { data: RecipientSearchResponse }
+      setSearchResults(response.data.data || [])
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to search recipients',
+        variant: 'destructive'
+      })
+      setSearchResults([])
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const selectRecipient = (recipient: RecipientSearchResponse['data'][0]) => {
+    setSelectedRecipient(recipient)
+    setSearchQuery('')  // Clear search after selection
+  }
   const [accountsList, setAccountsList] = useState<Account[]>([])
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(true)
@@ -515,53 +576,91 @@ export default function TransfersPage() {
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="sm:col-span-2">
                             <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                              Recipient Name
+                              Recipient Search
                             </Label>
-                            <Input
-                              placeholder="Legal name of individual or business"
-                              value={domesticForm.recipient_name}
-                              onChange={(e) => setDomesticForm((p) => ({ ...p, recipient_name: e.target.value }))}
-                              className="mt-1.5"
-                            />
+                            <div className="relative">
+                              <Input
+                                placeholder="Search by name..."
+                                value={searchQuery}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                  setSearchQuery(e.target.value)
+                                  if (e.target.value.length >= 2) {
+                                    handleRecipientSearch(e.target.value)
+                                  } else {
+                                    setSearchResults([])
+                                  }
+                                }}
+                                className="mt-1.5"
+                                disabled={loading}
+                              />
+                              {loading && (
+                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                  <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                                </div>
+                              )}
+                              {searchResults.length > 0 && (
+                                <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                  {searchResults.map((recipient) => (
+                                    <div
+                                      key={recipient.user_id}
+                                      className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                                      onClick={() => selectRecipient(recipient)}
+                                    >
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <div className="font-medium text-sm" style={{ color: colors.textPrimary }}>
+                                            {recipient.display_name}
+                                          </div>
+                                          <div className="text-xs" style={{ color: colors.textSecondary }}>
+                                            {recipient.email}
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-xs text-gray-500">
+                                            {recipient.accounts.map((account) => (
+                                              <div key={account.id} className="flex items-center gap-1 text-xs">
+                                                <span className="font-medium">{account.type}</span>
+                                                <span>•••• {account.last_four}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {user?.country === 'US' && (
-                            <>
-                              <div>
-                                <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                                  Routing Number (ABA)
-                                </Label>
-                                <Input
-                                  placeholder="9-digit ABA routing number"
-                                  maxLength={9}
-                                  value={domesticForm.routing_number}
-                                  onChange={(e) => setDomesticForm((p) => ({ ...p, routing_number: e.target.value.replace(/\D/g, '') }))}
-                                  className="mt-1.5"
-                                />
+                          {selectedRecipient ? (
+                            <div className="sm:col-span-2">
+                              <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                                Selected Recipient
+                              </Label>
+                              <div className="p-3 bg-gray-50 rounded-lg border">
+                                <div className="font-medium text-sm" style={{ color: colors.textPrimary }}>
+                                  {selectedRecipient.display_name}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {selectedRecipient.email}
+                                </div>
+                                <div className="mt-2">
+                                  <Label className="text-xs">Select Account</Label>
+                                  <select
+                                    value={selectedRecipient.accounts.find((acc) => acc.is_primary)?.id || ''}
+                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRecipient((prev) => prev ? {...prev, selectedAccountId: e.target.value} : null)}
+                                    className="mt-1 w-full p-2 border rounded"
+                                  >
+                                    {selectedRecipient.accounts.map((account: RecipientAccount) => (
+                                      <option key={account.id} value={account.id}>
+                                        {account.type} (••• {account.last_four})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
                               </div>
-                              <div>
-                                <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                                  Account Number
-                                </Label>
-                                <Input
-                                  placeholder="Recipient account number"
-                                  value={domesticForm.account_number}
-                                  onChange={(e) => setDomesticForm((p) => ({ ...p, account_number: e.target.value }))}
-                                  className="mt-1.5"
-                                />
-                              </div>
-                            </>
-                          )}
-                          <div className="sm:col-span-2">
-                            <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                              Physical Address
-                            </Label>
-                            <Input
-                              placeholder="Street, City, State, Zip (required for wires)"
-                              value={domesticForm.physical_address}
-                              onChange={(e) => setDomesticForm((p) => ({ ...p, physical_address: e.target.value }))}
-                              className="mt-1.5"
-                            />
-                          </div>
+                            </div>
+                          ) : null}
                         </div>
                       </SectionCard>
                       <SectionCard number={3} title="Transfer Amount">

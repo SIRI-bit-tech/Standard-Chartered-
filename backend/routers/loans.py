@@ -10,6 +10,14 @@ from utils.auth import get_current_user_id
 
 router = APIRouter()
 
+async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account suspended")
+
 
 @router.get("/products")
 async def get_loan_products(
@@ -60,6 +68,7 @@ async def apply_for_loan(
     db: AsyncSession = Depends(get_db)
 ):
     """Apply for loan"""
+    await _ensure_user_active(db, current_user_id)
     # Verify product exists
     product_result = await db.execute(
         select(LoanProduct).where(LoanProduct.id == product_id)

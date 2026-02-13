@@ -9,6 +9,8 @@ class VirtualCardType(str, Enum):
     TIME_LIMITED = "time_limited"
     SUBSCRIPTION = "subscription"
     RECURRING = "recurring"
+    DEBIT = "debit"
+    CREDIT = "credit"
 
 
 class VirtualCardStatus(str, Enum):

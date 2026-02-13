@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, validator
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 from enum import Enum
 
@@ -40,16 +40,16 @@ class AdminLoginRequest(BaseModel):
 
 class AdminResponse(BaseModel):
     """Admin response"""
-    id: str
-    email: str
-    username: str
-    first_name: str
-    last_name: str
-    role: str
-    department: Optional[str]
-    is_active: bool
-    last_login: Optional[datetime]
-    created_at: datetime
+    id: Optional[str] = None
+    email: Optional[str] = None
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    role: Optional[str] = None
+    department: Optional[str] = None
+    is_active: Optional[bool] = None
+    last_login: Optional[datetime] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -107,6 +107,15 @@ class DeclineVirtualCardRequest(BaseModel):
     card_id: str
     reason: str = Field(..., max_length=500)
 
+class AdminUpdateCardStatusRequest(BaseModel):
+    """Update virtual card status by admin"""
+    card_id: str
+    status: Literal['pending', 'active']
+
+class AdminCardActionRequest(BaseModel):
+    """Admin action on card (freeze/unfreeze/block)"""
+    card_id: str
+
 
 class VirtualCardApprovalResponse(BaseModel):
     """Virtual card approval response"""
@@ -135,6 +144,15 @@ class AdminEditUserRequest(BaseModel):
     country: Optional[str] = None
     date_joined: Optional[datetime] = Field(None, description="Override user join date")
     is_active: Optional[bool] = None
+
+class AdminAccountStatusRequest(BaseModel):
+    account_id: str
+    status: Literal['active', 'frozen', 'closed']
+
+class AdminAdjustBalanceRequest(BaseModel):
+    account_id: str
+    amount: float
+    operation: Literal['credit', 'debit']
 
 
 class AdminAuditLogResponse(BaseModel):
