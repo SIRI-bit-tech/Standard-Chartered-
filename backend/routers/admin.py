@@ -188,7 +188,7 @@ async def admin_update_card_status(
         admin = admin_result.scalar()
         if not admin:
             raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
-        required_perm = "cards:approve" if request.status == "active" else "cards:view"
+        required_perm = "cards:approve" if request.status == "active" else "cards:update"
         if not AdminPermissionManager.has_permission(admin.role, required_perm):
             raise UnauthorizedError(message="You don't have permission to update cards", error_code="PERMISSION_DENIED")
         card_result = await db.execute(select(VirtualCard).where(VirtualCard.id == request.card_id))

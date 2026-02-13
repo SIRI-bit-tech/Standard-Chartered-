@@ -25,14 +25,16 @@
    })
    const [busy, setBusy] = useState(false)
   const [cards, setCards] = useState<VirtualCardSummary[]>([])
-  const existingTypes = new Set(cards.map((c) => c.card_type))
+  const filteredCards = cards.filter((c) => c.status === 'active' || c.status === 'pending')
+  const existingTypes = new Set(filteredCards.map((c) => c.card_type))
+  const hasBothTypes = existingTypes.has('debit') && existingTypes.has('credit')
   const blockedNotExpired = cards.some(
     (c) =>
+      c.card_type === form.card_type &&
       (c.status === 'blocked' || c.status === 'suspended') &&
       (c.expiry_year > new Date().getFullYear() ||
         (c.expiry_year === new Date().getFullYear() && c.expiry_month >= new Date().getMonth() + 1)),
   )
-  const hasBothTypes = existingTypes.has('debit') && existingTypes.has('credit')
  
   useEffect(() => {
     ;(async () => {
@@ -46,8 +48,8 @@
     ;(async () => {
       try {
         const resp = await apiClient.get<{ cards: VirtualCardSummary[] }>(`/api/v1/cards/list`)
-        const list = (resp as any)?.cards ?? []
-        if (Array.isArray(list)) setCards(list)
+        const list = Array.isArray(resp.cards) ? resp.cards : []
+        setCards(list)
       } catch (e) {
         logger.error('Failed to fetch cards', { error: e })
       }

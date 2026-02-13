@@ -3,6 +3,7 @@
  import { useEffect, useRef, useState } from 'react'
  import { Wifi } from 'lucide-react'
  import { apiClient } from '@/lib/api-client'
+ import { logger } from '@/lib/logger'
  import { colors } from '@/types'
  
  interface Props {
@@ -20,8 +21,9 @@
 export function VirtualCard3D({ card }: Props) {
   const [showBack, setShowBack] = useState(false)
   const timerRef = useRef<number | null>(null)
-  const [fullNumber, setFullNumber] = useState<string | null>(null)
   const [cvv, setCvv] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [cvvRevealed, setCvvRevealed] = useState(false)
  
    useEffect(() => {
      return () => {
@@ -33,17 +35,23 @@ export function VirtualCard3D({ card }: Props) {
      if (timerRef.current) window.clearTimeout(timerRef.current)
      setShowBack(true)
      timerRef.current = window.setTimeout(() => setShowBack(false), 5000)
-    if (!cvv && card.id) {
-      ;(async () => {
-        try {
-          const res = await apiClient.get(`/api/v1/cards/${card.id}`)
-          const obj: any = res && typeof res === 'object' ? (res as any).data ?? res : null
-          if (obj?.cvv) setCvv(obj.cvv)
-          if (obj?.card_number) setFullNumber(obj.card_number)
-        } catch {}
-      })()
-    }
    }
+
+  async function handleRevealCvv() {
+    if (!card.id) return
+    try {
+      const confirmed = typeof window !== 'undefined' ? window.confirm('Reveal CVV?') : false
+      if (!confirmed) return
+      const data = await apiClient.get<{ cvv?: string; card_number?: string }>(`/api/v1/cards/${card.id}`)
+      if (typeof data.cvv === 'string' && data.cvv) {
+        setCvv(data.cvv)
+        setCvvRevealed(true)
+      }
+    } catch (err) {
+      logger.error('Failed to reveal CVV', { error: err })
+      setError('Unable to reveal CVV')
+    }
+  }
  
   const bg =
     card.card_type === 'debit'
@@ -57,8 +65,14 @@ export function VirtualCard3D({ card }: Props) {
        ? 'rgba(255,0,0,0.25)'
        : 'transparent'
  
-  const rawNumber = (fullNumber || card.card_number || '').replace(/\s+/g, '')
-  const groups = rawNumber.match(/.{1,4}/g) || []
+  const rawNumber = (card.card_number || '').replace(/\s+/g, '')
+  const digits = rawNumber.replace(/\D/g, '')
+  const len = digits.length
+  const maskedPan =
+    len >= 10
+      ? `${digits.slice(0, 6)}${'•'.repeat(len - 10)}${digits.slice(-4)}`
+      : `${'•'.repeat(Math.max(0, len - 4))}${digits.slice(-4)}`
+  const maskedGroups = maskedPan.match(/.{1,4}/g) || []
   const hasDetails =
     !!card.card_number &&
     !!card.expiry_month &&
@@ -67,23 +81,24 @@ export function VirtualCard3D({ card }: Props) {
   const expiry = hasDetails
     ? `${String(card.expiry_month).padStart(2, '0')}/${String(card.expiry_year).slice(-2)}`
     : ''
-  const name = hasDetails ? (card.card_name || 'CARDHOLDER') : ''
 
-  const Chip = () => (
-    <img
-      src="/chip.png"
-      alt="Chip"
-      className="h-8 w-12 object-contain select-none pointer-events-none"
-      style={{ background: 'transparent', border: 'none', boxShadow: '0 1px 1px rgba(0,0,0,0.2)' }}
-    />
-  )
+  const Chip = () => <img src="/chip.png" alt="Chip" className="h-8 w-12 object-contain select-none pointer-events-none" style={{ background: 'transparent', border: 'none', boxShadow: '0 1px 1px rgba(0,0,0,0.2)' }} />
   const brandLogo = card.card_type === 'credit' ? '/mastercard.png' : '/visa.png'
 
    return (
     <div
       className="relative w-full cursor-pointer perspective-1000"
       onClick={flipOnce}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+          e.preventDefault()
+          flipOnce()
+        }
+      }}
       aria-label="Virtual card preview"
+      aria-pressed={showBack}
       style={{ maxWidth: '428px', aspectRatio: '85.6 / 53.98' }}
     >
        <div
@@ -109,7 +124,7 @@ export function VirtualCard3D({ card }: Props) {
             {hasDetails ? (
               <>
                 <div className="grid grid-cols-4 gap-2 font-mono text-base tracking-[0.25em]">
-                  {groups.map((g, idx) => (
+                  {maskedGroups.map((g, idx) => (
                     <span key={idx}>{g}</span>
                   ))}
                 </div>
@@ -142,9 +157,20 @@ export function VirtualCard3D({ card }: Props) {
               <div className="h-10 w-32 rounded-sm bg-white/80" />
               <div className="flex items-center gap-2">
                 <span className="text-xs opacity-80">CVV</span>
-                <span className="font-mono">{cvv || '***'}</span>
+                <span className="font-mono">{cvvRevealed && cvv ? cvv : '***'}</span>
+                {!cvvRevealed && (
+                  <button
+                    type="button"
+                    onClick={handleRevealCvv}
+                    className="rounded-sm bg-white/20 px-2 py-1 text-[10px]"
+                    style={{ color: '#ffffff' }}
+                  >
+                    Reveal CVV
+                  </button>
+                )}
               </div>
             </div>
+            {error && <div className="text-[10px]" style={{ color: colors.error }}>{error}</div>}
             <div className="text-[10px] opacity-60">For online use only</div>
           </div>
          </div>
