@@ -1,6 +1,6 @@
  'use client'
  
- import { useEffect, useRef, useState } from 'react'
+ import { useEffect, useRef, useState, type MouseEvent } from 'react'
  import { Wifi } from 'lucide-react'
  import { apiClient } from '@/lib/api-client'
  import { logger } from '@/lib/logger'
@@ -37,7 +37,8 @@ export function VirtualCard3D({ card }: Props) {
      timerRef.current = window.setTimeout(() => setShowBack(false), 5000)
    }
 
-  async function handleRevealCvv() {
+  async function handleRevealCvv(e: MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation()
     if (!card.id) return
     try {
       const confirmed = typeof window !== 'undefined' ? window.confirm('Reveal CVV?') : false

@@ -52,7 +52,8 @@ export default function AdminLoginPage() {
       if (response.success) {
         localStorage.setItem('admin_token', response.token.access_token)
         localStorage.setItem('admin_refresh_token', response.token.refresh_token)
-        document.cookie = `admin_token=${response.token.access_token}; path=/; max-age=3600; samesite=lax; Secure`
+        const secure = typeof window !== 'undefined' && (window.location.protocol === 'https:' || process.env.NODE_ENV === 'production') ? '; Secure' : ''
+        document.cookie = `admin_token=${response.token.access_token}; path=/; max-age=3600; samesite=lax${secure}`
         localStorage.setItem('admin_id', response.data.admin_id)
         const fullName = `${response.data.first_name || ''} ${response.data.last_name || ''}`.trim()
         if (fullName) {

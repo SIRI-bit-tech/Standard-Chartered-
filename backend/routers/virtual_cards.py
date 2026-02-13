@@ -154,9 +154,10 @@ async def create_virtual_card(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unexpected error during card creation", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create virtual card: {str(e)}"
+            detail="An internal server error occurred while creating the card."
         )
 
 
