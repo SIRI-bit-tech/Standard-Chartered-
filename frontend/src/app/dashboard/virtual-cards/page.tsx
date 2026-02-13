@@ -19,6 +19,7 @@ export default function VirtualCardsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [metrics, setMetrics] = useState({ total: 0, active: 0, blocked: 0 })
   const { user } = useAuthStore()
+  const [cannotCreate, setCannotCreate] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -39,6 +40,16 @@ export default function VirtualCardsPage() {
         active: response.active_count ?? 0,
         blocked: response.blocked_count ?? 0,
       })
+      const hasDebit = (response.cards ?? []).some((c) => c.card_type === 'debit')
+      const hasCredit = (response.cards ?? []).some((c) => c.card_type === 'credit')
+      const hasBoth = hasDebit && hasCredit
+      const blockedNotExpired = (response.cards ?? []).some(
+        (c) =>
+          (c.status === 'blocked' || c.status === 'suspended') &&
+          (c.expiry_year > new Date().getFullYear() ||
+            (c.expiry_year === new Date().getFullYear() && c.expiry_month >= new Date().getMonth() + 1)),
+      )
+      setCannotCreate(hasBoth || blockedNotExpired)
     } catch (e) {
       console.error('Failed to fetch virtual cards:', e)
     } finally {
@@ -64,7 +75,7 @@ export default function VirtualCardsPage() {
             Create and manage virtual cards for secure online payments
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(!showCreateForm)} className="gap-2" disabled={loading}>
+        <Button onClick={() => setShowCreateForm(!showCreateForm)} className="gap-2" disabled={loading || cannotCreate}>
           <PlusIcon className="h-4 w-4" />
           New Card
         </Button>

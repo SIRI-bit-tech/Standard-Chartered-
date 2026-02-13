@@ -142,10 +142,16 @@
                          Unfreeze
                        </Button>
                      ) : null}
-                     <Button size="sm" variant="destructive" className="gap-1" onClick={() => block(it.id)}>
-                       <Ban className="h-4 w-4" />
-                       Block
-                     </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="gap-1 text-white"
+                      onClick={() => block(it.id)}
+                      aria-label="Block card"
+                    >
+                      <Ban className="h-4 w-4" />
+                      Block
+                    </Button>
                    </div>
                  </TableCell>
                </TableRow>

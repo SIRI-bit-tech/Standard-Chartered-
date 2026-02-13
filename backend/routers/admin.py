@@ -186,7 +186,10 @@ async def admin_update_card_status(
     try:
         admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
         admin = admin_result.scalar()
-        if not admin or not AdminPermissionManager.has_permission(admin.role, "cards:approve"):
+        if not admin:
+            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        required_perm = "cards:approve" if request.status == "active" else "cards:view"
+        if not AdminPermissionManager.has_permission(admin.role, required_perm):
             raise UnauthorizedError(message="You don't have permission to update cards", error_code="PERMISSION_DENIED")
         card_result = await db.execute(select(VirtualCard).where(VirtualCard.id == request.card_id))
         card = card_result.scalar_one_or_none()
@@ -358,7 +361,7 @@ async def admin_list_cards(admin_id: str, db: AsyncSession = Depends(get_db)):
     try:
         admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
         admin = admin_result.scalar()
-        if not admin or not AdminPermissionManager.has_permission(admin.role, "cards:approve"):
+        if not admin or not AdminPermissionManager.has_permission(admin.role, "cards:view"):
             raise UnauthorizedError(message="You don't have permission to view cards", error_code="PERMISSION_DENIED")
         cards_result = await db.execute(select(VirtualCard))
         cards = cards_result.scalars().all()

@@ -37,8 +37,25 @@ class VirtualCard(Base):
     
     # Card details
     card_number = Column(String, nullable=False, unique=True, index=True)  # Encrypted
-    card_type = Column(Enum(VirtualCardType), nullable=False)
-    status = Column(Enum(VirtualCardStatus), default=VirtualCardStatus.ACTIVE, nullable=False)
+    card_type = Column(
+        Enum(
+            VirtualCardType,
+            values_callable=lambda x: [e.value for e in x],
+            name="virtualcardtype",
+            validate_strings=True
+        ),
+        nullable=False
+    )
+    status = Column(
+        Enum(
+            VirtualCardStatus,
+            values_callable=lambda x: [e.value for e in x],
+            name="virtualcardstatus",
+            validate_strings=True
+        ),
+        default=VirtualCardStatus.ACTIVE,
+        nullable=False
+    )
     
     # Expiry
     expiry_month = Column(Integer, nullable=False)

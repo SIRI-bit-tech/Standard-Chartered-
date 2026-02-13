@@ -6,7 +6,7 @@
  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
  import { apiClient } from '@/lib/api-client'
  import { logger } from '@/lib/logger'
- import type { Account, VirtualCardType } from '@/types'
+ import type { Account, VirtualCardType, VirtualCardSummary } from '@/types'
  import { colors } from '@/types'
  import { VirtualCard3D } from '@/components/cards/VirtualCard3D'
  
@@ -24,6 +24,15 @@
      monthly_limit: '',
    })
    const [busy, setBusy] = useState(false)
+  const [cards, setCards] = useState<VirtualCardSummary[]>([])
+  const existingTypes = new Set(cards.map((c) => c.card_type))
+  const blockedNotExpired = cards.some(
+    (c) =>
+      (c.status === 'blocked' || c.status === 'suspended') &&
+      (c.expiry_year > new Date().getFullYear() ||
+        (c.expiry_year === new Date().getFullYear() && c.expiry_month >= new Date().getMonth() + 1)),
+  )
+  const hasBothTypes = existingTypes.has('debit') && existingTypes.has('credit')
  
   useEffect(() => {
     ;(async () => {
@@ -32,6 +41,15 @@
         if (res.success && Array.isArray(res.data)) setAccounts(res.data)
       } catch (e) {
         logger.error('Failed to fetch accounts', { error: e })
+      }
+    })()
+    ;(async () => {
+      try {
+        const resp = await apiClient.get<{ cards: VirtualCardSummary[] }>(`/api/v1/cards/list`)
+        const list = (resp as any)?.cards ?? []
+        if (Array.isArray(list)) setCards(list)
+      } catch (e) {
+        logger.error('Failed to fetch cards', { error: e })
       }
     })()
   }, [])
@@ -71,10 +89,24 @@
               <SelectValue placeholder="Select type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="debit">Debit</SelectItem>
-              <SelectItem value="credit">Credit</SelectItem>
+              <SelectItem value="debit" disabled={existingTypes.has('debit')}>
+                Debit
+              </SelectItem>
+              <SelectItem value="credit" disabled={existingTypes.has('credit')}>
+                Credit
+              </SelectItem>
             </SelectContent>
           </Select>
+          {hasBothTypes && (
+            <p className="mt-1 text-xs" style={{ color: colors.textSecondary }}>
+              You already have both cards.
+            </p>
+          )}
+          {blockedNotExpired && (
+            <p className="mt-1 text-xs" style={{ color: colors.error }}>
+              You cannot apply while a card is blocked and not expired.
+            </p>
+          )}
         </div>
 
         <div>
@@ -117,7 +149,7 @@
           </div>
         </div>
 
-        <Button className="w-full" disabled={busy} onClick={submit}>
+        <Button className="w-full" disabled={busy || hasBothTypes || blockedNotExpired} onClick={submit}>
           Apply
         </Button>
       </div>

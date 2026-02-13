@@ -85,6 +85,33 @@ async def lifespan(app: FastAPI):
             await conn.execute(text(
                 "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'declined'"
             ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'pending'"
+            ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'suspended'"
+            ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'inactive'"
+            ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'active'"
+            ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'blocked'"
+            ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'cancelled'"
+            ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'expired'"
+            ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardtype ADD VALUE IF NOT EXISTS 'debit'"
+            ))
+            await conn.execute(text(
+                "ALTER TYPE virtualcardtype ADD VALUE IF NOT EXISTS 'credit'"
+            ))
             
             print("✅ Database migrations completed successfully!")
         except Exception as e:
