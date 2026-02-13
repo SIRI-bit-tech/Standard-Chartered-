@@ -64,6 +64,8 @@ export default function AdminLoginPage() {
         router.push('/admin/dashboard')
       } else {
         console.log('Login: Failed - response.success is false')
+        setError(response.message || 'Login failed. Please check your credentials.')
+        setLoading(false)
       }
     } catch (err: any) {
       logger.error('Admin login error', { error: err })

@@ -81,6 +81,11 @@ interface RecipientAccount {
   status: string
 }
 
+// Extended type for selected recipient with account selection
+type SelectedRecipient = RecipientSearchResponse['data'][0] & {
+  selectedAccount?: RecipientSearchResponse['data'][0]['accounts'][0] | null
+}
+
 export default function TransfersPage() {
   const { user } = useAuthStore()
   const { setAccounts } = useAccountStore()
@@ -91,7 +96,7 @@ export default function TransfersPage() {
   // State for recipient search and selection
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<RecipientSearchResponse['data']>([])
-  const [selectedRecipient, setSelectedRecipient] = useState<RecipientSearchResponse['data'][0] | null>(null)
+  const [selectedRecipient, setSelectedRecipient] = useState<SelectedRecipient | null>(null)
   const [loading, setLoading] = useState(false)
   
   // Handler functions
@@ -100,7 +105,7 @@ export default function TransfersPage() {
     
     setLoading(true)
     try {
-      const response = await apiClient.get('/transfers/recipients/search', { params: { q: query } }) as { data: RecipientSearchResponse }
+      const response = await apiClient.get('/transfers/recipients/search', { params: { query } }) as { data: RecipientSearchResponse }
       setSearchResults(response.data.data || [])
     } catch (error) {
       toast({
@@ -115,7 +120,7 @@ export default function TransfersPage() {
   }
   
   const selectRecipient = (recipient: RecipientSearchResponse['data'][0]) => {
-    setSelectedRecipient(recipient)
+    setSelectedRecipient(recipient as SelectedRecipient)
     setSearchQuery('')  // Clear search after selection
   }
   const [accountsList, setAccountsList] = useState<Account[]>([])
@@ -272,13 +277,8 @@ export default function TransfersPage() {
 
     if (transferType === 'domestic') {
       if (!domesticForm.from_account_id) return 'Select a “From” account.'
-      if (!domesticForm.recipient_name.trim()) return 'Enter the recipient name.'
-      if (!domesticForm.routing_number.trim()) return 'Enter a routing number.'
-      if (!/^\d{9}$/.test(domesticForm.routing_number.trim()))
-        return 'Routing number must be 9 digits.'
-      if (!domesticForm.account_number.trim()) return 'Enter an account number.'
-      if (!/^[0-9]{4,17}$/.test(domesticForm.account_number.trim()))
-        return 'Account number must be 4-17 digits.'
+      if (!selectedRecipient) return 'Please select a recipient from the search results.'
+      if (selectedRecipient && (!selectedRecipient.accounts || selectedRecipient.accounts.length === 0)) return 'Recipient has no available accounts.'
       return null
     }
 
@@ -352,7 +352,8 @@ export default function TransfersPage() {
         const payload = {
           transfer_pin: pin,
           from_account_id: domesticForm.from_account_id,
-          to_account_number: domesticForm.account_number,
+          recipient_id: selectedRecipient?.user_id,
+          to_account_id: selectedRecipient?.selectedAccount?.id ?? selectedRecipient?.accounts.find(acc => acc.is_primary)?.id ?? selectedRecipient?.accounts[0]?.id,
           amount: domesticForm.amount,
           description: domesticForm.memo || undefined,
         }
@@ -370,6 +371,7 @@ export default function TransfersPage() {
             amount: 0,
             memo: '',
           })
+          setSelectedRecipient(null)
           alert(res.message ?? 'Domestic transfer submitted.')
         }
       } else if (transferType === 'international') {
@@ -647,8 +649,15 @@ export default function TransfersPage() {
                                 <div className="mt-2">
                                   <Label className="text-xs">Select Account</Label>
                                   <select
-                                    value={selectedRecipient.accounts.find((acc) => acc.is_primary)?.id || ''}
-                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSelectedRecipient((prev) => prev ? {...prev, selectedAccountId: e.target.value} : null)}
+                                    value={selectedRecipient?.selectedAccount?.id ?? selectedRecipient?.accounts.find((acc) => acc.is_primary)?.id ?? ''}
+                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                                  if (selectedRecipient) {
+                                    setSelectedRecipient({
+                                      ...selectedRecipient,
+                                      selectedAccount: selectedRecipient.accounts.find(acc => acc.id === e.target.value) || null
+                                    })
+                                  }
+                                }}
                                     className="mt-1 w-full p-2 border rounded"
                                   >
                                     {selectedRecipient.accounts.map((account: RecipientAccount) => (

@@ -37,7 +37,7 @@ export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
     ;(async () => {
       try {
         const hasToken =
-          !!(localStorage.getItem('access_token') || document.cookie.includes('accessToken='))
+          !!(localStorage.getItem('admin_token') || document.cookie.includes('adminToken='))
         if (!hasToken) return
         const res = await apiClient.get<{ success: boolean; data: { id: string }[] }>(
           '/api/v1/notifications?limit=10',

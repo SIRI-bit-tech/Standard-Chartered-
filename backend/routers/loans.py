@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.loan import LoanProduct, LoanApplication, LoanApplicationStatus, LoanType, Loan
+from models.user import User
 from models.account import Account
 from database import get_db
 import uuid

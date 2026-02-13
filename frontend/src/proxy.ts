@@ -1,11 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-const protectedRoutes = ["/dashboard", "/dashboard/*"]
-const publicRoutes = ["/", "/auth/login", "/auth/register", "/auth/forgot-password"]
+const protectedRoutes = ["/dashboard", "/dashboard/*", "/admin", "/admin/*"]
+const publicRoutes = ["/", "/auth/login", "/auth/register", "/auth/forgot-password", "/admin/auth/login", "/admin/auth/register"]
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const accessToken = request.cookies.get("accessToken")?.value
+  const adminToken = request.cookies.get("admin_token")?.value
+
+  // Check if accessing public routes first
+  const isPublicRoute = publicRoutes.includes(pathname)
 
   // Check if accessing protected routes
   const isProtectedRoute = protectedRoutes.some((route) => {
@@ -16,13 +20,16 @@ export function proxy(request: NextRequest) {
     return pathname === route
   })
 
-  // Check if accessing public routes
-  const isPublicRoute = publicRoutes.includes(pathname)
+  // Redirect logic for admin routes
+  if (isProtectedRoute && pathname.startsWith('/admin')) {
+    if (!adminToken) {
+      return NextResponse.redirect(new URL("/admin/auth/login", request.url))
+    }
+  }
 
-  // Redirect logic
-  if (isProtectedRoute) {
+  // Redirect logic for user routes
+  if (isProtectedRoute && !pathname.startsWith('/admin')) {
     if (!accessToken) {
-      // Redirect to login if trying to access protected route without token
       return NextResponse.redirect(new URL("/auth/login", request.url))
     }
   }
@@ -35,10 +42,4 @@ export function proxy(request: NextRequest) {
   }
 
   return NextResponse.next()
-}
-
-export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|public).*)",
-  ],
 }

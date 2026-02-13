@@ -81,6 +81,11 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS routing_number VARCHAR"
             ))
             
+            # Virtual card enum migration
+            await conn.execute(text(
+                "ALTER TYPE virtualcardstatus ADD VALUE IF NOT EXISTS 'declined'"
+            ))
+            
             print("✅ Database migrations completed successfully!")
         except Exception as e:
             print(f"❌ Migration error: {e}")
