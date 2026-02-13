@@ -2,15 +2,26 @@
  
  import { useEffect, useRef, useState } from 'react'
  import { Wifi } from 'lucide-react'
- import { colors, type VirtualCardSummary } from '@/types'
+ import { apiClient } from '@/lib/api-client'
+ import { colors } from '@/types'
  
  interface Props {
-   card: Pick<VirtualCardSummary, 'card_name' | 'card_number' | 'expiry_month' | 'expiry_year' | 'status' | 'card_type'>
+  card: {
+    id?: string
+    card_name: string
+    card_number: string
+    expiry_month: number
+    expiry_year: number
+    status: string
+    card_type: 'debit' | 'credit'
+  }
  }
  
 export function VirtualCard3D({ card }: Props) {
   const [showBack, setShowBack] = useState(false)
   const timerRef = useRef<number | null>(null)
+  const [fullNumber, setFullNumber] = useState<string | null>(null)
+  const [cvv, setCvv] = useState<string | null>(null)
  
    useEffect(() => {
      return () => {
@@ -22,6 +33,16 @@ export function VirtualCard3D({ card }: Props) {
      if (timerRef.current) window.clearTimeout(timerRef.current)
      setShowBack(true)
      timerRef.current = window.setTimeout(() => setShowBack(false), 5000)
+    if (!cvv && card.id) {
+      ;(async () => {
+        try {
+          const res = await apiClient.get(`/api/v1/cards/${card.id}`)
+          const obj: any = res && typeof res === 'object' ? (res as any).data ?? res : null
+          if (obj?.cvv) setCvv(obj.cvv)
+          if (obj?.card_number) setFullNumber(obj.card_number)
+        } catch {}
+      })()
+    }
    }
  
   const bg =
@@ -36,8 +57,8 @@ export function VirtualCard3D({ card }: Props) {
        ? 'rgba(255,0,0,0.25)'
        : 'transparent'
  
-  const groups = (card.card_number || '').replace(/\s+/g, '').match(/.{1,4}/g) || []
-  const maskedGroups = groups.map((g, i) => (i === 0 || i === groups.length - 1 ? g : '••••'))
+  const rawNumber = (fullNumber || card.card_number || '').replace(/\s+/g, '')
+  const groups = rawNumber.match(/.{1,4}/g) || []
   const hasDetails =
     !!card.card_number &&
     !!card.expiry_month &&
@@ -52,18 +73,19 @@ export function VirtualCard3D({ card }: Props) {
     <img
       src="/chip.png"
       alt="Chip"
-      className="h-12 w-16 object-contain select-none pointer-events-none"
+      className="h-8 w-12 object-contain select-none pointer-events-none"
       style={{ background: 'transparent', border: 'none', boxShadow: '0 1px 1px rgba(0,0,0,0.2)' }}
     />
   )
   const brandLogo = card.card_type === 'credit' ? '/mastercard.png' : '/visa.png'
 
    return (
-     <div
-      className="relative w-full max-w-[360px] md:max-w-[420px] h-[220px] md:h-[250px] cursor-pointer perspective-1000"
-       onClick={flipOnce}
-       aria-label="Virtual card preview"
-     >
+    <div
+      className="relative w-full cursor-pointer perspective-1000"
+      onClick={flipOnce}
+      aria-label="Virtual card preview"
+      style={{ maxWidth: '428px', aspectRatio: '85.6 / 53.98' }}
+    >
        <div
          className={`absolute inset-0 transition-transform duration-700 preserve-3d ${showBack ? 'rotate-y-180' : ''}`}
          style={{ transformStyle: 'preserve-3d' }}
@@ -87,7 +109,7 @@ export function VirtualCard3D({ card }: Props) {
             {hasDetails ? (
               <>
                 <div className="grid grid-cols-4 gap-2 font-mono text-base tracking-[0.25em]">
-                  {maskedGroups.map((g, idx) => (
+                  {groups.map((g, idx) => (
                     <span key={idx}>{g}</span>
                   ))}
                 </div>
@@ -97,15 +119,14 @@ export function VirtualCard3D({ card }: Props) {
                     <span className="font-mono">{expiry}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <img src={brandLogo} alt="Network" className="h-5 w-auto opacity-90" />
-                    <span className="font-semibold">{name}</span>
+                    <img src={brandLogo} alt="Network" className="h-4 w-auto opacity-90" />
                   </div>
                 </div>
               </>
             ) : (
               <div className="flex items-end justify-between text-xs">
                 <span className="opacity-80">Pending approval</span>
-                <img src={brandLogo} alt="Network" className="h-5 w-auto opacity-90" />
+                <img src={brandLogo} alt="Network" className="h-4 w-auto opacity-90" />
               </div>
             )}
           </div>
@@ -121,7 +142,7 @@ export function VirtualCard3D({ card }: Props) {
               <div className="h-10 w-32 rounded-sm bg-white/80" />
               <div className="flex items-center gap-2">
                 <span className="text-xs opacity-80">CVV</span>
-                <span className="font-mono">***</span>
+                <span className="font-mono">{cvv || '***'}</span>
               </div>
             </div>
             <div className="text-[10px] opacity-60">For online use only</div>

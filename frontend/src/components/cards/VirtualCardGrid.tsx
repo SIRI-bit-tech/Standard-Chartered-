@@ -8,6 +8,7 @@
  import { logger } from '@/lib/logger'
  import type { VirtualCardSummary } from '@/types'
  import { Copy, Lock, Unlock, Trash2 } from 'lucide-react'
+ import { useToast } from '@/hooks/use-toast'
  
  interface Props {
    cards: VirtualCardSummary[]
@@ -16,14 +17,17 @@
  
  export function VirtualCardGrid({ cards, onRefresh }: Props) {
    const [busy, setBusy] = useState<string | null>(null)
+  const { toast } = useToast()
  
    async function freeze(card: VirtualCardSummary) {
      setBusy(card.id)
      try {
       await apiClient.post(`/api/v1/cards/${card.id}/block`, { reason: 'user freeze' })
        onRefresh()
+      toast({ title: 'Card frozen', description: `“${card.card_name}” is now blocked.` })
      } catch (e) {
        logger.error('Freeze card failed', { error: e })
+      toast({ title: 'Freeze failed', description: 'Unable to block the card', variant: 'destructive' })
      } finally {
        setBusy(null)
      }
@@ -34,8 +38,10 @@
      try {
       await apiClient.post(`/api/v1/cards/${card.id}/unblock`, {})
        onRefresh()
+      toast({ title: 'Card unfrozen', description: `“${card.card_name}” is now active.` })
      } catch (e) {
        logger.error('Unfreeze card failed', { error: e })
+      toast({ title: 'Unfreeze failed', description: 'Unable to activate the card', variant: 'destructive' })
      } finally {
        setBusy(null)
      }
@@ -46,8 +52,10 @@
      try {
       await apiClient.delete(`/api/v1/cards/${card.id}`)
        onRefresh()
+      toast({ title: 'Card deleted', description: `“${card.card_name}” was cancelled.` })
      } catch (e) {
        logger.error('Delete card failed', { error: e })
+      toast({ title: 'Delete failed', description: 'Unable to cancel the card', variant: 'destructive' })
      } finally {
        setBusy(null)
      }

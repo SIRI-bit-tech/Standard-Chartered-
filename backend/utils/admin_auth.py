@@ -77,7 +77,7 @@ class AdminPermissionManager:
             "users:create", "users:read", "users:update", "users:delete",
             "transfers:approve", "transfers:decline", "transfers:view",
             "deposits:approve", "deposits:decline", "deposits:view",
-            "cards:approve", "cards:decline", "cards:view",
+            "cards:approve", "cards:decline", "cards:view", "cards:update",
             "loans:approve", "loans:decline", "loans:view",
             "admins:create", "admins:read", "admins:update", "admins:delete",
             "audit_logs:view", "settings:manage"
@@ -86,13 +86,13 @@ class AdminPermissionManager:
             "users:read", "users:update",
             "transfers:approve", "transfers:decline", "transfers:view",
             "deposits:approve", "deposits:decline", "deposits:view",
-            "cards:approve", "cards:decline", "cards:view",
+            "cards:approve", "cards:decline", "cards:view", "cards:update",
             "loans:approve", "loans:decline", "loans:view",
             "audit_logs:view"
         ],
         "moderator": [
             "users:read",
-            "transfers:view", "deposits:view", "cards:view", "loans:view",
+            "transfers:view", "deposits:view", "cards:view", "cards:update", "loans:view",
             "audit_logs:view"
         ],
         "support": [

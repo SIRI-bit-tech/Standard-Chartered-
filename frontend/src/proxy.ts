@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 const protectedRoutes = ["/dashboard", "/dashboard/*", "/admin", "/admin/*"]
 const publicRoutes = ["/", "/auth/login", "/auth/register", "/auth/forgot-password", "/admin/auth/login", "/admin/auth/register"]
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const accessToken = request.cookies.get("accessToken")?.value
   const adminToken = request.cookies.get("admin_token")?.value
@@ -20,20 +20,21 @@ export function middleware(request: NextRequest) {
     return pathname === route
   })
 
-  // Redirect logic for admin routes
-  if (isProtectedRoute && pathname.startsWith('/admin')) {
+  // Redirect logic for admin routes (skip public admin auth pages)
+  if (isProtectedRoute && pathname.startsWith('/admin') && !isPublicRoute) {
     if (!adminToken) {
       return NextResponse.redirect(new URL("/admin/auth/login", request.url))
     }
   }
 
-  // Redirect logic for user routes
-  if (isProtectedRoute && !pathname.startsWith('/admin')) {
+  // Redirect logic for user routes (skip public auth pages)
+  if (isProtectedRoute && !pathname.startsWith('/admin') && !isPublicRoute) {
     if (!accessToken) {
       return NextResponse.redirect(new URL("/auth/login", request.url))
     }
   }
 
+  // If already authenticated, avoid auth pages
   if (isPublicRoute && accessToken && pathname !== "/") {
     // Redirect to dashboard if trying to access auth pages with valid token
     if (pathname.startsWith("/auth/")) {
@@ -41,5 +42,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // If admin is authenticated, avoid admin auth pages
+  if (isPublicRoute && adminToken && pathname.startsWith("/admin/auth/")) {
+    return NextResponse.redirect(new URL("/admin/dashboard", request.url))
+  }
+
   return NextResponse.next()
+}
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|public).*)"],
 }

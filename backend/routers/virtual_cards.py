@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from datetime import datetime, timedelta
 import uuid
 import secrets
@@ -13,7 +14,8 @@ from database import get_db
 from schemas.virtual_card import (
     CreateVirtualCardRequest, VirtualCardResponse, VirtualCardDetailResponse,
     VirtualCardListResponse, UpdateVirtualCardRequest, VirtualCardStatusRequest,
-    VirtualCardBlockRequest, VirtualCardLimitUsageResponse
+    VirtualCardBlockRequest, VirtualCardLimitUsageResponse,
+    VirtualCardType as SchemaVirtualCardType
 )
 from utils.ably import AblyRealtimeManager
 from utils.auth import get_current_user_id
@@ -57,55 +59,85 @@ async def create_virtual_card(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Account not found"
             )
+        # Begin transaction and lock user's virtual cards to prevent race conditions
+        # Query existing cards and enforce constraints
+        existing_result = await db.execute(
+            select(VirtualCard).where(VirtualCard.user_id == current_user_id)
+        )
+        existing_cards = existing_result.scalars().all()
+        
+        req_type = request.card_type
+        if isinstance(req_type, SchemaVirtualCardType):
+            model_card_type = VirtualCardType(req_type.value)
+        elif isinstance(req_type, VirtualCardType):
+            model_card_type = req_type
+        else:
+            model_card_type = VirtualCardType(str(req_type).lower())
+        
         # Enforce only DEBIT and CREDIT types and maximum of 2 cards per user (one per type)
-        if request.card_type not in (VirtualCardType.DEBIT, VirtualCardType.CREDIT):
+        if model_card_type not in (VirtualCardType.DEBIT, VirtualCardType.CREDIT):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only debit or credit cards are allowed")
         
-        # Begin transaction and lock user's virtual cards to prevent race conditions
-        async with db.begin():
-            # Re-query with row-level lock to serialize concurrent requests
-            existing_result = await db.execute(
-                select(VirtualCard)
-                .where(VirtualCard.user_id == current_user_id)
-                .with_for_update()  # Row-level lock
+        def _val(x):
+            return (getattr(x, "value", None) or str(x or "")).lower()
+        has_debit = any(_val(c.card_type) == "debit" and _val(c.status) != "cancelled" for c in existing_cards)
+        has_credit = any(_val(c.card_type) == "credit" and _val(c.status) != "cancelled" for c in existing_cards)
+        if (model_card_type == VirtualCardType.DEBIT and has_debit) or (model_card_type == VirtualCardType.CREDIT and has_credit):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already have this card type")
+        if sum(1 for c in existing_cards if c.status != VirtualCardStatus.CANCELLED) >= 2:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum of two cards allowed")
+        
+        # Block applying while any blocked card has not expired yet
+        now = datetime.utcnow()
+        def not_expired(c):
+            try:
+                # Consider card expired after the end of expiry month
+                return (c.expiry_year > now.year) or (c.expiry_year == now.year and c.expiry_month >= now.month)
+            except Exception:
+                return True
+        if any(_val(c.status) == "blocked" and not_expired(c) for c in existing_cards):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot apply for a new card while a blocked card has not expired")
+        
+        expiry_month, expiry_year = get_expiry_dates()
+        
+        virtual_card = VirtualCard(
+            id=str(uuid.uuid4()),
+            user_id=current_user_id,
+            account_id=request.account_id,
+            card_number=generate_virtual_card_number(),
+            card_type=model_card_type.value,
+            status=VirtualCardStatus.PENDING.value,
+            expiry_month=expiry_month,
+            expiry_year=expiry_year,
+            cvv=generate_cvv(),
+            card_name=request.card_name,
+            spending_limit=request.spending_limit,
+            daily_limit=request.daily_limit,
+            monthly_limit=request.monthly_limit,
+            valid_from=request.valid_from or datetime.utcnow(),
+            valid_until=request.valid_until,
+            allowed_merchants=json.dumps(request.allowed_merchants or []),
+            blocked_merchants=json.dumps(request.blocked_merchants or []),
+            allowed_countries=json.dumps(request.allowed_countries or []),
+            requires_3d_secure=request.requires_3d_secure,
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(virtual_card)
+        try:
+            await db.commit()
+        except IntegrityError as ie:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Card creation conflict. Please retry."
             )
-            existing_cards = existing_result.scalars().all()
-            
-            # Re-check uniqueness after obtaining lock
-            has_debit = any(c.card_type == VirtualCardType.DEBIT and c.status != VirtualCardStatus.CANCELLED for c in existing_cards)
-            has_credit = any(c.card_type == VirtualCardType.CREDIT and c.status != VirtualCardStatus.CANCELLED for c in existing_cards)
-            if (request.card_type == VirtualCardType.DEBIT and has_debit) or (request.card_type == VirtualCardType.CREDIT and has_credit):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already have this card type")
-            if sum(1 for c in existing_cards if c.status != VirtualCardStatus.CANCELLED) >= 2:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum of two cards allowed")
-            
-            expiry_month, expiry_year = get_expiry_dates()
-            
-            virtual_card = VirtualCard(
-                id=str(uuid.uuid4()),
-                user_id=current_user_id,
-                account_id=request.account_id,
-                card_number=generate_virtual_card_number(),
-                card_type=request.card_type,
-                status=VirtualCardStatus.PENDING,
-                expiry_month=expiry_month,
-                expiry_year=expiry_year,
-                cvv=generate_cvv(),
-                card_name=request.card_name,
-                spending_limit=request.spending_limit,
-                daily_limit=request.daily_limit,
-                monthly_limit=request.monthly_limit,
-                valid_from=request.valid_from or datetime.utcnow(),
-                valid_until=request.valid_until,
-                allowed_merchants=json.dumps(request.allowed_merchants or []),
-                blocked_merchants=json.dumps(request.blocked_merchants or []),
-                allowed_countries=json.dumps(request.allowed_countries or []),
-                requires_3d_secure=request.requires_3d_secure,
-                created_at=datetime.utcnow()
+        except SQLAlchemyError as se:
+            await db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error during card creation: {str(se)}"
             )
-            
-            db.add(virtual_card)
-            # Transaction commits automatically when exiting the context manager
         
         await db.refresh(virtual_card)
         
