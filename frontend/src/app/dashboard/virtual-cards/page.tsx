@@ -40,10 +40,11 @@ export default function VirtualCardsPage() {
         active: response.active_count ?? 0,
         blocked: response.blocked_count ?? 0,
       })
-      const hasDebit = (response.cards ?? []).some((c) => c.card_type === 'debit')
-      const hasCredit = (response.cards ?? []).some((c) => c.card_type === 'credit')
+      const activeCards = (response.cards ?? []).filter((c) => c.status !== 'cancelled')
+      const hasDebit = activeCards.some((c) => c.card_type === 'debit')
+      const hasCredit = activeCards.some((c) => c.card_type === 'credit')
       const hasBoth = hasDebit && hasCredit
-      const blockedNotExpired = (response.cards ?? []).some(
+      const blockedNotExpired = activeCards.some(
         (c) =>
           (c.status === 'blocked' || c.status === 'suspended') &&
           (c.expiry_year > new Date().getFullYear() ||

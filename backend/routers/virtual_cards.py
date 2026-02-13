@@ -19,6 +19,7 @@ from schemas.virtual_card import (
 )
 from utils.ably import AblyRealtimeManager
 from utils.auth import get_current_user_id
+from utils.logger import logger
 
 # Mounted in main.py at prefix="/api/v1/cards". No local prefix to avoid double-prefix.
 router = APIRouter(tags=["virtual-cards"])
@@ -62,7 +63,7 @@ async def create_virtual_card(
         # Begin transaction and lock user's virtual cards to prevent race conditions
         # Query existing cards and enforce constraints
         existing_result = await db.execute(
-            select(VirtualCard).where(VirtualCard.user_id == current_user_id)
+            select(VirtualCard).where(VirtualCard.user_id == current_user_id).with_for_update(nowait=False)
         )
         existing_cards = existing_result.scalars().all()
         
@@ -84,7 +85,7 @@ async def create_virtual_card(
         has_credit = any(_val(c.card_type) == "credit" and _val(c.status) != "cancelled" for c in existing_cards)
         if (model_card_type == VirtualCardType.DEBIT and has_debit) or (model_card_type == VirtualCardType.CREDIT and has_credit):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already have this card type")
-        if sum(1 for c in existing_cards if c.status != VirtualCardStatus.CANCELLED) >= 2:
+        if sum(1 for c in existing_cards if _val(c.status) != "cancelled") >= 2:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum of two cards allowed")
         
         # Block applying while any blocked card has not expired yet
@@ -134,9 +135,10 @@ async def create_virtual_card(
             )
         except SQLAlchemyError as se:
             await db.rollback()
+            logger.error("Database error during card creation", error=se)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error during card creation: {str(se)}"
+                detail="An internal server error occurred while creating the card."
             )
         
         await db.refresh(virtual_card)

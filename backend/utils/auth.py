@@ -14,16 +14,14 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def hash_password(password: str) -> str:
     """Hash password using bcrypt (direct), fallback to passlib if needed"""
     import bcrypt
-    password_bytes = password.encode('utf-8')
-    if len(password_bytes) > 72:
-        password_bytes = password_bytes[:72]
+    password_bytes = password.encode('utf-8')[:72]
     try:
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
     except Exception:
         # Fallback to passlib if bcrypt fails in this environment
         try:
-            return pwd_context.hash(password[:72])
+            return pwd_context.hash(password_bytes.decode('utf-8', errors='ignore'))
         except Exception:
             # Last resort: raise to surface environment issue
             raise
