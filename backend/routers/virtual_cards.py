@@ -60,42 +60,53 @@ async def create_virtual_card(
         # Enforce only DEBIT and CREDIT types and maximum of 2 cards per user (one per type)
         if request.card_type not in (VirtualCardType.DEBIT, VirtualCardType.CREDIT):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only debit or credit cards are allowed")
-        existing_result = await db.execute(select(VirtualCard).where(VirtualCard.user_id == current_user_id))
-        existing_cards = existing_result.scalars().all()
-        has_debit = any(c.card_type == VirtualCardType.DEBIT and c.status != VirtualCardStatus.CANCELLED for c in existing_cards)
-        has_credit = any(c.card_type == VirtualCardType.CREDIT and c.status != VirtualCardStatus.CANCELLED for c in existing_cards)
-        if (request.card_type == VirtualCardType.DEBIT and has_debit) or (request.card_type == VirtualCardType.CREDIT and has_credit):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already have this card type")
-        if sum(1 for c in existing_cards if c.status != VirtualCardStatus.CANCELLED) >= 2:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum of two cards allowed")
         
-        expiry_month, expiry_year = get_expiry_dates()
+        # Begin transaction and lock user's virtual cards to prevent race conditions
+        async with db.begin():
+            # Re-query with row-level lock to serialize concurrent requests
+            existing_result = await db.execute(
+                select(VirtualCard)
+                .where(VirtualCard.user_id == current_user_id)
+                .with_for_update()  # Row-level lock
+            )
+            existing_cards = existing_result.scalars().all()
+            
+            # Re-check uniqueness after obtaining lock
+            has_debit = any(c.card_type == VirtualCardType.DEBIT and c.status != VirtualCardStatus.CANCELLED for c in existing_cards)
+            has_credit = any(c.card_type == VirtualCardType.CREDIT and c.status != VirtualCardStatus.CANCELLED for c in existing_cards)
+            if (request.card_type == VirtualCardType.DEBIT and has_debit) or (request.card_type == VirtualCardType.CREDIT and has_credit):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already have this card type")
+            if sum(1 for c in existing_cards if c.status != VirtualCardStatus.CANCELLED) >= 2:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum of two cards allowed")
+            
+            expiry_month, expiry_year = get_expiry_dates()
+            
+            virtual_card = VirtualCard(
+                id=str(uuid.uuid4()),
+                user_id=current_user_id,
+                account_id=request.account_id,
+                card_number=generate_virtual_card_number(),
+                card_type=request.card_type,
+                status=VirtualCardStatus.PENDING,
+                expiry_month=expiry_month,
+                expiry_year=expiry_year,
+                cvv=generate_cvv(),
+                card_name=request.card_name,
+                spending_limit=request.spending_limit,
+                daily_limit=request.daily_limit,
+                monthly_limit=request.monthly_limit,
+                valid_from=request.valid_from or datetime.utcnow(),
+                valid_until=request.valid_until,
+                allowed_merchants=json.dumps(request.allowed_merchants or []),
+                blocked_merchants=json.dumps(request.blocked_merchants or []),
+                allowed_countries=json.dumps(request.allowed_countries or []),
+                requires_3d_secure=request.requires_3d_secure,
+                created_at=datetime.utcnow()
+            )
+            
+            db.add(virtual_card)
+            # Transaction commits automatically when exiting the context manager
         
-        virtual_card = VirtualCard(
-            id=str(uuid.uuid4()),
-            user_id=current_user_id,
-            account_id=request.account_id,
-            card_number=generate_virtual_card_number(),
-            card_type=request.card_type,
-            status=VirtualCardStatus.PENDING,
-            expiry_month=expiry_month,
-            expiry_year=expiry_year,
-            cvv=generate_cvv(),
-            card_name=request.card_name,
-            spending_limit=request.spending_limit,
-            daily_limit=request.daily_limit,
-            monthly_limit=request.monthly_limit,
-            valid_from=request.valid_from or datetime.utcnow(),
-            valid_until=request.valid_until,
-            allowed_merchants=json.dumps(request.allowed_merchants or []),
-            blocked_merchants=json.dumps(request.blocked_merchants or []),
-            allowed_countries=json.dumps(request.allowed_countries or []),
-            requires_3d_secure=request.requires_3d_secure,
-            created_at=datetime.utcnow()
-        )
-        
-        db.add(virtual_card)
-        await db.commit()
         await db.refresh(virtual_card)
         
         AblyRealtimeManager.publish_notification(

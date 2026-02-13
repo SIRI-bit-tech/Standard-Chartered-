@@ -142,6 +142,41 @@ async def admin_dashboard_overview(
             }
         )
 
+    # System alerts - reuse security/alert notifications only (no mock text).
+    alerts_result = await db.execute(
+        select(Notification)
+        .where(Notification.type.in_([NotificationType.SECURITY, NotificationType.ALERT, NotificationType.SYSTEM]))
+        .order_by(Notification.created_at.desc())
+        .limit(5)
+    )
+    alert_notifs = alerts_result.scalars().all()
+    system_alerts = []
+    for n in alert_notifs:
+        if n.type == NotificationType.ALERT or n.type == NotificationType.SECURITY:
+            severity = "critical"
+        elif n.type == NotificationType.SYSTEM:
+            severity = "notice"
+        else:
+            severity = "warning"
+
+        system_alerts.append(
+            {
+                "id": n.id,
+                "title": n.title,
+                "message": n.message,
+                "severity": severity,
+                "cta": None,
+            }
+        )
+
+    return {"success": True, "data": {
+        "kpis": kpis,
+        "transaction_volume": tx_series,
+        "user_growth": user_series,
+        "activity_feed": activity_feed,
+        "system_alerts": system_alerts,
+    }}
+
 @router.put("/cards/status")
 async def admin_update_card_status(
     admin_id: str,
@@ -317,7 +352,7 @@ async def admin_block_card(admin_id: str, request: AdminCardActionRequest, db: A
     except Exception as e:
         logger.error("Block card failed", error=e)
         raise InternalServerError(operation="block card", error_code="BLOCK_FAILED", original_error=e)
-    # System alerts - reuse security/alert notifications only (no mock text).
+
 @router.get("/cards/list")
 async def admin_list_cards(admin_id: str, db: AsyncSession = Depends(get_db)):
     try:
@@ -345,40 +380,6 @@ async def admin_list_cards(admin_id: str, db: AsyncSession = Depends(get_db)):
     except Exception as e:
         logger.error("List cards failed", error=e)
         raise InternalServerError(operation="list cards", error_code="LIST_CARDS_FAILED", original_error=e)
-    # System alerts - reuse security/alert notifications only (no mock text).
-    alerts_result = await db.execute(
-        select(Notification)
-        .where(Notification.type.in_([NotificationType.SECURITY, NotificationType.ALERT, NotificationType.SYSTEM]))
-        .order_by(Notification.created_at.desc())
-        .limit(5)
-    )
-    alert_notifs = alerts_result.scalars().all()
-    system_alerts = []
-    for n in alert_notifs:
-        if n.type == NotificationType.ALERT or n.type == NotificationType.SECURITY:
-            severity = "critical"
-        elif n.type == NotificationType.SYSTEM:
-            severity = "notice"
-        else:
-            severity = "warning"
-
-        system_alerts.append(
-            {
-                "id": n.id,
-                "title": n.title,
-                "message": n.message,
-                "severity": severity,
-                "cta": None,
-            }
-        )
-
-    return {"success": True, "data": {
-        "kpis": kpis,
-        "transaction_volume": tx_series,
-        "user_growth": user_series,
-        "activity_feed": activity_feed,
-        "system_alerts": system_alerts,
-    }}
 
 
 @router.get("/users/list")

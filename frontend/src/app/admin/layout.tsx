@@ -10,16 +10,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Keep auth pages clean (no admin chrome).
-  const isAuthRoute = pathname?.startsWith('/admin/auth')
-  if (isAuthRoute) return <>{children}</>
-
   // Attach admin token for admin API calls.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const token = localStorage.getItem('admin_token')
     if (token) apiClient.setAuthToken(token)
   }, [])
+
+  // Keep auth pages clean (no admin chrome).
+  const isAuthRoute = pathname?.startsWith('/admin/auth')
+  if (isAuthRoute) return <>{children}</>
 
   return (
     <div className="flex h-screen bg-background">

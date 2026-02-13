@@ -22,6 +22,7 @@ class VirtualCardStatus(str, enum.Enum):
     CANCELLED = "cancelled"
     SUSPENDED = "suspended"
     PENDING = "pending"
+    DECLINED = "declined"
 
 
 class VirtualCard(Base):

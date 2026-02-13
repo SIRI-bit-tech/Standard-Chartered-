@@ -89,28 +89,38 @@
                      </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                        <DropdownMenuItem
-                         onClick={async () => {
-                           try {
-                             const adminId = localStorage.getItem('admin_id')
-                             if (!adminId) {
-                               window.location.href = '/admin/auth/login'
-                               return
-                             }
-                           const qs = new URLSearchParams({ admin_id: adminId })
-                           await apiClient.put(`/admin/users/edit?${qs.toString()}`, {
-                             user_id: u.id,
-                             is_active: u.status !== 'active',
-                           })
-                           window.location.reload()
-                           } catch (err: any) {
-                             logger.error('Failed to toggle user active state', { error: err })
-                           }
-                         }}
-                       >
-                         {u.status === 'active' ? 'Suspend User' : 'Activate User'}
-                       </DropdownMenuItem>
-                      <DropdownMenuItem
                         onClick={async () => {
+                          const confirmed = window.confirm(
+                            `Are you sure you want to ${u.status === 'active' ? 'suspend' : 'activate'} this user?`
+                          )
+                          if (!confirmed) return
+                          
+                          try {
+                            const adminId = localStorage.getItem('admin_id')
+                            if (!adminId) {
+                              window.location.href = '/admin/auth/login'
+                              return
+                            }
+                            const qs = new URLSearchParams({ admin_id: adminId })
+                            await apiClient.put(`/admin/users/edit?${qs.toString()}`, {
+                              user_id: u.id,
+                              is_active: u.status !== 'active',
+                            })
+                            window.location.reload()
+                          } catch (err: any) {
+                            logger.error('Failed to toggle user active state', { error: err })
+                          }
+                        }}
+                      >
+                        {u.status === 'active' ? 'Suspend User' : 'Activate User'}
+                      </DropdownMenuItem>
+                     <DropdownMenuItem
+                        onClick={async () => {
+                          const confirmed = window.confirm(
+                            'Are you sure you want to delete this user? This action cannot be undone.'
+                          )
+                          if (!confirmed) return
+                          
                           try {
                             const adminId = localStorage.getItem('admin_id')
                             if (!adminId) {
