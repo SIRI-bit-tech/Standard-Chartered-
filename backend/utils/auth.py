@@ -14,14 +14,21 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def hash_password(password: str) -> str:
     """Hash password using bcrypt (direct), fallback to passlib if needed"""
     import bcrypt
-    password_bytes = password.encode('utf-8')[:72]
+    enc = password.encode('utf-8')
+    if len(enc) > 72:
+        truncated_str = enc[:72].decode('utf-8', errors='ignore')
+        password_bytes = truncated_str.encode('utf-8')
+        truncated_for_passlib = truncated_str
+    else:
+        password_bytes = enc
+        truncated_for_passlib = password
     try:
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
     except Exception:
         # Fallback to passlib if bcrypt fails in this environment
         try:
-            return pwd_context.hash(password_bytes.decode('utf-8', errors='ignore'))
+            return pwd_context.hash(truncated_for_passlib)
         except Exception:
             # Last resort: raise to surface environment issue
             raise
@@ -32,14 +39,19 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     import bcrypt
     if not hashed_password:
         return False
-    password_bytes = plain_password.encode('utf-8')
-    if len(password_bytes) > 72:
-        password_bytes = password_bytes[:72]
+    enc = plain_password.encode('utf-8')
+    if len(enc) > 72:
+        truncated_str = enc[:72].decode('utf-8', errors='ignore')
+        password_bytes = truncated_str.encode('utf-8')
+        truncated_for_passlib = truncated_str
+    else:
+        password_bytes = enc
+        truncated_for_passlib = plain_password
     try:
         return bcrypt.checkpw(password_bytes, hashed_password.encode('utf-8'))
     except Exception:
         try:
-            return pwd_context.verify(plain_password, hashed_password)
+            return pwd_context.verify(truncated_for_passlib, hashed_password)
         except Exception:
             return False
 

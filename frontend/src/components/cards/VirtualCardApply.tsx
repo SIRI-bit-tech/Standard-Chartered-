@@ -25,7 +25,7 @@
    })
    const [busy, setBusy] = useState(false)
   const [cards, setCards] = useState<VirtualCardSummary[]>([])
-  const filteredCards = cards.filter((c) => c.status === 'active' || c.status === 'pending')
+ const filteredCards = cards.filter((c) => c.status !== 'cancelled')
   const existingTypes = new Set(filteredCards.map((c) => c.card_type))
   const hasBothTypes = existingTypes.has('debit') && existingTypes.has('credit')
   const blockedNotExpired = cards.some(
