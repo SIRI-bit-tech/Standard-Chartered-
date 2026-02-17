@@ -12,17 +12,20 @@ import { AccountSummaryCard } from '@/components/dashboard/account-summary-card'
 import { QuickActionsGrid } from '@/components/dashboard/quick-actions-grid'
 import { RecentTransactionsList } from '@/components/dashboard/recent-transactions-list'
 import { colors } from '@/types'
-import type { Account, Transaction } from '@/types'
+import type { Account, TransferHistoryItem } from '@/types'
 
 const US_COUNTRY_CODE = 'US'
 
 type AccountsResponse = { success: boolean; message?: string; data: Account[] }
-type TransactionsResponse = { success: boolean; data: Transaction[] }
+type TransferHistoryResponse = {
+  success: boolean
+  data: { items: TransferHistoryItem[]; total: number; page: number; page_size: number }
+}
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [totalBalance, setTotalBalance] = useState(0)
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
+  const [recentItems, setRecentItems] = useState<TransferHistoryItem[]>([])
   const { user } = useAuthStore()
   const { accounts, setAccounts } = useAccountStore()
   const router = useRouter()
@@ -40,23 +43,17 @@ export default function DashboardPage() {
   async function loadDashboardData() {
     try {
       if (!user) return
-      const accountsResponse: AccountsResponse = await apiClient.get<AccountsResponse>(
-        `/api/v1/accounts`,
-      )
+      const accountsResponse: AccountsResponse = await apiClient.get<AccountsResponse>(`/api/v1/accounts/`)
       if (accountsResponse.success) {
         setAccounts(accountsResponse.data)
         setTotalBalance(
           accountsResponse.data.reduce((sum: number, acc: Account) => sum + acc.balance, 0),
         )
-        const selectedPrimaryAccount =
-          accountsResponse.data.find((a) => a.is_primary) ?? accountsResponse.data[0]
-
-        if (selectedPrimaryAccount) {
-          const txRes: TransactionsResponse = await apiClient.get<TransactionsResponse>(
-            `/api/v1/accounts/${selectedPrimaryAccount.id}/transactions?limit=5`,
-          )
-          if (txRes.success) setRecentTransactions(txRes.data)
-        }
+        // Load unified recent transfer history for consistent display
+        const hx: TransferHistoryResponse = await apiClient.get<TransferHistoryResponse>(
+          `/api/v1/transfers/history?page=1&page_size=5`,
+        )
+        if (hx.success) setRecentItems(hx.data.items)
       }
     } catch (e) {
       console.error('Failed to load dashboard data:', e)
@@ -114,7 +111,7 @@ export default function DashboardPage() {
             View all
           </Link>
         </div>
-        <RecentTransactionsList transactions={recentTransactions} loading={loading} />
+        <RecentTransactionsList items={recentItems} loading={loading} />
       </section>
     </div>
   )

@@ -11,16 +11,8 @@
  import { Badge } from '@/components/ui/badge'
  import { colors } from '@/types'
  
- interface AdminTransactionRow {
-   id: string
-   description: string
-   amount: number
-   currency: string
-   status: string
-   created_at?: string | null
-   account_number: string
-   user: { id: string; name: string; display_id: string }
- }
+ import type { AdminTransactionRow } from '@/types'
+ import { AdminTransactionActions } from './admin-transaction-actions'
  
  export function AdminTransactionsTable({ items }: { items: AdminTransactionRow[] }) {
    return (
@@ -33,6 +25,7 @@
              <TableHead>Account</TableHead>
              <TableHead className="text-right">Amount</TableHead>
              <TableHead>Status</TableHead>
+            <TableHead className="text-right pr-4">Actions</TableHead>
            </TableRow>
          </TableHeader>
          <TableBody>
@@ -60,6 +53,9 @@
                    {t.status}
                  </Badge>
                </TableCell>
+              <TableCell className="text-right pr-4">
+                <AdminTransactionActions tx={t} />
+              </TableCell>
              </TableRow>
            ))}
          </TableBody>

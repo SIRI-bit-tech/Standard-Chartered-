@@ -9,6 +9,24 @@ class EmailVerificationRequest(BaseModel):
     email: str = Field(..., description="User's email address")
     verification_code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
 
+class StartPinResetRequest(BaseModel):
+    """Start transfer PIN reset by email"""
+    email: str = Field(..., description="User's email address")
+
+class ConfirmPinResetRequest(BaseModel):
+    """Confirm PIN reset code and get short-lived token"""
+    email: str = Field(..., description="User's email address")
+    code: str = Field(..., min_length=6, max_length=6, description="6-digit reset code")
+
+class CompletePinResetRequest(BaseModel):
+    """Complete PIN reset with token and new PIN"""
+    email: str = Field(..., description="User's email address")
+    token: str = Field(..., description="Short-lived reset token")
+    new_pin: str = Field(..., pattern=r"^\d{4}$", description="4-digit new transfer PIN")
+
+    @field_validator("new_pin")
+    def check_pin_strength(cls, v: str) -> str:
+        return validate_transfer_pin_strength(v)
 
 class ResendVerificationRequest(BaseModel):
     """Request model for resending verification code"""

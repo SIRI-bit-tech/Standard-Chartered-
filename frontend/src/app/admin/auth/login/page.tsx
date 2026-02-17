@@ -13,6 +13,8 @@ import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react'
 
 export default function AdminLoginPage() {
   const router = useRouter()
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const nextPath = searchParams?.get('next') || '/admin/dashboard'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [adminCode, setAdminCode] = useState('')
@@ -63,7 +65,7 @@ export default function AdminLoginPage() {
         console.log('Login: Stored admin_id:', response.data.admin_id)
         console.log('Login: Redirecting to dashboard...')
         logger.debug('Admin logged in successfully')
-        router.push('/admin/dashboard')
+        router.push(nextPath)
       } else {
         console.log('Login: Failed - response.success is false')
         setError(response.message || 'Login failed. Please check your credentials.')

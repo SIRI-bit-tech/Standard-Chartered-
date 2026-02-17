@@ -16,19 +16,21 @@ interface CountrySelectorProps {
   onChange: (value: string) => void
   placeholder?: string
   className?: string
+  returnType?: 'code' | 'name'
 }
 
 export function CountrySelector({ 
   value, 
   onChange, 
   placeholder = "Select your country", 
-  className = "" 
+  className = "", 
+  returnType = 'name'
 }: CountrySelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const selectedCountry = COUNTRIES.find(country => country.name === value)
+  const selectedCountry = COUNTRIES.find(country => (returnType === 'code' ? country.code === value : country.name === value))
 
   const filteredCountries = COUNTRIES.filter(country =>
     country.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -47,7 +49,7 @@ export function CountrySelector({
   }, [])
 
   const handleSelect = (country: Country) => {
-    onChange(country.name)
+    onChange(returnType === 'code' ? country.code : country.name)
     setIsOpen(false)
     setSearchTerm('')
   }
@@ -108,7 +110,7 @@ export function CountrySelector({
                   type="button"
                   onClick={() => handleSelect(country)}
                   className={`w-full px-3 py-2 text-left hover:bg-muted transition-colors flex items-center gap-2 text-sm ${
-                    country.name === value ? 'bg-primary/10 text-primary font-medium' : ''
+                    (returnType === 'code' ? country.code === value : country.name === value) ? 'bg-primary/10 text-primary font-medium' : ''
                   }`}
                 >
                   <Flag 

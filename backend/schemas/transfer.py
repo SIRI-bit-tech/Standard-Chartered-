@@ -123,6 +123,7 @@ class ACHTransferRequest(BaseModel):
     """ACH transfer request"""
     transfer_pin: str = Field(..., pattern=r"^\d{4}$", description="4-digit transfer PIN")
     from_account_id: str
+    bank_name: str = Field(..., max_length=100)
     routing_number: str = Field(..., max_length=9)
     account_number: str = Field(..., max_length=20)
     account_holder: str = Field(..., max_length=100)
@@ -138,6 +139,12 @@ class ACHTransferRequest(BaseModel):
     def validate_routing(cls, v):
         if not v.isdigit() or len(v) != 9:
             raise ValueError('Routing number must be 9 digits')
+        digits = [int(d) for d in v]
+        checksum = (3 * (digits[0] + digits[3] + digits[6]) +
+                    7 * (digits[1] + digits[4] + digits[7]) +
+                    1 * (digits[2] + digits[5] + digits[8])) % 10
+        if checksum != 0:
+            raise ValueError('Invalid routing number checksum')
         return v
 
 

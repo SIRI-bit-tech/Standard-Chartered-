@@ -98,6 +98,50 @@ class EmailService:
             logger.error(f"Failed to send verification email to {to_email}: {e}")
             return False
     
+    def send_pin_reset_email(self, to_email: str, reset_code: str) -> bool:
+        """Send transfer PIN reset code email"""
+        try:
+            subject = "Standard Chartered - Transfer PIN Reset Code"
+            html_content = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #00875A; padding: 20px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Standard Chartered Bank</h1>
+                    </div>
+                    <div style="padding: 30px; background-color: #f8f9fa;">
+                        <h2 style="color: #333;">Transfer PIN Reset</h2>
+                        <p style="color: #666; line-height: 1.6;">
+                            You requested to reset your transfer PIN. Use the 6‑digit code below to continue:
+                        </p>
+                        <div style="background-color: #e9ecef; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                            <span style="font-size: 24px; font-weight: bold; color: #00875A; letter-spacing: 3px;">{reset_code}</span>
+                        </div>
+                        <p style="color: #666; line-height: 1.6;">
+                            This code expires in 15 minutes. If you did not request this, please ignore this email.
+                        </p>
+                    </div>
+                    <div style="background-color: #333; color: white; padding: 20px; text-align: center;">
+                        <p style="margin: 0; font-size: 12px;">
+                            © 2026 Standard Chartered Bank. All rights reserved.
+                        </p>
+                    </div>
+                </body>
+            </html>
+            """
+
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = f"Standard Chartered Bank <{self.from_email}>"
+            msg['To'] = to_email
+            html_part = MIMEText(html_content, 'html')
+            msg.attach(html_part)
+            with self._create_connection() as server:
+                server.send_message(msg)
+            logger.info(f"PIN reset email sent to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send PIN reset email to {to_email}: {e}")
+            return False
     def send_welcome_email(self, to_email: str, user_name: str) -> bool:
         """Send welcome email after successful verification"""
         try:
@@ -209,7 +253,47 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send card ready email to {to_email}: {e}")
             return False
-
-
+    
+    def send_transfer_reversed_email(self, to_email: str, amount: float, currency: str, reference: str) -> bool:
+        """Notify user by email that a transfer was reversed and funds credited back."""
+        try:
+            subject = "Transfer Reversed — Funds Credited Back"
+            formatted_amount = f"{currency} {amount:,.2f}"
+            html_content = f"""
+            <html>
+                <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background-color: #00875A; padding: 20px; text-align: center;">
+                        <h1 style="color: white; margin: 0;">Standard Chartered Bank</h1>
+                    </div>
+                    <div style="padding: 30px; background-color: #f8f9fa;">
+                        <h2 style="color: #333;">Transfer Reversed</h2>
+                        <p style="color: #444; line-height: 1.6;">
+                            Your transfer with reference <strong>{reference}</strong> has been <strong>reversed</strong>.
+                        </p>
+                        <p style="color: #444; line-height: 1.6;">
+                            We have credited <strong>{formatted_amount}</strong> back to your funding account.
+                        </p>
+                        <p style="color: #666; line-height: 1.6; margin-top: 16px;">
+                            Your balance has been updated. You can also view this in Transfers → History.
+                        </p>
+                    </div>
+                    <div style="padding: 20px; text-align: center; color: #999; font-size: 12px;">
+                        © 2026 Standard Chartered Bank. All rights reserved.
+                    </div>
+                </body>
+            </html>
+            """
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = f"Standard Chartered Bank <{self.from_email}>"
+            msg['To'] = to_email
+            msg.attach(MIMEText(html_content, 'html'))
+            with self._create_connection() as server:
+                server.send_message(msg)
+            logger.info(f"Transfer reversed email sent to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send transfer reversed email to {to_email}: {e}")
+            return False
 # Global email service instance
 email_service = EmailService()

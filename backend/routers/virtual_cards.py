@@ -183,9 +183,10 @@ async def list_virtual_cards(
             "blocked_count": blocked_count
         }
     except Exception as e:
+        logger.error("Unexpected error while listing virtual cards", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An internal server error occurred while processing the request."
         )
 
 
@@ -214,9 +215,10 @@ async def get_virtual_card(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unexpected error while getting virtual card", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An internal server error occurred while processing the request."
         )
 
 
@@ -275,9 +277,10 @@ async def update_virtual_card(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unexpected error while updating virtual card", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An internal server error occurred while processing the request."
         )
 
 
@@ -320,9 +323,10 @@ async def block_virtual_card(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unexpected error while blocking virtual card", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An internal server error occurred while processing the request."
         )
 
 
@@ -364,9 +368,10 @@ async def unblock_virtual_card(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unexpected error while unblocking virtual card", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An internal server error occurred while processing the request."
         )
 
 
@@ -410,9 +415,10 @@ async def delete_virtual_card(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unexpected error while deleting virtual card", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An internal server error occurred while processing the request."
         )
 
 
@@ -452,7 +458,8 @@ async def get_card_limit_usage(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Unexpected error while fetching card limit usage", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="An internal server error occurred while processing the request."
         )

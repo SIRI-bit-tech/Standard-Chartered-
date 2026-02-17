@@ -39,7 +39,7 @@
   useEffect(() => {
     ;(async () => {
       try {
-        const res = await apiClient.get<{ success: boolean; data: Account[] }>(`/api/v1/accounts`)
+        const res = await apiClient.get<{ success: boolean; data: Account[] }>(`/api/v1/accounts/`)
         if (res.success && Array.isArray(res.data)) setAccounts(res.data)
       } catch (e) {
         logger.error('Failed to fetch accounts', { error: e })

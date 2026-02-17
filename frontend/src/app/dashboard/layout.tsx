@@ -5,6 +5,7 @@ import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { DashboardSidebar } from '@/components/dashboard/dashboard-sidebar'
 import BottomNavbar from '@/components/navigation/bottom-navbar'
 import { apiClient } from '@/lib/api-client'
+import { SessionKeeper } from '@/hooks/use-session-keeper'
 
 export default function DashboardLayout({
   children,
@@ -32,6 +33,7 @@ export default function DashboardLayout({
         <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>
+        <SessionKeeper />
       </div>
       <BottomNavbar />
     </div>
