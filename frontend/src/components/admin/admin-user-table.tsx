@@ -11,11 +11,15 @@
  import { Badge } from '@/components/ui/badge'
  import { Button } from '@/components/ui/button'
  import { MoreHorizontal, ShieldCheck, AlertTriangle } from 'lucide-react'
- import { colors } from '@/types'
+import { colors } from '@/types'
  import type { AdminUserRow } from '@/types'
- import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
  import { apiClient } from '@/lib/api-client'
  import { logger } from '@/lib/logger'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { getInitials } from '@/lib/utils'
+import { useState } from 'react'
+import { AdminEditUserDialog } from '@/components/admin/admin-edit-user-dialog'
  
  function statusBadge(status: AdminUserRow['status']) {
    if (status === 'active') return { bg: `${colors.success}20`, fg: colors.success, label: 'Active' }
@@ -23,8 +27,10 @@
    return { bg: `${colors.gray300}55`, fg: colors.textSecondary, label: 'Inactive' }
  }
  
- export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
-   return (
+export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  return (
      <div className="rounded-xl border bg-white" style={{ borderColor: colors.border }}>
        <Table>
          <TableHeader>
@@ -47,10 +53,12 @@
                  </TableCell>
                  <TableCell>
                    <div className="flex items-center gap-3">
-                     <div
-                       className="h-9 w-9 rounded-full"
-                       style={{ backgroundColor: colors.primaryLight }}
-                     />
+                    <Avatar className="h-9 w-9">
+                      {u.profile_picture_url ? <AvatarImage src={u.profile_picture_url} alt={u.name} /> : null}
+                      <AvatarFallback style={{ backgroundColor: colors.primaryLight, color: colors.primary }}>
+                        {getInitials(u.name, '')}
+                      </AvatarFallback>
+                    </Avatar>
                      <div>
                        <div className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
                          {u.name}
@@ -80,7 +88,7 @@
                      </span>
                    )}
                  </TableCell>
-                 <TableCell className="text-right pr-4">
+                <TableCell className="text-right pr-4">
                    <DropdownMenu>
                      <DropdownMenuTrigger asChild>
                        <Button variant="ghost" size="icon" aria-label="Actions">
@@ -88,7 +96,15 @@
                        </Button>
                      </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                       <DropdownMenuItem
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setEditingId(u.id)
+                          setDialogOpen(true)
+                        }}
+                      >
+                        Edit User
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
                         onClick={async () => {
                           const confirmed = window.confirm(
                             `Are you sure you want to ${u.status === 'active' ? 'suspend' : 'activate'} this user?`
@@ -114,7 +130,7 @@
                       >
                         {u.status === 'active' ? 'Suspend User' : 'Activate User'}
                       </DropdownMenuItem>
-                     <DropdownMenuItem
+                      <DropdownMenuItem
                         onClick={async () => {
                           const confirmed = window.confirm(
                             'Are you sure you want to delete this user? This action cannot be undone.'
@@ -137,7 +153,7 @@
                       >
                         Delete User
                       </DropdownMenuItem>
-                     </DropdownMenuContent>
+                    </DropdownMenuContent>
                    </DropdownMenu>
                  </TableCell>
                </TableRow>
@@ -145,6 +161,14 @@
            })}
          </TableBody>
        </Table>
+      <AdminEditUserDialog
+        open={dialogOpen}
+        onOpenChange={(v) => setDialogOpen(v)}
+        userId={editingId}
+        onSaved={() => {
+          window.location.reload()
+        }}
+      />
      </div>
    )
  }

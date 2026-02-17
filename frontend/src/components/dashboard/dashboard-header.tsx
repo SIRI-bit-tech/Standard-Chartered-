@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Bell, HelpCircle, Menu, User, LogOut, Settings } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useAuthStore, useNotificationStore } from '@/lib/store'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -125,6 +125,9 @@ export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="flex items-center gap-2 px-2">
               <Avatar className="h-8 w-8">
+                {user.profile_picture_url ? (
+                  <AvatarImage src={user.profile_picture_url} alt={displayName} />
+                ) : null}
                 <AvatarFallback
                   className="text-xs font-medium"
                   style={{

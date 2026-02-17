@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timedelta
 from models.user import User, UserTier
+from models.admin import AdminAuditLog
+from models.security import TrustedDevice
+from models.support import LoginHistory
 from database import get_db
 from schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse, AuthResponse,
@@ -19,7 +22,9 @@ from utils.logger import logger
 from config import settings
 from services.account import AccountService
 from utils.email import send_verification_email
+from utils.ip import get_client_ip, geolocate_ip
 import uuid
+from utils.totp import verify_totp
 
 router = APIRouter()
 
@@ -182,9 +187,10 @@ async def register(
 @router.post("/login", response_model=AuthResponse)
 async def login(
     request: LoginRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """Login user with username and password"""
+    """Login user with username and password, with optional 2FA requirement"""
     result = await db.execute(
         select(User).where((User.email == request.username) | (User.username == request.username))
     )
@@ -202,18 +208,69 @@ async def login(
             detail="Account is inactive. Please verify your email."
         )
     
-    # Update last login
+    device_id = request.device_id
+    device_name = request.device_name
+    user_agent = http_request.headers.get("User-Agent")
+    ip_address = get_client_ip(http_request)
+    geo = geolocate_ip(ip_address) or {}
+
+    # If 2FA is enabled, ALWAYS require completion (ignore trusted devices)
+    if getattr(user, "two_factor_enabled", False):
+        # Record pending login attempt
+        try:
+            lh = LoginHistory(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                device_name=device_name,
+                device_type=None,
+                country=geo.get("country"),
+                city=geo.get("city"),
+                timezone=geo.get("timezone"),
+                login_successful=False,
+                failure_reason="2FA_REQUIRED"
+            )
+            db.add(lh)
+            await db.commit()
+        except Exception:
+            pass
+        session_token = create_access_token({"sub": user.id, "purpose": "2fa"}, expires_delta=timedelta(minutes=5))
+        # Admin audit: 2FA required on login
+        try:
+            log = AdminAuditLog(
+                id=str(uuid.uuid4()),
+                admin_id=user.id,
+                admin_email=user.email,
+                action="login_2fa_required",
+                resource_type="auth",
+                resource_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            db.add(log)
+            await db.commit()
+        except Exception:
+            pass
+        return AuthResponse(
+            success=True,
+            message="Two-factor authentication required",
+            data={
+                "two_factor_required": True,
+                "session_token": session_token
+            }
+        )
+    
+    # Update last login and issue tokens
     user.last_login = datetime.utcnow()
     db.add(user)
     await db.commit()
     
-    # Generate tokens
     access_token = create_access_token({"sub": user.id, "email": user.username})
     refresh_token = create_refresh_token(user.id)
     
     # Publish notification
     try:
-        # Skip Ably notification if API key is not configured
         if settings.ABLY_API_KEY and settings.ABLY_API_KEY != "your-ably-api-key":
             AblyRealtimeManager.publish_notification(
                 user.id,
@@ -223,6 +280,24 @@ async def login(
             )
     except Exception as e:
         logger.warning(f"Failed to publish notification: {e}")
+    
+    try:
+        lh_ok = LoginHistory(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            device_name=device_name,
+            device_type=None,
+            country=geo.get("country"),
+            city=geo.get("city"),
+            timezone=geo.get("timezone"),
+            login_successful=True
+        )
+        db.add(lh_ok)
+        await db.commit()
+    except Exception:
+        pass
     
     return AuthResponse(
         success=True,
@@ -274,6 +349,117 @@ async def refresh_access_token(
         access_token=access_token,
         refresh_token=request.refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+
+@router.post("/2fa/complete", response_model=AuthResponse)
+async def complete_two_factor(
+    payload: dict,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    session_token = payload.get("session_token")
+    code = (payload.get("code") or "").strip()
+    trust_device = bool(payload.get("trust_device"))
+    device_id = (payload.get("device_id") or "").strip() or None
+    device_name = (payload.get("device_name") or "").strip() or None
+    payload_decoded = verify_token(session_token)
+    if not payload_decoded or payload_decoded.get("purpose") != "2fa":
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
+    user_id = payload_decoded.get("sub")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar()
+    if not user or not getattr(user, "two_factor_enabled", False) or not getattr(user, "two_factor_secret", None):
+        raise HTTPException(status_code=400, detail="Two-factor authentication not enabled")
+    if not verify_totp(code, user.two_factor_secret):
+        raise HTTPException(status_code=400, detail="Invalid authentication code")
+    # Success -> issue tokens
+    access_token = create_access_token({"sub": user.id, "email": user.username})
+    refresh_token = create_refresh_token(user.id)
+    # Trust device if requested
+    if trust_device and device_id:
+        try:
+            ip_address = get_client_ip(http_request)
+            td = TrustedDevice(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                device_id=device_id,
+                device_name=device_name or http_request.headers.get("X-Device-Name") or "",
+                user_agent=http_request.headers.get("User-Agent"),
+                ip_address=ip_address,
+                active=True
+            )
+            db.add(td)
+            await db.commit()
+        except Exception:
+            pass
+    # Record successful login
+    try:
+        ip_address = get_client_ip(http_request)
+        geo = geolocate_ip(ip_address) or {}
+        lh_ok = LoginHistory(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            ip_address=ip_address,
+            user_agent=http_request.headers.get("User-Agent"),
+            device_name=device_name,
+            device_type=None,
+            country=geo.get("country"),
+            city=geo.get("city"),
+            timezone=geo.get("timezone"),
+            login_successful=True
+        )
+        db.add(lh_ok)
+        await db.commit()
+    except Exception:
+        pass
+    # Admin audit: 2FA verified on login
+    try:
+        log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=user.id,
+            admin_email=user.email,
+            action="login_2fa_verified",
+            resource_type="auth",
+            resource_id=user.id,
+            ip_address=get_client_ip(http_request),
+            user_agent=http_request.headers.get("User-Agent")
+        )
+        db.add(log)
+        await db.commit()
+    except Exception:
+        pass
+    # Admin audit: login without 2FA path
+    try:
+        log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=user.id,
+            admin_email=user.email,
+            action="login_success",
+            resource_type="auth",
+            resource_id=user.id,
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        db.add(log)
+        await db.commit()
+    except Exception:
+        pass
+    return AuthResponse(
+        success=True,
+        message="Login successful",
+        data={
+            "user_id": user.id,
+            "email": user.email,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "token": access_token
+        },
+        token=TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        )
     )
 
 

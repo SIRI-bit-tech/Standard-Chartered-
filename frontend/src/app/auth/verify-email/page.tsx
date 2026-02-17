@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
+import { useLoadingStore } from '@/lib/store'
 
 export default function EmailVerificationPage() {
   const router = useRouter()
@@ -22,6 +23,7 @@ export default function EmailVerificationPage() {
   const [resending, setResending] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const { show, hide } = useLoadingStore()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,6 +40,7 @@ export default function EmailVerificationPage() {
 
     setLoading(true)
     setError('')
+    show()
 
     try {
       const requestData = {
@@ -45,7 +48,11 @@ export default function EmailVerificationPage() {
         verification_code: verificationCode
       }
       
-      const response = await apiClient.post<{success: boolean; message: string; data?: any}>('/api/v1/auth/verify-email', requestData)
+      const response = await apiClient.post<{success: boolean; message: string; data?: any}>(
+        '/api/v1/auth/verify-email',
+        requestData,
+        { headers: { 'X-Show-Loader': '1' } }
+      )
 
       if (response.success) {
         setSuccess(true)
@@ -72,17 +79,21 @@ export default function EmailVerificationPage() {
       setError(errorMessage)
     } finally {
       setLoading(false)
+      hide()
     }
   }
 
   const handleResendCode = async () => {
     setResending(true)
     setError('')
+    show()
 
     try {
-      const response = await apiClient.post<{success: boolean; message: string; data?: any}>('/api/v1/auth/resend-verification', {
-        email
-      })
+      const response = await apiClient.post<{success: boolean; message: string; data?: any}>(
+        '/api/v1/auth/resend-verification',
+        { email },
+        { headers: { 'X-Show-Loader': '1' } }
+      )
 
       if (response.success) {
         setSuccess(true)
@@ -92,6 +103,7 @@ export default function EmailVerificationPage() {
       setError(error.response?.data?.detail || 'Failed to resend code. Please try again.')
     } finally {
       setResending(false)
+      hide()
     }
   }
 

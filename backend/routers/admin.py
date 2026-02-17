@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, text
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import json
 
@@ -438,6 +438,7 @@ async def admin_list_users(
                 "id": u.id,
                 "user_id": _to_admin_user_id(u),
                 "name": f"{u.first_name} {u.last_name}",
+                "profile_picture_url": u.profile_picture_url,
                 "country": (u.country or "").upper(),
                 "email": u.email,
                 "status": _user_status(u),
@@ -1247,11 +1248,13 @@ async def admin_reverse_transfer(
                 user_res = await db.execute(select(User).where(User.id == from_acc.user_id))
                 sender = user_res.scalar_one_or_none()
                 if sender and getattr(sender, "email", None):
+                    admin_reason = (payload.get("reason") or "").strip()
                     email_service.send_transfer_reversed_email(
                         sender.email,
                         float(transfer.total_amount or 0.0),
                         transfer.currency,
-                        transfer.reference_number
+                        transfer.reference_number,
+                        reason=admin_reason if admin_reason else None
                     )
         except Exception:
             pass
@@ -1692,19 +1695,57 @@ async def admin_edit_user(
             )
         
         # Update fields
-        if request.first_name:
+        old_email = user.email
+        changed_fields = []
+        def mark_changed(name: str): 
+            changed_fields.append(name)
+        if request.email and request.email != user.email:
+            user.email = request.email
+            mark_changed("email")
+        if request.username and request.username != user.username:
+            user.username = request.username
+            mark_changed("username")
+        if request.first_name and request.first_name != user.first_name:
             user.first_name = request.first_name
-        if request.last_name:
+            mark_changed("first_name")
+        if request.last_name and request.last_name != user.last_name:
             user.last_name = request.last_name
-        if request.phone:
+            mark_changed("last_name")
+        if request.phone and request.phone != (user.phone or ""):
             user.phone = request.phone
-        if request.country:
+            mark_changed("phone")
+        if request.country and request.country.upper() != (user.country or ""):
             user.country = request.country.upper()
+            mark_changed("country")
+        if request.street_address is not None and request.street_address != (user.street_address or ""):
+            user.street_address = request.street_address
+            mark_changed("street_address")
+        if request.city is not None and request.city != (user.city or ""):
+            user.city = request.city
+            mark_changed("city")
+        if request.state is not None and request.state != (user.state or ""):
+            user.state = request.state
+            mark_changed("state")
+        if request.postal_code is not None and request.postal_code != (user.postal_code or ""):
+            user.postal_code = request.postal_code
+            mark_changed("postal_code")
         if request.date_joined:
-            user.created_at = request.date_joined
+            # Normalize to naive UTC for storage and comparison
+            new_dt = request.date_joined
+            if isinstance(new_dt, datetime) and new_dt.tzinfo is not None:
+                new_dt = new_dt.astimezone(timezone.utc).replace(tzinfo=None)
+            now_utc = datetime.utcnow()
+            if new_dt > now_utc:
+                raise ValidationError(
+                    message="date_joined cannot be in the future",
+                    error_code="DATE_JOINED_FUTURE_FORBIDDEN"
+                )
+            user.created_at = new_dt
+            mark_changed("created_at")
         if request.is_active is not None:
             user.is_active = request.is_active
             user.is_locked = not request.is_active
+            mark_changed("status")
         
         db.add(user)
         
@@ -1717,8 +1758,14 @@ async def admin_edit_user(
             resource_type="user",
             resource_id=user.id,
             details=json.dumps({
+                "email": request.email,
+                "username": request.username,
                 "first_name": request.first_name,
                 "last_name": request.last_name,
+                "country": request.country,
+                "city": request.city,
+                "state": request.state,
+                "postal_code": request.postal_code,
                 "date_joined": request.date_joined.isoformat() if request.date_joined else None
             })
         )
@@ -1727,6 +1774,38 @@ async def admin_edit_user(
         await db.commit()
         
         AblyRealtimeManager.publish_admin_event("users", {"type": "edited", "user_id": user.id})
+        try:
+            AblyRealtimeManager.publish_notification(
+                user.id,
+                "profile_update",
+                "Profile Updated",
+                "Your profile information was updated by support.",
+                {
+                    "user_id": user.id,
+                    "email": user.email,
+                    "username": user.username,
+                }
+            )
+        except Exception:
+            pass
+        # Email notifications (old and new email on email change; otherwise current email)
+        try:
+            if getattr(settings, "SMTP_SERVER", None) and changed_fields:
+                full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or "Customer"
+                if old_email and old_email != user.email:
+                    email_service.send_profile_update_notice(
+                        old_email, full_name, changed_fields, old_email=old_email, new_email=user.email, acted_by=None
+                    )
+                    if user.email:
+                        email_service.send_profile_update_notice(
+                            user.email, full_name, changed_fields, old_email=old_email, new_email=user.email, acted_by=None
+                        )
+                elif user.email:
+                    email_service.send_profile_update_notice(
+                        user.email, full_name, changed_fields, acted_by=None
+                    )
+        except Exception:
+            pass
         logger.info(f"User edited by admin {admin.email}: {user.email}")
         
         return {
@@ -1743,6 +1822,47 @@ async def admin_edit_user(
             error_code="EDIT_FAILED",
             original_error=e
         )
+
+@router.get("/users/detail")
+async def admin_get_user_detail(
+    admin_id: str,
+    user_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get full user detail for edit modal"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin or not AdminPermissionManager.has_permission(admin.role, "users:read"):
+            raise UnauthorizedError(message="You don't have permission to view users", error_code="PERMISSION_DENIED")
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise NotFoundError(resource="User", error_code="USER_NOT_FOUND")
+        return {
+            "success": True,
+            "data": {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "phone": user.phone,
+                "country": user.country,
+                "street_address": user.street_address,
+                "city": user.city,
+                "state": user.state,
+                "postal_code": user.postal_code,
+                "profile_picture_url": getattr(user, "profile_picture_url", None),
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "is_active": user.is_active,
+            }
+        }
+    except (UnauthorizedError, NotFoundError):
+        raise
+    except Exception as e:
+        logger.error("Get user detail failed", error=e)
+        raise InternalServerError(operation="get user detail", error_code="GET_USER_DETAIL_FAILED", original_error=e)
 
 @router.put("/accounts/status")
 async def admin_update_account_status(

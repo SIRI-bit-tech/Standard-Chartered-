@@ -11,12 +11,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Lock, ArrowLeft, CheckCircle, Shield } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
+import { useLoadingStore } from '@/lib/store'
 
 export default function SetTransferPinPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
   const { setUser } = useAuthStore()
+  const { show, hide } = useLoadingStore()
   
   const [transferPin, setTransferPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
@@ -44,12 +46,17 @@ export default function SetTransferPinPage() {
 
     setLoading(true)
     setError('')
+    show()
 
     try {
-      const response = await apiClient.post<{success: boolean; message: string; data?: any}>('/api/v1/auth/set-transfer-pin', {
-        email,
-        transfer_pin: transferPin
-      })
+      const response = await apiClient.post<{success: boolean; message: string; data?: any}>(
+        '/api/v1/auth/set-transfer-pin',
+        {
+          email,
+          transfer_pin: transferPin
+        },
+        { headers: { 'X-Show-Loader': '1' } }
+      )
 
       if (response.success) {
         // Store authentication tokens and user data
@@ -87,6 +94,7 @@ export default function SetTransferPinPage() {
       }
     } finally {
       setLoading(false)
+      hide()
     }
   }
 

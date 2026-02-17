@@ -75,9 +75,9 @@
                ))}
              </SelectContent>
            </Select>
-           <DropdownMenu>
+          <DropdownMenu>
              <DropdownMenuTrigger asChild>
-               <Button variant="outline" size="icon" aria-label="More filters">
+              <Button variant="outline" size="icon" aria-label="More filters" suppressHydrationWarning>
                  <SlidersHorizontal className="h-4 w-4" />
                </Button>
              </DropdownMenuTrigger>

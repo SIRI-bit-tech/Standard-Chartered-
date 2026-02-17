@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from config import settings
 from database import engine, Base
 from routers import auth, verification, accounts, transfers, loans, notifications, support, profile, documents, bill_payments, deposits, virtual_cards, admin
+from routers import security as security_router
 import logging
 
 # Import all models to ensure they're registered
@@ -21,6 +22,7 @@ from models.bill_payment import BillPayment, BillPayee, ScheduledPayment
 from models.deposit import Deposit
 from models.virtual_card import VirtualCard
 from models.admin import AdminUser, AdminAuditLog, AdminPermission
+from models.security import TrustedDevice
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,12 @@ async def lifespan(app: FastAPI):
             ))
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires FLOAT"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT FALSE NOT NULL"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR"
             ))
             
             # Address columns
@@ -154,6 +162,7 @@ app.include_router(bill_payments.router, prefix="/api/v1/bills", tags=["Bill Pay
 app.include_router(deposits.router, prefix="/api/v1/deposits", tags=["Deposits"])
 app.include_router(virtual_cards.router, prefix="/api/v1/cards", tags=["Virtual Cards"])
 app.include_router(admin.router, tags=["Admin"])
+app.include_router(security_router.router)
 
 
 @app.exception_handler(RequestValidationError)

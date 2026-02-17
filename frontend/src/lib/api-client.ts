@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { API_BASE_URL } from '@/constants'
+import { useLoadingStore } from '@/lib/store'
 
 interface ApiClientConfig {
   baseURL: string
@@ -38,6 +39,7 @@ class ApiClient {
               window.localStorage.setItem('access_token', newAccess)
               if (newRefresh) window.localStorage.setItem('refresh_token', newRefresh)
               document.cookie = `accessToken=${newAccess}; path=/; max-age=3600; secure; samesite=strict`
+              window.localStorage.setItem('access_token_updated_at', String(Date.now()))
             }
           } catch { }
           this.setAuthToken(newAccess)
@@ -53,6 +55,15 @@ class ApiClient {
     // Request interceptor to attach token from storage/cookie on the client
     this.client.interceptors.request.use((cfg) => {
       try {
+        const showLoaderHeader =
+          (cfg.headers as any)?.['X-Show-Loader'] === '1' ||
+          (cfg as any)?.meta?.showLoader === true
+        if (showLoaderHeader && typeof window !== 'undefined') {
+          try {
+            useLoadingStore.getState().show()
+              ; (cfg as any)._showLoader = true
+          } catch { }
+        }
         if (typeof window !== 'undefined') {
           const urlPath = typeof cfg.url === 'string' ? cfg.url : ''
           const isAdminRequest = urlPath.startsWith('/admin')
@@ -92,8 +103,38 @@ class ApiClient {
 
     // Response interceptor for error handling
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        try {
+          const cfg: any = response.config || {}
+          if (cfg._showLoader) {
+            const state = useLoadingStore.getState()
+            if (!state.isLoading) {
+              state.show()
+            }
+            window.setTimeout(() => {
+              try {
+                useLoadingStore.getState().hide()
+              } catch { }
+            }, 8000)
+          }
+        } catch { }
+        return response
+      },
       async (error: AxiosError) => {
+        try {
+          const cfg: any = error.config || {}
+          if (cfg?._showLoader) {
+            const state = useLoadingStore.getState()
+            if (!state.isLoading) {
+              state.show()
+            }
+            window.setTimeout(() => {
+              try {
+                useLoadingStore.getState().hide()
+              } catch { }
+            }, 8000)
+          }
+        } catch { }
         const status = error.response?.status
         const failingUrl: string = (error.config?.url as string) || ''
         const isAdminRequest = typeof failingUrl === 'string' && failingUrl.startsWith('/admin')
@@ -120,6 +161,21 @@ class ApiClient {
           } catch {
             // fall through to logout handling
           }
+          // As a last attempt, if another tab/process refreshed the token very recently,
+          // retry once using the latest token from storage.
+          try {
+            const cfg: any = error.config || {}
+            if (!cfg._retry_after_external_refresh && typeof window !== 'undefined') {
+              const updatedAt = Number(window.localStorage.getItem('access_token_updated_at') || 0)
+              const justUpdated = Date.now() - updatedAt < 8000
+              const latest = window.localStorage.getItem('access_token')
+              if (justUpdated && latest) {
+                cfg._retry_after_external_refresh = true
+                this.setAuthToken(latest)
+                return this.client.request(cfg)
+              }
+            }
+          } catch { }
           // Avoid redirect loops while already on an auth page or when the auth endpoint itself fails
           if (typeof window !== 'undefined') {
             const onAdminAuthPage = window.location.pathname.startsWith('/admin/auth')
@@ -150,9 +206,6 @@ class ApiClient {
               try {
                 const reqUrl = (error.config?.url as string) || ''
                 const isAdminCtx = window.location.pathname.startsWith('/admin') || reqUrl.startsWith('/admin')
-                const onAuthPage = isAdminCtx
-                  ? window.location.pathname.startsWith('/admin/auth')
-                  : window.location.pathname.startsWith('/auth/')
                 if (isAdminCtx) {
                   window.localStorage.removeItem('admin_token')
                   window.localStorage.removeItem('admin_refresh_token')

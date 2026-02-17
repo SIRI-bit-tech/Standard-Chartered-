@@ -5,16 +5,29 @@ import React from "react"
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
-import { getInitials, formatDate } from '@/lib/utils'
+import { ProfileHeader } from '@/components/profile/profile-header'
+import { PersonalInfoForm, type PersonalInfo } from '@/components/profile/personal-info-form'
+import { SecurityPanel } from '@/components/profile/security-panel'
+import { ActivityList } from '@/components/profile/activity-list'
+import { DevicesPanel } from '@/components/profile/devices-panel'
+import { useUserRealtime } from '@/hooks/use-user-realtime'
+import { ProfileAvatarUploader } from '@/components/profile/profile-avatar-uploader'
+import { formatDate } from '@/lib/utils'
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('personal')
   const [loading, setLoading] = useState(true)
-  const [profileData, setProfileData] = useState({
+  const [isEditing, setIsEditing] = useState(false)
+  const [profileData, setProfileData] = useState<PersonalInfo>({
     first_name: '',
     last_name: '',
     phone: '',
-    bio: '',
+    country: '',
+    street_address: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    email: '',
   })
   const [loginHistory, setLoginHistory] = useState<any[]>([])
   const [documents, setDocuments] = useState<any[]>([])
@@ -34,9 +47,22 @@ export default function ProfilePage() {
         setProfileData({
           first_name: profileResponse.data.first_name,
           last_name: profileResponse.data.last_name,
-          phone: profileResponse.data.phone,
-          bio: profileResponse.data.bio || '',
+          phone: profileResponse.data.phone || '',
+          country: profileResponse.data.country || '',
+          street_address: profileResponse.data.street_address || '',
+          city: profileResponse.data.city || '',
+          state: profileResponse.data.state || '',
+          postal_code: profileResponse.data.postal_code || '',
+          email: user?.email || profileResponse.data.email || '',
         })
+        if (user) {
+          setUser({
+            ...user,
+            profile_picture_url: profileResponse.data.profile_picture_url || user.profile_picture_url,
+            created_at: profileResponse.data.created_at || user.created_at,
+            last_login: profileResponse.data.last_login || user.last_login,
+          })
+        }
       }
 
       // Load login history
@@ -65,13 +91,23 @@ export default function ProfilePage() {
 
     setLoading(true)
     try {
-      const response = await apiClient.put<{ success: boolean; data: any }>(`/api/v1/profile`, {
-        ...profileData,
-      })
+      const payload = {
+        first_name: profileData.first_name,
+        last_name: profileData.last_name,
+        phone: profileData.phone,
+        country: profileData.country,
+        street_address: profileData.street_address,
+        city: profileData.city,
+        state: profileData.state,
+        postal_code: profileData.postal_code,
+      }
+      const response = await apiClient.put<{ success: boolean; data: any }>(`/api/v1/profile`, payload)
 
       if (response.success) {
         alert('Profile updated successfully!')
-        setUser({ ...user, ...profileData })
+        setUser({ ...user, ...payload })
+        await loadProfileData()
+        setIsEditing(false)
       }
     } catch (error) {
       console.error('Failed to update profile:', error)
@@ -81,6 +117,16 @@ export default function ProfilePage() {
     }
   }
 
+  const activityChannel = user?.id ? `banking:notifications:${user.id}` : ''
+  useUserRealtime(activityChannel, (payload) => {
+    try {
+      if (payload?.type === 'login_activity' || payload?.type === 'security_update' || payload?.type === 'profile_update') {
+        // Refresh history and security related widgets
+        loadProfileData()
+      }
+    } catch { /* no-op */ }
+  })
+
   if (!user) {
     return <div className="text-center py-12">Loading...</div>
   }
@@ -88,6 +134,20 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-foreground">Profile & Settings</h1>
+      <ProfileHeader
+        first_name={user.first_name}
+        last_name={user.last_name}
+        email={user.email}
+        created_at={user.created_at}
+        profile_picture_url={user.profile_picture_url || undefined}
+        rightContent={
+          <ProfileAvatarUploader
+            onUploaded={(url) => {
+              if (user) setUser({ ...user, profile_picture_url: url })
+            }}
+          />
+        }
+      />
 
       {/* Tabs */}
       <div className="bg-white border-b border-border rounded-t-xl">
@@ -141,104 +201,38 @@ export default function ProfilePage() {
         <>
           {/* Personal Info Tab */}
           {activeTab === 'personal' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white rounded-xl p-8 border border-border">
-                <h2 className="text-2xl font-bold text-foreground mb-6">Personal Information</h2>
-
-                <form onSubmit={handleUpdateProfile} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        First Name
-                      </label>
-                      <input
-                        type="text"
-                        value={profileData.first_name}
-                        onChange={(e) =>
-                          setProfileData({ ...profileData, first_name: e.target.value })
-                        }
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                      />
+            <div className="grid grid-cols-1 gap-6">
+              <div className="bg-white rounded-xl p-8 border border-border">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-foreground">Personal Information</h2>
+                  {!isEditing ? (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="px-4 py-2 border rounded-lg hover:bg-muted transition"
+                    >
+                      Edit
+                    </button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setIsEditing(false)
+                          loadProfileData()
+                        }}
+                        className="px-4 py-2 border rounded-lg hover:bg-muted transition"
+                      >
+                        Cancel
+                      </button>
+                      {/* Save button remains inside the form */}
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Last Name
-                      </label>
-                      <input
-                        type="text"
-                        value={profileData.last_name}
-                        onChange={(e) =>
-                          setProfileData({ ...profileData, last_name: e.target.value })
-                        }
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Email</label>
-                    <input
-                      type="email"
-                      value={user.email}
-                      disabled
-                      className="w-full px-4 py-2 border border-border rounded-lg bg-border-light"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={profileData.phone}
-                      onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">Bio</label>
-                    <textarea
-                      value={profileData.bio}
-                      onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
-                      placeholder="Tell us about yourself (optional)"
-                      className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary resize-none"
-                      rows={4}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-medium disabled:opacity-50"
-                  >
-                    {loading ? 'Updating...' : 'Save Changes'}
-                  </button>
-                </form>
-              </div>
-
-              {/* Avatar Card */}
-              <div className="bg-white rounded-xl p-8 border border-border h-fit">
-                <div className="text-center">
-                  <div className="w-24 h-24 bg-primary text-white rounded-full flex items-center justify-center text-3xl font-bold mx-auto mb-4">
-                    {getInitials(user.first_name, user.last_name)}
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground">
-                    {user.first_name} {user.last_name}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">{user.email}</p>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <span className="text-success font-medium">Active</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Tier:</span>
-                      <span className="text-primary font-medium capitalize">{user.tier}</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
+                <PersonalInfoForm
+                  value={profileData}
+                  disabled={!isEditing || loading}
+                  onChange={setProfileData}
+                  onSubmit={handleUpdateProfile}
+                />
               </div>
             </div>
           )}
@@ -248,63 +242,7 @@ export default function ProfilePage() {
             <div className="bg-white rounded-xl p-8 border border-border">
               <h2 className="text-2xl font-bold text-foreground mb-6">Security Settings</h2>
 
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-semibold text-foreground mb-3">Change Password</h3>
-                  <form className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Current Password
-                      </label>
-                      <input
-                        type="password"
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        New Password
-                      </label>
-                      <input
-                        type="password"
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Confirm Password
-                      </label>
-                      <input
-                        type="password"
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                    <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition">
-                      Update Password
-                    </button>
-                  </form>
-                </div>
-
-                <hr className="border-border" />
-
-                <div>
-                  <h3 className="font-semibold text-foreground mb-3">Two-Factor Authentication</h3>
-                  <p className="text-muted-foreground mb-4">Add an extra layer of security to your account</p>
-                  <button className="px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition">
-                    Enable 2FA
-                  </button>
-                </div>
-
-                <hr className="border-border" />
-
-                <div>
-                  <h3 className="font-semibold text-foreground mb-3">Authorized Devices</h3>
-                  <p className="text-muted-foreground mb-4">Manage devices that have access to your account</p>
-                  <button className="px-4 py-2 border border-border rounded-lg hover:bg-border transition">
-                    View Devices
-                  </button>
-                </div>
-              </div>
+              <SecurityPanel onRefreshDevices={loadProfileData} />
             </div>
           )}
 
@@ -337,31 +275,11 @@ export default function ProfilePage() {
           {activeTab === 'activity' && (
             <div className="bg-white rounded-xl p-8 border border-border">
               <h2 className="text-2xl font-bold text-foreground mb-6">Login Activity</h2>
-
-              {loginHistory.length > 0 ? (
-                <div className="space-y-3">
-                  {loginHistory.map((activity, idx) => (
-                    <div key={idx} className="p-4 border border-border rounded-lg">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-foreground">
-                            {activity.device_type ? activity.device_type.charAt(0).toUpperCase() + activity.device_type.slice(1) : 'Unknown'} Login
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {activity.city && activity.country
-                              ? `${activity.city}, ${activity.country}`
-                              : 'Unknown Location'}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">{formatDate(activity.created_at)}</p>
-                        </div>
-                        <span className="text-success text-sm">✓ Successful</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground">No login activity</p>
-              )}
+              <ActivityList items={loginHistory} />
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold mb-2">Devices</h3>
+                <DevicesPanel items={loginHistory} />
+              </div>
             </div>
           )}
         </>

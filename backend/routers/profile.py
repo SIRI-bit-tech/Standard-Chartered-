@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.user import User
@@ -6,6 +6,7 @@ from models.support import LoginHistory
 from database import get_db
 from datetime import datetime
 from utils.auth import get_current_user_id
+from utils.cloudinary import CloudinaryManager
 
 router = APIRouter()
 
@@ -43,12 +44,20 @@ async def get_profile(
             "first_name": user.first_name,
             "last_name": user.last_name,
             "phone": user.phone,
+            "street_address": user.street_address,
+            "city": user.city,
+            "state": user.state,
+            "postal_code": user.postal_code,
             "country": user.country,
             "primary_currency": user.primary_currency,
             "tier": user.tier,
+            "profile_picture_url": user.profile_picture_url,
             "email_verified": user.email_verified,
             "phone_verified": user.phone_verified,
-            "identity_verified": user.identity_verified
+            "identity_verified": user.identity_verified,
+            "two_factor_enabled": getattr(user, "two_factor_enabled", False),
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_login": user.last_login.isoformat() if user.last_login else None
         },
         "message": "Profile retrieved successfully"
     }
@@ -56,11 +65,8 @@ async def get_profile(
 
 @router.put("")
 async def update_profile(
+    payload: dict = Body(...),
     current_user_id: str = Depends(get_current_user_id),
-    first_name: str = None,
-    last_name: str = None,
-    phone: str = None,
-    bio: str = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Update profile"""
@@ -72,14 +78,31 @@ async def update_profile(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if first_name:
+    first_name = payload.get("first_name")
+    last_name = payload.get("last_name")
+    phone = payload.get("phone")
+    street_address = payload.get("street_address")
+    city = payload.get("city")
+    state = payload.get("state")
+    postal_code = payload.get("postal_code")
+    country = payload.get("country")
+
+    if first_name is not None:
         user.first_name = first_name
-    if last_name:
+    if last_name is not None:
         user.last_name = last_name
-    if phone:
+    if phone is not None:
         user.phone = phone
-    if bio:
-        user.bio = bio
+    if street_address is not None:
+        user.street_address = street_address
+    if city is not None:
+        user.city = city
+    if state is not None:
+        user.state = state
+    if postal_code is not None:
+        user.postal_code = postal_code
+    if country is not None:
+        user.country = country
     
     user.updated_at = datetime.utcnow()
     db.add(user)
@@ -87,9 +110,53 @@ async def update_profile(
     
     return {
         "success": True,
-        "data": {},
+        "data": {
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "phone": user.phone,
+            "street_address": user.street_address,
+            "city": user.city,
+            "state": user.state,
+            "postal_code": user.postal_code,
+            "country": user.country
+        },
         "message": "Profile updated successfully"
     }
+
+
+@router.post("/avatar/upload-url")
+async def get_avatar_upload_url(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Provide a signed Cloudinary upload config for avatar images"""
+    # Ensure user exists
+    res = await db.execute(select(User).where(User.id == current_user_id))
+    if not res.scalar():
+        raise HTTPException(status_code=404, detail="User not found")
+    cfg = CloudinaryManager.generate_signed_upload_url(folder="avatars", resource_type="image", expire_seconds=900)
+    return {"success": True, "data": cfg}
+
+
+@router.put("/avatar")
+async def set_avatar(
+    payload: dict,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Store avatar URL on the user profile"""
+    image_url = payload.get("image_url")
+    if not image_url:
+        raise HTTPException(status_code=400, detail="image_url is required")
+    res = await db.execute(select(User).where(User.id == current_user_id))
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.profile_picture_url = image_url
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    await db.commit()
+    return {"success": True, "data": {"profile_picture_url": image_url}, "message": "Avatar updated"}
 
 
 @router.get("/settings")

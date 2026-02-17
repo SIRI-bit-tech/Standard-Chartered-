@@ -17,6 +17,7 @@ interface CountrySelectorProps {
   placeholder?: string
   className?: string
   returnType?: 'code' | 'name'
+  disabled?: boolean
 }
 
 export function CountrySelector({ 
@@ -24,13 +25,17 @@ export function CountrySelector({
   onChange, 
   placeholder = "Select your country", 
   className = "", 
-  returnType = 'name'
+  returnType = 'name',
+  disabled = false
 }: CountrySelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const selectedCountry = COUNTRIES.find(country => (returnType === 'code' ? country.code === value : country.name === value))
+  const norm = (s?: string) => (s || '').toString().trim().toLowerCase()
+  const selectedCountry =
+    COUNTRIES.find(country => country.code === value) ||
+    COUNTRIES.find(country => norm(country.name) === norm(value))
 
   const filteredCountries = COUNTRIES.filter(country =>
     country.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -58,8 +63,9 @@ export function CountrySelector({
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-left flex items-center justify-between hover:border-primary/50 transition-colors text-sm"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-left flex items-center justify-between transition-colors text-sm ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50'}`}
       >
         <div className="flex items-center gap-2">
           {selectedCountry ? (
@@ -75,6 +81,8 @@ export function CountrySelector({
               />
               <span className="text-sm">{selectedCountry.name}</span>
             </>
+          ) : value ? (
+            <span className="text-sm">{value}</span>
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
@@ -82,7 +90,7 @@ export function CountrySelector({
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-60 overflow-hidden">
           <div className="p-2 border-b border-border">
             <div className="relative">

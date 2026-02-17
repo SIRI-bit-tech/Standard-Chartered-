@@ -62,6 +62,7 @@ export function SessionKeeper() {
             localStorage.setItem('access_token', newAccess)
             if (newRefresh) localStorage.setItem('refresh_token', newRefresh)
             document.cookie = `accessToken=${newAccess}; path=/; max-age=3600; secure; samesite=strict`
+            localStorage.setItem('access_token_updated_at', String(Date.now()))
             apiClient.setAuthToken(newAccess)
             scheduleRefresh()
           }
@@ -114,6 +115,7 @@ export function SessionKeeper() {
           localStorage.setItem('access_token', newAccess)
           if (newRefresh) localStorage.setItem('refresh_token', newRefresh)
           document.cookie = `accessToken=${newAccess}; path=/; max-age=3600; secure; samesite=strict`
+            localStorage.setItem('access_token_updated_at', String(Date.now()))
           apiClient.setAuthToken(newAccess)
           setModalOpen(false)
           resetIdle()

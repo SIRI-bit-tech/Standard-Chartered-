@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from models.account import Account, Statement
+from models.user import User
 from models.transaction import Transaction
 from database import get_db
 from utils.auth import get_current_user_id
@@ -19,6 +20,10 @@ async def get_accounts(
     """Get all accounts for the authenticated user"""
     result = await db.execute(select(Account).where(Account.user_id == user_id))
     accounts = result.scalars().all()
+    user_res = await db.execute(select(User).where(User.id == user_id))
+    user = user_res.scalar_one_or_none()
+    uc = ((user.country if user else "") or "").strip().upper()
+    is_us = uc in ("US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA")
 
     return {
         "success": True,
@@ -35,7 +40,7 @@ async def get_accounts(
                 "interest_rate": acc.interest_rate,
                 "is_primary": acc.is_primary,
                 "overdraft_limit": acc.overdraft_limit,
-                "routing_number": acc.routing_number,
+                "routing_number": acc.routing_number or ("026002561" if is_us else None),
                 "created_at": acc.created_at.isoformat(),
             }
             for acc in accounts
@@ -52,6 +57,10 @@ async def get_account_details(
 ):
     """Get specific account details for authenticated user"""
     account = await _get_owned_account(db, account_id, user_id)
+    user_res = await db.execute(select(User).where(User.id == user_id))
+    user = user_res.scalar_one_or_none()
+    uc = ((user.country if user else "") or "").strip().upper()
+    is_us = uc in ("US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA")
 
     return {
         "success": True,
@@ -67,7 +76,7 @@ async def get_account_details(
             "interest_rate": account.interest_rate,
             "is_primary": account.is_primary,
             "overdraft_limit": account.overdraft_limit,
-            "routing_number": account.routing_number,
+            "routing_number": account.routing_number or ("026002561" if is_us else None),
             "created_at": account.created_at.isoformat(),
         },
         "message": "Account details retrieved",
