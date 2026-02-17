@@ -28,7 +28,7 @@ from schemas.admin import (
     AdminStatisticsResponse
 )
 from pydantic import ValidationError as PydanticValidationError
-from utils.admin_auth import AdminAuthManager, AdminPermissionManager
+from utils.admin_auth import AdminAuthManager, AdminPermissionManager, get_current_admin
 from utils.errors import (
     ValidationError, AuthenticationError, NotFoundError, UnauthorizedError, InternalServerError
 )
@@ -510,17 +510,18 @@ async def admin_list_accounts(
             }
         )
 
+    return {"success": True, "data": {"items": payload, "total": total, "page": page, "page_size": page_size}}
+
 @router.put("/transfers/edit")
 async def admin_edit_transfer(
-    admin_id: str,
     payload: dict,
+    current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
-        admin = admin_result.scalar()
-        if not admin:
-            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        admin = current_admin
+        if not AdminPermissionManager.has_permission(admin.role, "transfers:edit"):
+            raise UnauthorizedError(message="You don't have permission to edit transfers", error_code="PERMISSION_DENIED")
         transfer_id = payload.get("transfer_id")
         if not transfer_id:
             raise ValidationError(message="transfer_id is required", error_code="TRANSFER_ID_REQUIRED")
@@ -535,23 +536,28 @@ async def admin_edit_transfer(
         destination_account_number = payload.get("destination_account_number")  # allow editing destination
         recipient_name = payload.get("recipient_name")  # display-only, stored as description
         delta = 0.0
+        editing_destination_completed = bool(destination_account_number) and transfer.status == TransferStatus.COMPLETED
+        # Track old/new amounts explicitly to avoid misapplication when destination also changes
+        old_amount = float(transfer.amount or 0.0)
+        new_amount = old_amount
         if amount is not None:
             try:
                 amount = float(amount)
             except Exception:
                 raise ValidationError(message="amount must be a number", error_code="AMOUNT_INVALID")
-            old_amount = float(transfer.amount or 0.0)
-            delta = amount - old_amount
+            new_amount = amount
+            delta = new_amount - old_amount
+        # Apply delta to from/to accounts only when not simultaneously changing destination on a completed transfer
         from_acc_res = await db.execute(select(Account).where(Account.id == transfer.from_account_id).with_for_update())
         from_acc = from_acc_res.scalar_one_or_none()
         if not from_acc:
             raise NotFoundError(resource="Account", error_code="ACCOUNT_NOT_FOUND")
-        if delta != 0.0:
+        if delta != 0.0 and not editing_destination_completed:
             from_before = from_acc.balance
             from_acc.balance = (from_acc.balance or 0.0) - delta
             from_acc.available_balance = (from_acc.available_balance or 0.0) - delta
             from_acc.updated_at = datetime.utcnow()
-        if getattr(transfer, "to_account_id", None) and delta != 0.0 and transfer.status == TransferStatus.COMPLETED:
+        if getattr(transfer, "to_account_id", None) and delta != 0.0 and transfer.status == TransferStatus.COMPLETED and not editing_destination_completed:
             to_acc_res = await db.execute(select(Account).where(Account.id == transfer.to_account_id).with_for_update())
             to_acc = to_acc_res.scalar_one_or_none()
             if to_acc:
@@ -564,13 +570,17 @@ async def admin_edit_transfer(
             new_to_acc = to_acc_res.scalar_one_or_none()
             # If completed and there was a previous internal recipient, move funds
             if transfer.status == TransferStatus.COMPLETED:
+                # When changing destination on a completed transfer, first set the new amount (if provided)
+                if amount is not None:
+                    transfer.amount = new_amount
                 if getattr(transfer, "to_account_id", None):
                     prev_to_res = await db.execute(select(Account).where(Account.id == transfer.to_account_id).with_for_update())
                     prev_to = prev_to_res.scalar_one_or_none()
                     if prev_to:
                         prev_before = prev_to.balance
-                        prev_to.balance = (prev_to.balance or 0.0) - (transfer.amount or 0.0)
-                        prev_to.available_balance = (prev_to.available_balance or 0.0) - (transfer.amount or 0.0)
+                        # Debit previous recipient by the full ORIGINAL amount
+                        prev_to.balance = (prev_to.balance or 0.0) - old_amount
+                        prev_to.available_balance = (prev_to.available_balance or 0.0) - old_amount
                         prev_to.updated_at = datetime.utcnow()
                         # Record a debit on previous recipient
                         rev_tx = Transaction(
@@ -579,7 +589,7 @@ async def admin_edit_transfer(
                             user_id=prev_to.user_id,
                             type=TransactionType.WITHDRAWAL,
                             status=TransactionStatus.COMPLETED,
-                            amount=transfer.amount,
+                            amount=old_amount,
                             currency=transfer.currency,
                             balance_before=prev_before,
                             balance_after=prev_to.balance,
@@ -592,8 +602,10 @@ async def admin_edit_transfer(
                 if new_to_acc:
                     # Credit new recipient
                     new_before = new_to_acc.balance
-                    new_to_acc.balance = (new_to_acc.balance or 0.0) + (transfer.amount or 0.0)
-                    new_to_acc.available_balance = (new_to_acc.available_balance or 0.0) + (transfer.amount or 0.0)
+                    # Credit full NEW amount
+                    credit_amount = transfer.amount if amount is not None else (transfer.amount or 0.0)
+                    new_to_acc.balance = (new_to_acc.balance or 0.0) + credit_amount
+                    new_to_acc.available_balance = (new_to_acc.available_balance or 0.0) + credit_amount
                     new_to_acc.updated_at = datetime.utcnow()
                     dep_tx = Transaction(
                         id=str(uuid.uuid4()),
@@ -601,7 +613,7 @@ async def admin_edit_transfer(
                         user_id=new_to_acc.user_id,
                         type=TransactionType.DEPOSIT,
                         status=TransactionStatus.COMPLETED,
-                        amount=transfer.amount,
+                        amount=credit_amount,
                         currency=transfer.currency,
                         balance_before=new_before,
                         balance_after=new_to_acc.balance,
@@ -621,7 +633,8 @@ async def admin_edit_transfer(
         tx_res = await db.execute(select(Transaction).where(Transaction.transfer_id == transfer.id))
         txs = tx_res.scalars().all()
         for t in txs:
-            if t.type in (TransactionType.WITHDRAWAL, TransactionType.DEBIT, TransactionType.PAYMENT, TransactionType.FEE) and delta != 0.0:
+            # Skip delta-based modification when changing destination on completed transfers
+            if not editing_destination_completed and t.type in (TransactionType.WITHDRAWAL, TransactionType.DEBIT, TransactionType.PAYMENT, TransactionType.FEE) and delta != 0.0:
                 t.amount = (t.amount or 0.0) + delta
                 t.updated_at = datetime.utcnow()
             if description is not None:
@@ -636,9 +649,10 @@ async def admin_edit_transfer(
                     pass
             db.add(t)
         if amount is not None:
-            transfer.amount = amount
+            # Ensure amount set (already applied earlier if editing destination)
+            transfer.amount = new_amount
             fee = float(transfer.fee_amount or 0.0)
-            transfer.total_amount = amount + fee
+            transfer.total_amount = new_amount + fee
         if description is not None:
             transfer.description = description
         if recipient_name is not None and not description:
@@ -672,8 +686,6 @@ async def admin_edit_transfer(
     except Exception as e:
         logger.error("Edit transfer failed", error=e)
         raise InternalServerError(operation="edit transfer", error_code="TRANSFER_EDIT_FAILED", original_error=e)
-
-    return {"success": True, "data": {"items": payload, "total": total, "page": page, "page_size": page_size}}
 
 @router.get("/system/settings")
 async def admin_system_settings(admin_id: str, db: AsyncSession = Depends(get_db)):
@@ -1078,16 +1090,15 @@ async def decline_transfer(
 
 @router.put("/transactions/edit")
 async def admin_edit_transaction(
-    admin_id: str,
     payload: dict,
+    current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Edit basic transaction attributes like description or created_at."""
     try:
-        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
-        admin = admin_result.scalar()
-        if not admin:
-            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        admin = current_admin
+        if not AdminPermissionManager.has_permission(admin.role, "transactions:edit"):
+            raise UnauthorizedError(message="You don't have permission to edit transactions", error_code="PERMISSION_DENIED")
         tx_id = payload.get("transaction_id")
         if not tx_id:
             raise ValidationError(message="transaction_id is required", error_code="TX_ID_REQUIRED")
@@ -1123,16 +1134,15 @@ async def admin_edit_transaction(
 
 @router.post("/transfers/reverse")
 async def admin_reverse_transfer(
-    admin_id: str,
     payload: dict,
+    current_admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Reverse a transfer: credit sender back, and if internal/domestic to internal account, debit recipient."""
     try:
-        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
-        admin = admin_result.scalar()
-        if not admin:
-            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        admin = current_admin
+        if not AdminPermissionManager.has_permission(admin.role, "transfers:reverse"):
+            raise UnauthorizedError(message="You don't have permission to reverse transfers", error_code="PERMISSION_DENIED")
         transfer_id = payload.get("transfer_id")
         if not transfer_id:
             raise ValidationError(message="transfer_id is required", error_code="TRANSFER_ID_REQUIRED")
@@ -1140,6 +1150,9 @@ async def admin_reverse_transfer(
         transfer = result.scalar_one_or_none()
         if not transfer:
             raise NotFoundError(resource="Transfer", error_code="TRANSFER_NOT_FOUND")
+        # Prevent double-reversal or reversing terminal transfers
+        if transfer.status in (TransferStatus.CANCELLED, TransferStatus.REJECTED, TransferStatus.FAILED):
+            raise ValidationError(message="Transfer already reversed or not reversible", error_code="TRANSFER_NOT_REVERSIBLE")
         # Credit sender back
         from_acc_res = await db.execute(select(Account).where(Account.id == transfer.from_account_id).with_for_update())
         from_acc = from_acc_res.scalar_one_or_none()

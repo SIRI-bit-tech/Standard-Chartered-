@@ -28,6 +28,19 @@ router = APIRouter(tags=["transfers"])
 
 logger = logging.getLogger(__name__)
 
+_background_tasks: set[asyncio.Task] = set()
+
+def _schedule_auto_complete(transfer_id: str, delay_seconds: int = 120) -> None:
+    task = asyncio.create_task(_auto_complete_transfer(transfer_id, delay_seconds))
+    _background_tasks.add(task)
+    def _done_callback(t: asyncio.Task) -> None:
+        _background_tasks.discard(t)
+        try:
+            t.result()
+        except Exception:
+            logger.exception("Background auto-complete task failed")
+    task.add_done_callback(_done_callback)
+
 async def _auto_complete_transfer(transfer_id: str, delay_seconds: int = 120):
     """Automatically complete a transfer after a delay.
     Marks withdrawal tx as COMPLETED and credits recipient account if applicable."""
@@ -54,7 +67,9 @@ async def _auto_complete_transfer(transfer_id: str, delay_seconds: int = 120):
                 t.updated_at = datetime.utcnow()
             # Credit recipient if to_account_id exists
             if getattr(transfer, "to_account_id", None):
-                acc_res = await session.execute(select(Account).where(Account.id == transfer.to_account_id))
+                acc_res = await session.execute(
+                    select(Account).where(Account.id == transfer.to_account_id).with_for_update()
+                )
                 to_acc = acc_res.scalar_one_or_none()
                 if to_acc:
                     before = to_acc.balance
@@ -341,7 +356,7 @@ async def internal_transfer(
             db.add(from_tx)
 
         # Schedule auto-completion in ~2 minutes
-        asyncio.create_task(_auto_complete_transfer(transfer_id, 120))
+        _schedule_auto_complete(transfer_id, 120)
 
         return {
             "success": True,
@@ -499,7 +514,7 @@ async def domestic_transfer(
     db.add(tx)
     await db.commit()
     # Auto-complete
-    asyncio.create_task(_auto_complete_transfer(transfer_id, 120))
+    _schedule_auto_complete(transfer_id, 120)
     return {
         "success": True,
         "data": {"transfer_id": transfer_id, "reference": reference},
@@ -652,6 +667,12 @@ async def wire_transfer(
         
         # Debit immediately and mark processing
         total_amount = request.amount + 35.00
+        available = account.available_balance if account.available_balance is not None else (account.balance or 0.0)
+        if available < total_amount:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Insufficient funds"
+            )
         before = account.balance
         account.balance = (account.balance or 0.0) - total_amount
         account.available_balance = (account.available_balance or 0.0) - total_amount
@@ -693,7 +714,7 @@ async def wire_transfer(
         await db.refresh(new_transfer)
         
         # Auto-complete
-        asyncio.create_task(_auto_complete_transfer(new_transfer.id, 120))
+        _schedule_auto_complete(new_transfer.id, 120)
         
         AblyRealtimeManager.publish_notification(
             user_id,
@@ -743,6 +764,12 @@ async def international_transfer(
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     # Debit immediately and create processing ledger
     total_amount = request.amount + 25.00
+    available = account.available_balance if account.available_balance is not None else (account.balance or 0.0)
+    if available < total_amount:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Insufficient funds"
+        )
     before = account.balance
     account.balance = (account.balance or 0.0) - total_amount
     account.available_balance = (account.available_balance or 0.0) - total_amount
@@ -784,7 +811,7 @@ async def international_transfer(
     )
     db.add(tx)
     await db.commit()
-    asyncio.create_task(_auto_complete_transfer(transfer_id, 120))
+    _schedule_auto_complete(transfer_id, 120)
     return {
         "success": True,
         "data": {"transfer_id": transfer_id, "reference": reference},
@@ -837,12 +864,15 @@ async def get_transfer_history(
         except Exception:
             transactions = [t for t in transactions if False]
     if q_lower:
-        transactions = [
-            t for t in transactions
-            if q_lower in (t.description or "").lower()
-            or q_lower in (t.reference_number or "").lower()
-            or q_lower in (accounts.get(t.account_id).account_number if accounts.get(t.account_id) else "")
-        ]
+        safe_filtered = []
+        for t in transactions:
+            acct = accounts.get(t.account_id)
+            desc = (t.description or "").lower()
+            ref = (getattr(t, "reference_number", None) or "").lower()
+            acc_num = ((acct.account_number if acct else "") or "").lower()
+            if q_lower in desc or q_lower in ref or q_lower in acc_num:
+                safe_filtered.append(t)
+        transactions = safe_filtered
     
     total = len(transactions)
     start = (page - 1) * page_size
@@ -993,12 +1023,26 @@ async def get_transfer_history(
 
 
 @router.get("/{transfer_id}")
-async def get_transfer(transfer_id: str, db: AsyncSession = Depends(get_db)):
+async def get_transfer(
+    transfer_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
     """Get rich transfer receipt details for UI/printing."""
     result = await db.execute(select(Transfer).where(Transfer.id == transfer_id))
     transfer = result.scalar_one_or_none()
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
+    # Authorization: allow only participants to view (sender or recipient owner)
+    if getattr(transfer, "from_user_id", None) != user_id:
+        allowed = False
+        if getattr(transfer, "to_account_id", None):
+            to_check = await db.execute(select(Account).where(Account.id == transfer.to_account_id))
+            to_owner = to_check.scalar_one_or_none()
+            if to_owner and getattr(to_owner, "user_id", None) == user_id:
+                allowed = True
+        if not allowed:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     
     from_acc = None
     to_acc = None
