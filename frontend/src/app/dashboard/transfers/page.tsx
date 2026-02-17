@@ -380,16 +380,19 @@ export default function TransfersPage() {
           payload,
         )
         if (res.success) {
-          setInternalForm({ from_account_id: '', to_account_id: '', amount: 0, reference_memo: '' })
+          const receiptId = res.data?.transfer_id
+          const receiptRef = res.data?.reference
+          const receiptAmt = internalForm.amount
           setReceiptData({
             id: res.data?.transfer_id,
             status: 'processing',
             type: 'internal',
-            amount: internalForm.amount,
+            amount: receiptAmt,
             currency,
-            reference: res.data?.reference,
+            reference: receiptRef,
           })
           setReceiptOpen(true)
+          setInternalForm({ from_account_id: '', to_account_id: '', amount: 0, reference_memo: '' })
         }
       } else if (transferType === 'domestic') {
         const payload = {
@@ -405,6 +408,18 @@ export default function TransfersPage() {
           payload,
         )
         if (res.success) {
+          const receiptId = res.data?.transfer_id
+          const receiptRef = res.data?.reference
+          const receiptAmt = domesticForm.amount
+          setReceiptData({
+            id: res.data?.transfer_id,
+            status: 'processing',
+            type: 'domestic',
+            amount: receiptAmt,
+            currency,
+            reference: receiptRef,
+          })
+          setReceiptOpen(true)
           setDomesticForm({
             from_account_id: '',
             recipient_name: '',
@@ -415,15 +430,6 @@ export default function TransfersPage() {
             memo: '',
           })
           setSelectedRecipient(null)
-          setReceiptData({
-            id: res.data?.transfer_id,
-            status: 'processing',
-            type: 'domestic',
-            amount: domesticForm.amount,
-            currency,
-            reference: res.data?.reference,
-          })
-          setReceiptOpen(true)
         }
       } else if (transferType === 'international') {
         const payload = {
@@ -444,6 +450,18 @@ export default function TransfersPage() {
           payload,
         )
         if (res.success) {
+          const receiptId = res.data?.transfer_id
+          const receiptRef = res.data?.reference
+          const receiptAmt = internationalForm.amount
+          setReceiptData({
+            id: res.data?.transfer_id,
+            status: 'processing',
+            type: 'international',
+            amount: receiptAmt,
+            currency,
+            reference: receiptRef,
+          })
+          setReceiptOpen(true)
           setInternationalForm({
             from_account_id: '',
             beneficiary_name: '',
@@ -454,15 +472,6 @@ export default function TransfersPage() {
             amount: 0,
             purpose: '',
           })
-          setReceiptData({
-            id: res.data?.transfer_id,
-            status: 'processing',
-            type: 'international',
-            amount: internationalForm.amount,
-            currency,
-            reference: res.data?.reference,
-          })
-          setReceiptOpen(true)
         }
       } else {
         const payload = {
@@ -480,6 +489,16 @@ export default function TransfersPage() {
           payload,
         )
         if (res.success) {
+          const receiptId = res.transfer_id
+          const receiptAmt = achForm.amount
+          setReceiptData({
+            id: res.transfer_id,
+            status: 'processing',
+            type: 'ach',
+            amount: receiptAmt,
+            currency,
+          })
+          setReceiptOpen(true)
           setAchForm({
             from_account_id: '',
             recipient_name: '',
@@ -490,14 +509,6 @@ export default function TransfersPage() {
             amount: 0,
             description: '',
           })
-          setReceiptData({
-            id: res.transfer_id,
-            status: 'processing',
-            type: 'ach',
-            amount: achForm.amount,
-            currency,
-          })
-          setReceiptOpen(true)
         }
       }
     } catch (err) {

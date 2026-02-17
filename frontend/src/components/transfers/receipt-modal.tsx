@@ -10,8 +10,6 @@ interface Props {
 }
 
 export function ReceiptModal({ open, onClose, data }: Props) {
-  if (!open) return null
-
   const [receipt, setReceipt] = useState<TransferReceipt | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -19,6 +17,7 @@ export function ReceiptModal({ open, onClose, data }: Props) {
   useEffect(() => {
     let cancelled = false
     async function load() {
+      if (!open) return
       if (!data?.id) {
         setReceipt(null)
         return
@@ -38,11 +37,13 @@ export function ReceiptModal({ open, onClose, data }: Props) {
     return () => {
       cancelled = true
     }
-  }, [data?.id])
+  }, [open, data?.id])
 
   const printReceipt = () => {
     window.print()
   }
+
+  if (!open) return null
 
   const shareLink = data.id ? `${window.location.origin}/dashboard/transfers/receipt/${data.id}` : null
 

@@ -48,14 +48,8 @@
    async function saveEdits() {
      try {
        setBusy(true)
-       const adminId = localStorage.getItem('admin_id')
-       if (!adminId) {
-         window.location.href = '/admin/auth/login'
-         return
-       }
-        const qs = new URLSearchParams({ admin_id: adminId })
-        if (tx.transfer_id) {
-          await apiClient.put(`/admin/transfers/edit?${qs.toString()}`, {
+      if (tx.transfer_id) {
+        await apiClient.put(`/admin/transfers/edit`, {
             transfer_id: tx.transfer_id,
             description: desc,
             amount: amount ? parseFloat(amount) : undefined,
@@ -63,14 +57,14 @@
             processed_at: processedAt ? new Date(processedAt).toISOString() : undefined,
             recipient_name: recipientName || undefined,
             destination_account_number: destinationAccount || undefined,
-          })
-        } else {
-          await apiClient.put(`/admin/transactions/edit?${qs.toString()}`, {
+        })
+      } else {
+        await apiClient.put(`/admin/transactions/edit`, {
             transaction_id: tx.id,
             description: desc,
             created_at: createdAt ? new Date(createdAt).toISOString() : undefined,
-          })
-        }
+        })
+      }
        setOpen(false)
        window.location.reload()
      } catch (e) {
@@ -84,13 +78,7 @@
      if (!tx.transfer_id) return
      try {
        setBusy(true)
-       const adminId = localStorage.getItem('admin_id')
-       if (!adminId) {
-         window.location.href = '/admin/auth/login'
-         return
-       }
-       const qs = new URLSearchParams({ admin_id: adminId })
-       await apiClient.post(`/admin/transfers/reverse?${qs.toString()}`, {
+      await apiClient.post(`/admin/transfers/reverse`, {
          transfer_id: tx.transfer_id,
        })
        setReverseOpen(false)

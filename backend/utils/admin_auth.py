@@ -2,9 +2,14 @@ import os
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
-from utils.auth import hash_password, verify_password, create_access_token as create_user_token
+from utils.auth import hash_password, verify_password, create_access_token as create_user_token, verify_token
 from utils.logger import logger
 from config import settings
+from fastapi import Request, HTTPException, status, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from database import get_db
+from models.admin import AdminUser
 
 
 class AdminAuthManager:
@@ -76,6 +81,8 @@ class AdminPermissionManager:
         "super_admin": [
             "users:create", "users:read", "users:update", "users:delete",
             "transfers:approve", "transfers:decline", "transfers:view",
+            "transfers:edit", "transfers:reverse",
+            "transactions:edit",
             "deposits:approve", "deposits:decline", "deposits:view",
             "cards:approve", "cards:decline", "cards:view", "cards:update",
             "loans:approve", "loans:decline", "loans:view",
@@ -85,6 +92,8 @@ class AdminPermissionManager:
         "manager": [
             "users:read", "users:update",
             "transfers:approve", "transfers:decline", "transfers:view",
+            "transfers:edit", "transfers:reverse",
+            "transactions:edit",
             "deposits:approve", "deposits:decline", "deposits:view",
             "cards:approve", "cards:decline", "cards:view", "cards:update",
             "loans:approve", "loans:decline", "loans:view",
@@ -112,3 +121,29 @@ class AdminPermissionManager:
     def get_role_permissions(role: str) -> list:
         """Get all permissions for a role"""
         return AdminPermissionManager.ROLE_PERMISSIONS.get(role, [])
+
+
+async def get_current_admin(request: Request, db: AsyncSession = Depends(get_db)) -> AdminUser:
+    """Extract and verify JWT for admin; return the AdminUser object."""
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid authorization header",
+        )
+    token = auth.split(" ", 1)[1]
+    payload = verify_token(token)
+    if not payload or payload.get("type") != "admin_access" or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired admin token",
+        )
+    admin_id = str(payload["sub"])
+    result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+    admin = result.scalar_one_or_none()
+    if not admin or not getattr(admin, "is_active", True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin not found or inactive",
+        )
+    return admin
