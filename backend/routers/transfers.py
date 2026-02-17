@@ -4,6 +4,7 @@ from sqlalchemy import select, or_
 from models.transfer import Transfer, TransferStatus, TransferType, Beneficiary
 from models.account import Account, AccountStatus
 from models.user import User
+from models.transaction import Transaction, TransactionType as TxType, TransactionStatus as TxStatus
 from database import get_db
 from schemas.transfer import (
     InternalTransferRequest,
@@ -19,10 +20,75 @@ from utils.ably import AblyRealtimeManager
 import logging
 import uuid
 from datetime import datetime, timedelta
+import httpx
+import asyncio
+from database import AsyncSessionLocal
 
-router = APIRouter(prefix="/transfers", tags=["transfers"])
+router = APIRouter(tags=["transfers"])
 
 logger = logging.getLogger(__name__)
+
+async def _auto_complete_transfer(transfer_id: str, delay_seconds: int = 120):
+    """Automatically complete a transfer after a delay.
+    Marks withdrawal tx as COMPLETED and credits recipient account if applicable."""
+    try:
+        await asyncio.sleep(delay_seconds)
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(Transfer).where(Transfer.id == transfer_id))
+            transfer = result.scalar_one_or_none()
+            if not transfer:
+                return
+            if transfer.status not in (TransferStatus.PROCESSING, TransferStatus.PENDING):
+                return
+            transfer.status = TransferStatus.COMPLETED
+            transfer.processed_at = datetime.utcnow()
+            # Complete any linked withdrawal transactions
+            tx_res = await session.execute(
+                select(Transaction).where(
+                    Transaction.transfer_id == transfer.id,
+                    Transaction.type.in_([TxType.WITHDRAWAL, TxType.DEBIT, TxType.PAYMENT, TxType.FEE])
+                )
+            )
+            for t in tx_res.scalars().all():
+                t.status = TxStatus.COMPLETED
+                t.updated_at = datetime.utcnow()
+            # Credit recipient if to_account_id exists
+            if getattr(transfer, "to_account_id", None):
+                acc_res = await session.execute(select(Account).where(Account.id == transfer.to_account_id))
+                to_acc = acc_res.scalar_one_or_none()
+                if to_acc:
+                    before = to_acc.balance
+                    to_acc.balance = (to_acc.balance or 0.0) + transfer.amount
+                    to_acc.available_balance = (to_acc.available_balance or 0.0) + transfer.amount
+                    to_acc.updated_at = datetime.utcnow()
+                    deposit_tx = Transaction(
+                        id=str(uuid.uuid4()),
+                        account_id=to_acc.id,
+                        user_id=to_acc.user_id,
+                        type=TxType.DEPOSIT,
+                        status=TxStatus.COMPLETED,
+                        amount=transfer.amount,
+                        currency=transfer.currency,
+                        balance_before=before,
+                        balance_after=to_acc.balance,
+                        description="Incoming transfer",
+                        reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+                        transfer_id=transfer.id,
+                        created_at=datetime.utcnow(),
+                    )
+                    session.add(deposit_tx)
+            await session.commit()
+            try:
+                AblyRealtimeManager.publish_transfer_status(
+                    transfer.from_user_id,
+                    transfer.id,
+                    "completed",
+                    {"amount": transfer.amount, "currency": transfer.currency},
+                )
+            except Exception:
+                pass
+    except Exception:
+        logger.exception("Auto-complete transfer failed for %s", transfer_id)
 
 async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
     result = await db.execute(select(User).where(User.id == user_id))
@@ -95,6 +161,27 @@ async def search_recipients(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to search recipients"
         )
+
+
+@router.get("/validate-routing")
+async def validate_routing_number(number: str = Query(..., min_length=9, max_length=9)):
+    """Validate routing number using an authoritative directory and return bank name if found."""
+    try:
+        if not number.isdigit() or len(number) != 9:
+            return {"valid": False}
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"https://bankrouting.io/api/v1/aba/{number}")
+        if resp.status_code != 200:
+            return {"valid": False}
+        payload = resp.json()
+        if payload.get("status") == "success" and payload.get("data", {}).get("bank_name"):
+            bank_name = str(payload["data"]["bank_name"]).strip()
+            return {"valid": True, "bank_name": bank_name}
+        return {"valid": False}
+    except Exception:
+        logger.exception("Routing number validation error")
+        # Return generic false instead of raising server error for cleaner UX
+        return {"valid": False}
 
 
 MAX_FAILED_ATTEMPTS = 5
@@ -212,13 +299,11 @@ async def internal_transfer(
                     detail="Insufficient funds",
                 )
 
-            from_account.balance -= total_amount
-            from_account.available_balance -= total_amount
+            from_balance_before = from_account.balance
+            to_balance_before = to_account.balance
+            from_account.balance = from_balance_before - total_amount
+            from_account.available_balance = from_account.available_balance - total_amount
             from_account.updated_at = datetime.utcnow()
-
-            to_account.balance += request.amount
-            to_account.available_balance += request.amount
-            to_account.updated_at = datetime.utcnow()
 
             new_transfer = Transfer(
                 id=transfer_id,
@@ -232,16 +317,36 @@ async def internal_transfer(
                 total_amount=total_amount,
                 reference_number=reference_number,
                 description=request.description or "Internal Transfer",
-                status=TransferStatus.COMPLETED,
-                processed_at=datetime.utcnow(),
+                status=TransferStatus.PROCESSING,
+                requires_mfa="false",
                 created_at=datetime.utcnow(),
             )
             db.add(new_transfer)
+            
+            from_tx = Transaction(
+                id=str(uuid.uuid4()),
+                account_id=from_account.id,
+                user_id=user_id,
+                type=TxType.WITHDRAWAL,
+                status=TxStatus.PROCESSING,
+                amount=total_amount,
+                currency=from_account.currency,
+                balance_before=from_balance_before,
+                balance_after=from_account.balance,
+                description="Internal transfer to own account",
+                reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+                transfer_id=new_transfer.id,
+                created_at=datetime.utcnow(),
+            )
+            db.add(from_tx)
+
+        # Schedule auto-completion in ~2 minutes
+        asyncio.create_task(_auto_complete_transfer(transfer_id, 120))
 
         return {
             "success": True,
             "data": {"transfer_id": transfer_id, "reference": reference_number},
-            "message": "Internal transfer completed successfully",
+            "message": "Internal transfer is processing",
         }
     except HTTPException:
         raise
@@ -351,27 +456,54 @@ async def domestic_transfer(
         )
 
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
+    # Debit immediately and create processing ledger
+    transfer_id = str(uuid.uuid4())
+    reference = str(uuid.uuid4())[:12].upper()
+    from_before = from_account.balance
+    from_account.balance = from_account.balance - total_amount
+    from_account.available_balance = from_account.available_balance - total_amount
+    from_account.updated_at = datetime.utcnow()
     new_transfer = Transfer(
-        id=str(uuid.uuid4()),
+        id=transfer_id,
         from_account_id=request.from_account_id,
         from_user_id=user_id,
-        to_account_id=to_account.id,  # Use account ID, not account number
+        to_account_id=to_account.id,
         type=TransferType.DOMESTIC,
         amount=request.amount,
         currency=from_account.currency,
         fee_amount=2.50,
-        total_amount=request.amount + 2.50,
-        reference_number=str(uuid.uuid4())[:12].upper(),
-        description=request.description or "Domestic Transfer",
+        total_amount=total_amount,
+        reference_number=reference,
+        # Persist recipient name for history
+        description=recipient_info,
         status=TransferStatus.PROCESSING,
+        requires_mfa="false",
         created_at=datetime.utcnow(),
     )
     db.add(new_transfer)
+    tx = Transaction(
+        id=str(uuid.uuid4()),
+        account_id=from_account.id,
+        user_id=user_id,
+        type=TxType.WITHDRAWAL,
+        status=TxStatus.PROCESSING,
+        amount=total_amount,
+        currency=from_account.currency,
+        balance_before=from_before,
+        balance_after=from_account.balance,
+        description=f"Domestic transfer to {recipient_info}",
+        reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+        transfer_id=new_transfer.id,
+        created_at=datetime.utcnow(),
+    )
+    db.add(tx)
     await db.commit()
+    # Auto-complete
+    asyncio.create_task(_auto_complete_transfer(transfer_id, 120))
     return {
         "success": True,
-        "data": {"transfer_id": new_transfer.id, "reference": new_transfer.reference_number},
-        "message": "Domestic transfer submitted",
+        "data": {"transfer_id": transfer_id, "reference": reference},
+        "message": "Domestic transfer is processing",
     }
 
 
@@ -385,6 +517,32 @@ async def ach_transfer(
     await _ensure_user_active(db, user_id)
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     try:
+        # Authoritative routing number lookup + bank name match
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(f"https://bankrouting.io/api/v1/aba/{request.routing_number}")
+        except Exception:
+            logger.exception("Authoritative routing lookup failed during ACH")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid routing number")
+        if resp.status_code != 200:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid routing number")
+        payload = resp.json()
+        directory_name = (payload.get("data") or {}).get("bank_name")
+        if payload.get("status") != "success" or not directory_name:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid routing number")
+        def _norm(s: str) -> str:
+            s2 = s.lower().replace("&", "and")
+            # collapse whitespace and remove common punctuation
+            import re
+            s2 = re.sub(r"[^\w\s]", " ", s2)
+            s2 = re.sub(r"\s+", " ", s2).strip()
+            return s2
+        if _norm(request.bank_name) != _norm(directory_name):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bank name does not match routing number",
+            )
+
         account_result = await db.execute(
             select(Account).where(Account.id == request.from_account_id)
         )
@@ -396,7 +554,16 @@ async def ach_transfer(
             )
         if getattr(account, "status", None) and account.status != AccountStatus.ACTIVE:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
+        if account.available_balance < request.amount:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient funds")
         
+        balance_before = account.balance
+        account.balance = account.balance - request.amount
+        account.available_balance = account.available_balance - request.amount
+        account.updated_at = datetime.utcnow()
+        # Persist useful receipt details in available fields (no schema change)
+        # - to_account_number stores recipient account number
+        # - description encodes "recipient_name | bank_name" for later parsing
         new_transfer = Transfer(
             id=str(uuid.uuid4()),
             from_account_id=request.from_account_id,
@@ -407,14 +574,35 @@ async def ach_transfer(
             fee_amount=0.0,
             total_amount=request.amount,
             reference_number=f"ACH-{uuid.uuid4().hex[:12].upper()}",
-            description=request.description or "ACH Transfer",
+            description=f"{request.account_holder.strip()} | {request.bank_name.strip()}",
             status=TransferStatus.PROCESSING,
-            created_at=datetime.utcnow()
+            requires_mfa="false",
+            created_at=datetime.utcnow(),
+            to_account_number=request.account_number,
         )
         
         db.add(new_transfer)
+        tx = Transaction(
+            id=str(uuid.uuid4()),
+            account_id=account.id,
+            user_id=user_id,
+            type=TxType.WITHDRAWAL,
+            status=TxStatus.PROCESSING,
+            amount=request.amount,
+            currency=account.currency,
+            balance_before=balance_before,
+            balance_after=account.balance,
+            description="ACH transfer initiated",
+            reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+            transfer_id=new_transfer.id,
+            created_at=datetime.utcnow(),
+        )
+        db.add(tx)
         await db.commit()
         await db.refresh(new_transfer)
+        
+        # Auto-complete this transfer in ~2 minutes
+        asyncio.create_task(_auto_complete_transfer(new_transfer.id, 120))
         
         AblyRealtimeManager.publish_notification(
             user_id,
@@ -426,7 +614,7 @@ async def ach_transfer(
         return {
             "success": True,
             "transfer_id": new_transfer.id,
-            "status": TransferStatus.PROCESSING,
+            "status": "processing",
             "message": "ACH transfer submitted. Processing typically takes 3-5 business days."
         }
     except HTTPException:
@@ -462,6 +650,12 @@ async def wire_transfer(
                 detail="Account not found"
             )
         
+        # Debit immediately and mark processing
+        total_amount = request.amount + 35.00
+        before = account.balance
+        account.balance = (account.balance or 0.0) - total_amount
+        account.available_balance = (account.available_balance or 0.0) - total_amount
+        account.updated_at = datetime.utcnow()
         new_transfer = Transfer(
             id=str(uuid.uuid4()),
             from_account_id=request.from_account_id,
@@ -470,17 +664,36 @@ async def wire_transfer(
             amount=request.amount,
             currency=request.currency,
             fee_amount=35.00,
-            total_amount=request.amount + 35.00,
+            total_amount=total_amount,
             reference_number=f"WIRE-{uuid.uuid4().hex[:12].upper()}",
-            description=request.purpose or "Wire Transfer",
-            status=TransferStatus.PENDING,
-            requires_mfa=True,
+            # Persist "recipient | bank" for display
+            description=f"{request.account_holder.strip()} | {request.bank_name.strip()}",
+            status=TransferStatus.PROCESSING,
+            requires_mfa="false",
             created_at=datetime.utcnow()
         )
-        
         db.add(new_transfer)
+        tx = Transaction(
+            id=str(uuid.uuid4()),
+            account_id=account.id,
+            user_id=user_id,
+            type=TxType.WITHDRAWAL,
+            status=TxStatus.PROCESSING,
+            amount=total_amount,
+            currency=request.currency,
+            balance_before=before,
+            balance_after=account.balance,
+            description="Wire transfer initiated",
+            reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+            transfer_id=new_transfer.id,
+            created_at=datetime.utcnow(),
+        )
+        db.add(tx)
         await db.commit()
         await db.refresh(new_transfer)
+        
+        # Auto-complete
+        asyncio.create_task(_auto_complete_transfer(new_transfer.id, 120))
         
         AblyRealtimeManager.publish_notification(
             user_id,
@@ -492,8 +705,8 @@ async def wire_transfer(
         return {
             "success": True,
             "transfer_id": new_transfer.id,
-            "status": TransferStatus.PENDING,
-            "message": "Wire transfer submitted for approval. MFA required for confirmation."
+            "status": "processing",
+            "message": "Wire transfer is processing"
         }
     except HTTPException:
         raise
@@ -528,8 +741,16 @@ async def international_transfer(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
 
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
+    # Debit immediately and create processing ledger
+    total_amount = request.amount + 25.00
+    before = account.balance
+    account.balance = (account.balance or 0.0) - total_amount
+    account.available_balance = (account.available_balance or 0.0) - total_amount
+    account.updated_at = datetime.utcnow()
+    transfer_id = str(uuid.uuid4())
+    reference = str(uuid.uuid4())[:12].upper()
     new_transfer = Transfer(
-        id=str(uuid.uuid4()),
+        id=transfer_id,
         from_account_id=request.from_account_id,
         from_user_id=user_id,
         to_beneficiary_id=None,
@@ -537,76 +758,304 @@ async def international_transfer(
         amount=request.amount,
         currency="USD",
         fee_amount=25.00,
-        total_amount=request.amount + 25.00,
-        reference_number=str(uuid.uuid4())[:12].upper(),
-        description=request.purpose or "International Transfer",
-        status=TransferStatus.PENDING,
-        requires_mfa=True,
+        total_amount=total_amount,
+        reference_number=reference,
+        # Encode "recipient_name | bank_name" for display in history/receipt
+        description=f"{request.beneficiary_name.strip()} | {request.beneficiary_bank_name.strip()}",
+        status=TransferStatus.PROCESSING,
+        requires_mfa="false",
         created_at=datetime.utcnow(),
     )
     db.add(new_transfer)
+    tx = Transaction(
+        id=str(uuid.uuid4()),
+        account_id=account.id,
+        user_id=user_id,
+        type=TxType.WITHDRAWAL,
+        status=TxStatus.PROCESSING,
+        amount=total_amount,
+        currency="USD",
+        balance_before=before,
+        balance_after=account.balance,
+        description="International transfer initiated",
+        reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+        transfer_id=new_transfer.id,
+        created_at=datetime.utcnow(),
+    )
+    db.add(tx)
     await db.commit()
+    asyncio.create_task(_auto_complete_transfer(transfer_id, 120))
     return {
         "success": True,
-        "data": {"transfer_id": new_transfer.id, "reference": new_transfer.reference_number},
-        "message": "International transfer submitted for approval",
+        "data": {"transfer_id": transfer_id, "reference": reference},
+        "message": "International transfer is processing",
+    }
+
+@router.get("/history")
+async def get_transfer_history(
+    user_id: str = Depends(get_current_user_id),
+    q: str = Query("", max_length=100),
+    period: str = Query("30", pattern="^(30|90|all)$"),
+    type: str = Query("all"),
+    status: str = Query("all"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=5, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unified transfer history built from transaction ledger.
+    Returns items across user accounts with metrics and pagination."""
+    # Load all accounts for the user
+    accounts_result = await db.execute(select(Account).where(Account.user_id == user_id))
+    accounts = {a.id: a for a in accounts_result.scalars().all()}
+    if not accounts:
+        return {"success": True, "data": {"items": [], "total": 0, "page": page, "page_size": page_size,
+                                          "metrics": {"sent_monthly": 0.0, "sent_count": 0, "received_monthly": 0.0, "received_count": 0, "pending_amount": 0.0, "pending_count": 0}},
+                "message": "Transfer history retrieved"}
+    
+    # Fetch transactions for these accounts
+    tx_result = await db.execute(
+        select(Transaction).where(Transaction.account_id.in_(list(accounts.keys()))).order_by(Transaction.created_at.desc())
+    )
+    transactions = list(tx_result.scalars().all())
+    
+    # Apply in-memory filters (sufficient for demo and small datasets)
+    q_lower = q.strip().lower()
+    if period != "all":
+        days = int(period)
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        transactions = [t for t in transactions if t.created_at >= cutoff]
+    if type != "all":
+        try:
+            tx_type = getattr(TxType, type.upper())
+            transactions = [t for t in transactions if t.type == tx_type]
+        except Exception:
+            transactions = [t for t in transactions if False]
+    if status != "all":
+        try:
+            tx_status = getattr(TxStatus, status.upper())
+            transactions = [t for t in transactions if t.status == tx_status]
+        except Exception:
+            transactions = [t for t in transactions if False]
+    if q_lower:
+        transactions = [
+            t for t in transactions
+            if q_lower in (t.description or "").lower()
+            or q_lower in (t.reference_number or "").lower()
+            or q_lower in (accounts.get(t.account_id).account_number if accounts.get(t.account_id) else "")
+        ]
+    
+    total = len(transactions)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_items = transactions[start:end]
+    
+    # Metrics for current month
+    first_day_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_txs = [t for t in transactions if t.created_at >= first_day_month]
+    def is_debit(t: Transaction) -> bool:
+        return t.type in (TxType.DEBIT, TxType.WITHDRAWAL, TxType.FEE, TxType.PAYMENT, TxType.TRANSFER) and t.amount > 0
+    def is_credit(t: Transaction) -> bool:
+        return t.type in (TxType.CREDIT, TxType.DEPOSIT, TxType.INTEREST) and t.amount > 0
+    sent_monthly = sum(t.amount for t in month_txs if is_debit(t))
+    received_monthly = sum(t.amount for t in month_txs if is_credit(t))
+    pending_amount = sum(t.amount for t in transactions if t.status in (TxStatus.PENDING, TxStatus.PROCESSING))
+    
+    def mask_account(acc: Account) -> str:
+        if not acc or not acc.account_number:
+            return ""
+        return f"...{acc.account_number[-4:]} ({acc.nickname or acc.account_type.value.title()})"
+    
+    # Batch load transfers related to current page for counterparty resolution
+    transfer_ids = [getattr(t, "transfer_id", None) for t in page_items if getattr(t, "transfer_id", None)]
+    transfer_map = {}
+    if transfer_ids:
+        tr_res = await db.execute(select(Transfer).where(Transfer.id.in_(transfer_ids)))
+        transfer_map = {tr.id: tr for tr in tr_res.scalars().all()}
+    # Batch load accounts for transfer endpoints
+    to_ids = [tr.to_account_id for tr in transfer_map.values() if getattr(tr, "to_account_id", None)]
+    from_ids = [tr.from_account_id for tr in transfer_map.values() if getattr(tr, "from_account_id", None)]
+    acc_ids = list({*(to_ids or []), *(from_ids or [])})
+    acc_map = {}
+    if acc_ids:
+        acc_res = await db.execute(select(Account).where(Account.id.in_(acc_ids)))
+        acc_map = {a.id: a for a in acc_res.scalars().all()}
+    # Batch load users for those accounts
+    user_ids = list({a.user_id for a in acc_map.values()})
+    user_map = {}
+    if user_ids:
+        u_res = await db.execute(select(User).where(User.id.in_(user_ids)))
+        user_map = {u.id: u for u in u_res.scalars().all()}
+    # Resolve current user's display name (sender label for debits)
+    my_display_name = None
+    me = user_map.get(user_id)
+    if me:
+        full = f"{getattr(me, 'first_name', '')} {getattr(me, 'last_name', '')}".strip()
+        my_display_name = full or getattr(me, "username", None) or "Sender"
+
+    def type_label(tr_type) -> str:
+        try:
+            tval = tr_type.value if hasattr(tr_type, "value") else str(tr_type)
+        except Exception:
+            tval = str(tr_type)
+        return {
+            "internal": "Internal Transfer",
+            "domestic": "Domestic Transfer",
+            "international": "International Transfer",
+            "ach": "ACH Transfer",
+            "wire": "Wire Transfer",
+        }.get(tval, tval.title())
+
+    items = []
+    for t in page_items:
+        acc = accounts.get(t.account_id)
+        direction = "debit" if is_debit(t) else "credit"
+        # Resolve counterparty based on transfer linkage
+        tr = transfer_map.get(getattr(t, "transfer_id", None))
+        counterparty = None
+        subtitle = None
+        bank_name = None
+        if tr:
+            subtitle = type_label(getattr(tr, "type", None))
+            if direction == "debit":
+                # Outgoing: show the actual sender (current user)
+                counterparty = my_display_name or "Sender"
+            else:
+                # Incoming: show sender
+                src_acc = acc_map.get(getattr(tr, "from_account_id", None))
+                if src_acc:
+                    if src_acc.user_id == user_id:
+                        counterparty = src_acc.nickname or f"Own {getattr(src_acc.account_type, 'value', str(src_acc.account_type)).title()} Account"
+                    else:
+                        u = user_map.get(src_acc.user_id)
+                        if u:
+                            full_name = f"{getattr(u, 'first_name', '')} {getattr(u, 'last_name', '')}".strip()
+                            counterparty = full_name or u.username or "Sender"
+                else:
+                    # For external incoming, prefer sender name from description if encoded "name | bank"
+                    name = None
+                    try:
+                        if getattr(tr, "description", None) and "|" in tr.description:
+                            parts = [p.strip() for p in tr.description.split("|", 1)]
+                            name = parts[0] if parts else None
+                            if len(parts) == 2:
+                                bank_name = parts[1]
+                    except Exception:
+                        name = None
+                    counterparty = name or tr.description or "External Bank"
+            # Extract recipient bank from encoded "name | bank" where applicable
+            if not bank_name:
+                try:
+                    if getattr(tr, "description", None) and "|" in str(tr.description):
+                        parts = [p.strip() for p in str(tr.description).split("|", 1)]
+                        if len(parts) == 2:
+                            bank_name = parts[1]
+                except Exception:
+                    bank_name = None
+        # Fallbacks if no transfer link
+        if not counterparty:
+            if t.description:
+                counterparty = t.description
+            else:
+                counterparty = "External Bank" if direction == "debit" else "Incoming Transfer"
+        items.append({
+            "id": t.id,
+            "date": t.created_at.isoformat(),
+            "counterparty": counterparty,
+            "subtitle": subtitle or ("Credit" if direction == "credit" else "Debit"),
+            "bank_name": bank_name,
+            "reference": t.reference_number,
+            "account_masked": mask_account(acc),
+            "status": t.status.value if hasattr(t.status, "value") else str(t.status),
+            "amount": t.amount if direction == "credit" else -t.amount,
+            "currency": t.currency,
+            "direction": direction,
+            "transfer_id": getattr(t, "transfer_id", None),
+        })
+    
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "metrics": {
+                "sent_monthly": sent_monthly,
+                "sent_count": len([t for t in month_txs if is_debit(t)]),
+                "received_monthly": received_monthly,
+                "received_count": len([t for t in month_txs if is_credit(t)]),
+                "pending_amount": pending_amount,
+                "pending_count": len([t for t in transactions if t.status in (TxStatus.PENDING, TxStatus.PROCESSING)]),
+            }
+        },
+        "message": "Transfer history retrieved"
     }
 
 
 @router.get("/{transfer_id}")
 async def get_transfer(transfer_id: str, db: AsyncSession = Depends(get_db)):
-    """Get transfer details"""
-    result = await db.execute(
-        select(Transfer).where(Transfer.id == transfer_id)
-    )
-    transfer = result.scalar()
-    
+    """Get rich transfer receipt details for UI/printing."""
+    result = await db.execute(select(Transfer).where(Transfer.id == transfer_id))
+    transfer = result.scalar_one_or_none()
     if not transfer:
         raise HTTPException(status_code=404, detail="Transfer not found")
     
-    return {
-        "success": True,
-        "data": {
-            "id": transfer.id,
-            "type": transfer.type,
-            "amount": transfer.amount,
-            "status": transfer.status,
-            "reference_number": transfer.reference_number,
-            "created_at": transfer.created_at.isoformat()
-        },
-        "message": "Transfer details retrieved"
-    }
-
-
-@router.get("/history")
-async def get_transfer_history(
-    user_id: str = Depends(get_current_user_id),
-    limit: int = Query(20, le=100),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get transfer history. Requires auth."""
-    result = await db.execute(
-        select(Transfer)
-        .where(Transfer.from_user_id == user_id)
-        .order_by(Transfer.created_at.desc())
-        .limit(limit)
-    )
-    transfers = result.scalars().all()
+    from_acc = None
+    to_acc = None
+    if getattr(transfer, "from_account_id", None):
+        fr = await db.execute(select(Account).where(Account.id == transfer.from_account_id))
+        from_acc = fr.scalar_one_or_none()
+    if getattr(transfer, "to_account_id", None):
+        tr = await db.execute(select(Account).where(Account.id == transfer.to_account_id))
+        to_acc = tr.scalar_one_or_none()
     
-    return {
-        "success": True,
-        "data": [
-            {
-                "id": t.id,
-                "type": t.type,
-                "amount": t.amount,
-                "status": t.status,
-                "created_at": t.created_at.isoformat()
-            }
-            for t in transfers
-        ],
-        "message": "Transfer history retrieved"
+    def mask_account(acc: Account | None) -> str | None:
+        if not acc:
+            return None
+        last4 = acc.account_number[-4:] if getattr(acc, "account_number", None) else "—"
+        acc_label = acc.account_type.value if hasattr(acc.account_type, "value") else str(acc.account_type)
+        return f"{acc_label.title()} Account (**** {last4})"
+    
+    recipient_name = None
+    recipient_bank = None
+    recipient_account_masked = None
+    # Best-effort: infer from available fields
+    if to_acc:
+        recipient_name = "Own Account" if from_acc and to_acc and from_acc.user_id == to_acc.user_id else "Recipient Account"
+        recipient_account_masked = mask_account(to_acc)
+    elif getattr(transfer, "to_account_number", None):
+        num = transfer.to_account_number
+        recipient_account_masked = f"Account (**** {num[-4:]})"
+    # Try to infer bank and recipient from encoded description "name | bank" for external transfers
+    try:
+        if transfer.description and "|" in str(transfer.description):
+            parts = [p.strip() for p in str(transfer.description).split("|", 1)]
+            if len(parts) == 2:
+                recipient_name = recipient_name or (parts[0] or None)
+                recipient_bank = recipient_bank or (parts[1] or None)
+    except Exception:
+        pass
+    
+    data = {
+        "id": transfer.id,
+        "type": transfer.type.value if hasattr(transfer.type, "value") else str(transfer.type),
+        "status": transfer.status.value if hasattr(transfer.status, "value") else str(transfer.status),
+        "amount": transfer.amount,
+        "currency": transfer.currency,
+        "fee_amount": getattr(transfer, "fee_amount", 0.0) or 0.0,
+        "total_amount": getattr(transfer, "total_amount", None) or (transfer.amount + (getattr(transfer, "fee_amount", 0.0) or 0.0)),
+        "reference_number": transfer.reference_number,
+        "created_at": transfer.created_at.isoformat() if transfer.created_at else None,
+        "processed_at": transfer.processed_at.isoformat() if getattr(transfer, "processed_at", None) else None,
+        "from_account_masked": mask_account(from_acc),
+        "recipient_bank": recipient_bank,
+        "recipient_name": recipient_name,
+        "recipient_account_masked": recipient_account_masked,
+        "description": transfer.description,
     }
+    
+    return {"success": True, "data": data, "message": "Transfer details retrieved"}
+
 
 
 @router.post("/{transfer_id}/cancel")

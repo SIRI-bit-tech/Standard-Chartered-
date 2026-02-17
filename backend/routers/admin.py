@@ -8,7 +8,7 @@ import json
 from models.admin import AdminUser, AdminAuditLog, AdminRole
 from models.user import User
 from models.account import Account, AccountStatus
-from models.transaction import Transaction
+from models.transaction import Transaction, TransactionType, TransactionStatus
 from models.notification import Notification, NotificationType
 from models.transfer import Transfer, TransferStatus
 from models.deposit import Deposit, DepositStatus
@@ -510,6 +510,169 @@ async def admin_list_accounts(
             }
         )
 
+@router.put("/transfers/edit")
+async def admin_edit_transfer(
+    admin_id: str,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        transfer_id = payload.get("transfer_id")
+        if not transfer_id:
+            raise ValidationError(message="transfer_id is required", error_code="TRANSFER_ID_REQUIRED")
+        tr_res = await db.execute(select(Transfer).where(Transfer.id == transfer_id))
+        transfer = tr_res.scalar_one_or_none()
+        if not transfer:
+            raise NotFoundError(resource="Transfer", error_code="TRANSFER_NOT_FOUND")
+        amount = payload.get("amount")
+        description = payload.get("description")
+        created_at = payload.get("created_at")
+        processed_at = payload.get("processed_at")
+        destination_account_number = payload.get("destination_account_number")  # allow editing destination
+        recipient_name = payload.get("recipient_name")  # display-only, stored as description
+        delta = 0.0
+        if amount is not None:
+            try:
+                amount = float(amount)
+            except Exception:
+                raise ValidationError(message="amount must be a number", error_code="AMOUNT_INVALID")
+            old_amount = float(transfer.amount or 0.0)
+            delta = amount - old_amount
+        from_acc_res = await db.execute(select(Account).where(Account.id == transfer.from_account_id).with_for_update())
+        from_acc = from_acc_res.scalar_one_or_none()
+        if not from_acc:
+            raise NotFoundError(resource="Account", error_code="ACCOUNT_NOT_FOUND")
+        if delta != 0.0:
+            from_before = from_acc.balance
+            from_acc.balance = (from_acc.balance or 0.0) - delta
+            from_acc.available_balance = (from_acc.available_balance or 0.0) - delta
+            from_acc.updated_at = datetime.utcnow()
+        if getattr(transfer, "to_account_id", None) and delta != 0.0 and transfer.status == TransferStatus.COMPLETED:
+            to_acc_res = await db.execute(select(Account).where(Account.id == transfer.to_account_id).with_for_update())
+            to_acc = to_acc_res.scalar_one_or_none()
+            if to_acc:
+                to_acc.balance = (to_acc.balance or 0.0) + delta
+                to_acc.available_balance = (to_acc.available_balance or 0.0) + delta
+                to_acc.updated_at = datetime.utcnow()
+        # Change destination account if provided
+        if destination_account_number:
+            to_acc_res = await db.execute(select(Account).where(Account.account_number == destination_account_number).limit(1))
+            new_to_acc = to_acc_res.scalar_one_or_none()
+            # If completed and there was a previous internal recipient, move funds
+            if transfer.status == TransferStatus.COMPLETED:
+                if getattr(transfer, "to_account_id", None):
+                    prev_to_res = await db.execute(select(Account).where(Account.id == transfer.to_account_id).with_for_update())
+                    prev_to = prev_to_res.scalar_one_or_none()
+                    if prev_to:
+                        prev_before = prev_to.balance
+                        prev_to.balance = (prev_to.balance or 0.0) - (transfer.amount or 0.0)
+                        prev_to.available_balance = (prev_to.available_balance or 0.0) - (transfer.amount or 0.0)
+                        prev_to.updated_at = datetime.utcnow()
+                        # Record a debit on previous recipient
+                        rev_tx = Transaction(
+                            id=str(uuid.uuid4()),
+                            account_id=prev_to.id,
+                            user_id=prev_to.user_id,
+                            type=TransactionType.WITHDRAWAL,
+                            status=TransactionStatus.COMPLETED,
+                            amount=transfer.amount,
+                            currency=transfer.currency,
+                            balance_before=prev_before,
+                            balance_after=prev_to.balance,
+                            description="Transfer destination change (previous recipient debit)",
+                            reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+                            transfer_id=transfer.id,
+                            created_at=datetime.utcnow(),
+                        )
+                        db.add(rev_tx)
+                if new_to_acc:
+                    # Credit new recipient
+                    new_before = new_to_acc.balance
+                    new_to_acc.balance = (new_to_acc.balance or 0.0) + (transfer.amount or 0.0)
+                    new_to_acc.available_balance = (new_to_acc.available_balance or 0.0) + (transfer.amount or 0.0)
+                    new_to_acc.updated_at = datetime.utcnow()
+                    dep_tx = Transaction(
+                        id=str(uuid.uuid4()),
+                        account_id=new_to_acc.id,
+                        user_id=new_to_acc.user_id,
+                        type=TransactionType.DEPOSIT,
+                        status=TransactionStatus.COMPLETED,
+                        amount=transfer.amount,
+                        currency=transfer.currency,
+                        balance_before=new_before,
+                        balance_after=new_to_acc.balance,
+                        description="Transfer destination change (new recipient credit)",
+                        reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+                        transfer_id=transfer.id,
+                        created_at=datetime.utcnow(),
+                    )
+                    db.add(dep_tx)
+            # Update transfer destination
+            if new_to_acc:
+                transfer.to_account_id = new_to_acc.id
+                transfer.to_account_number = None
+            else:
+                transfer.to_account_id = None
+                transfer.to_account_number = destination_account_number
+        tx_res = await db.execute(select(Transaction).where(Transaction.transfer_id == transfer.id))
+        txs = tx_res.scalars().all()
+        for t in txs:
+            if t.type in (TransactionType.WITHDRAWAL, TransactionType.DEBIT, TransactionType.PAYMENT, TransactionType.FEE) and delta != 0.0:
+                t.amount = (t.amount or 0.0) + delta
+                t.updated_at = datetime.utcnow()
+            if description is not None:
+                t.description = description
+            if recipient_name is not None and not description:
+                # If recipient_name provided and no new description, reflect recipient_name in tx description
+                t.description = f"Transfer to {recipient_name}"
+            if created_at:
+                try:
+                    t.created_at = datetime.fromisoformat(created_at)
+                except Exception:
+                    pass
+            db.add(t)
+        if amount is not None:
+            transfer.amount = amount
+            fee = float(transfer.fee_amount or 0.0)
+            transfer.total_amount = amount + fee
+        if description is not None:
+            transfer.description = description
+        if recipient_name is not None and not description:
+            transfer.description = recipient_name
+        if created_at:
+            try:
+                transfer.created_at = datetime.fromisoformat(created_at)
+            except Exception:
+                pass
+        if processed_at:
+            try:
+                transfer.processed_at = datetime.fromisoformat(processed_at)
+            except Exception:
+                pass
+        db.add(transfer)
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="edit_transfer",
+            resource_type="transfer",
+            resource_id=transfer.id,
+            details=json.dumps({"fields": list(payload.keys())})
+        )
+        db.add(audit_log)
+        await db.commit()
+        AblyRealtimeManager.publish_admin_event("transactions", {"type": "transfer_edited", "transfer_id": transfer.id})
+        return {"success": True, "message": "Transfer updated"}
+    except (UnauthorizedError, NotFoundError, ValidationError):
+        raise
+    except Exception as e:
+        logger.error("Edit transfer failed", error=e)
+        raise InternalServerError(operation="edit transfer", error_code="TRANSFER_EDIT_FAILED", original_error=e)
+
     return {"success": True, "data": {"items": payload, "total": total, "page": page, "page_size": page_size}}
 
 @router.get("/system/settings")
@@ -591,6 +754,7 @@ async def admin_list_transactions(
                 "currency": t.currency,
                 "status": t.status,
                 "created_at": t.created_at.isoformat() if getattr(t, "created_at", None) else None,
+                "transfer_id": getattr(t, "transfer_id", None),
                 "account_number": acc.account_number if acc else "",
                 "user": {
                     "id": user.id if user else "",
@@ -912,6 +1076,180 @@ async def decline_transfer(
             original_error=e
         )
 
+@router.put("/transactions/edit")
+async def admin_edit_transaction(
+    admin_id: str,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Edit basic transaction attributes like description or created_at."""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        tx_id = payload.get("transaction_id")
+        if not tx_id:
+            raise ValidationError(message="transaction_id is required", error_code="TX_ID_REQUIRED")
+        result = await db.execute(select(Transaction).where(Transaction.id == tx_id))
+        tx = result.scalar_one_or_none()
+        if not tx:
+            raise NotFoundError(resource="Transaction", error_code="TX_NOT_FOUND")
+        if "description" in payload and isinstance(payload["description"], str):
+            tx.description = payload["description"]
+        if "created_at" in payload and payload["created_at"]:
+            try:
+                tx.created_at = datetime.fromisoformat(payload["created_at"])
+            except Exception:
+                pass
+        db.add(tx)
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="edit_transaction",
+            resource_type="transaction",
+            resource_id=tx.id,
+            details=json.dumps({"fields": list(payload.keys())})
+        )
+        db.add(audit_log)
+        await db.commit()
+        return {"success": True, "message": "Transaction updated"}
+    except (UnauthorizedError, NotFoundError, ValidationError):
+        raise
+    except Exception as e:
+        logger.error("Edit transaction failed", error=e)
+        raise InternalServerError(operation="edit transaction", error_code="TX_EDIT_FAILED", original_error=e)
+
+@router.post("/transfers/reverse")
+async def admin_reverse_transfer(
+    admin_id: str,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reverse a transfer: credit sender back, and if internal/domestic to internal account, debit recipient."""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        transfer_id = payload.get("transfer_id")
+        if not transfer_id:
+            raise ValidationError(message="transfer_id is required", error_code="TRANSFER_ID_REQUIRED")
+        result = await db.execute(select(Transfer).where(Transfer.id == transfer_id))
+        transfer = result.scalar_one_or_none()
+        if not transfer:
+            raise NotFoundError(resource="Transfer", error_code="TRANSFER_NOT_FOUND")
+        # Credit sender back
+        from_acc_res = await db.execute(select(Account).where(Account.id == transfer.from_account_id).with_for_update())
+        from_acc = from_acc_res.scalar_one_or_none()
+        if not from_acc:
+            raise NotFoundError(resource="Account", error_code="ACCOUNT_NOT_FOUND")
+        fb = from_acc.balance
+        from_acc.balance = (from_acc.balance or 0.0) + transfer.total_amount
+        from_acc.available_balance = (from_acc.available_balance or 0.0) + transfer.total_amount
+        from_acc.updated_at = datetime.utcnow()
+        credit_tx = Transaction(
+            id=str(uuid.uuid4()),
+            account_id=from_acc.id,
+            user_id=from_acc.user_id,
+            type=TransactionType.CREDIT,
+            status=TransactionStatus.COMPLETED,
+            amount=transfer.total_amount,
+            currency=transfer.currency,
+            balance_before=fb,
+            balance_after=from_acc.balance,
+            description="Transfer reversal credit",
+            reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+            transfer_id=transfer.id,
+            created_at=datetime.utcnow(),
+        )
+        db.add(credit_tx)
+        # If recipient was internal, debit them
+        if getattr(transfer, "to_account_id", None):
+            to_acc_res = await db.execute(select(Account).where(Account.id == transfer.to_account_id).with_for_update())
+            to_acc = to_acc_res.scalar_one_or_none()
+            if to_acc:
+                tb = to_acc.balance
+                to_acc.balance = (to_acc.balance or 0.0) - transfer.amount
+                to_acc.available_balance = (to_acc.available_balance or 0.0) - transfer.amount
+                to_acc.updated_at = datetime.utcnow()
+                debit_tx = Transaction(
+                    id=str(uuid.uuid4()),
+                    account_id=to_acc.id,
+                    user_id=to_acc.user_id,
+                    type=TransactionType.WITHDRAWAL,
+                    status=TransactionStatus.COMPLETED,
+                    amount=transfer.amount,
+                    currency=transfer.currency,
+                    balance_before=tb,
+                    balance_after=to_acc.balance,
+                    description="Transfer reversal debit",
+                    reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+                    transfer_id=transfer.id,
+                    created_at=datetime.utcnow(),
+                )
+                db.add(debit_tx)
+        transfer.status = TransferStatus.CANCELLED
+        transfer.processed_at = datetime.utcnow()
+        db.add(transfer)
+        # Log audit
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="reverse_transfer",
+            resource_type="transfer",
+            resource_id=transfer.id,
+            details=json.dumps({"reason": payload.get("reason")})
+        )
+        db.add(audit_log)
+        await db.commit()
+        # In-app notification to sender
+        try:
+            notif = Notification(
+                id=str(uuid.uuid4()),
+                user_id=from_acc.user_id,
+                type=NotificationType.TRANSACTION,
+                title="Transfer Reversed",
+                message=f"{transfer.currency} {transfer.total_amount:,.2f} credited back. Ref: {transfer.reference_number}",
+                transfer_id=transfer.id,
+                action_url=f"{settings.FRONTEND_URL}/dashboard/transfers/receipt/{transfer.id}",
+                action_type="view"
+            )
+            db.add(notif)
+            await db.commit()
+            AblyRealtimeManager.publish_notification(
+                from_acc.user_id,
+                "transfer_reversed",
+                "Transfer Reversed",
+                f"{transfer.currency} {transfer.total_amount:,.2f} credited back. Ref: {transfer.reference_number}",
+                {"id": notif.id, "transfer_id": transfer.id}
+            )
+        except Exception:
+            pass
+        # Email notification to sender (if SMTP configured)
+        try:
+            if getattr(settings, "SMTP_SERVER", None):
+                user_res = await db.execute(select(User).where(User.id == from_acc.user_id))
+                sender = user_res.scalar_one_or_none()
+                if sender and getattr(sender, "email", None):
+                    email_service.send_transfer_reversed_email(
+                        sender.email,
+                        float(transfer.total_amount or 0.0),
+                        transfer.currency,
+                        transfer.reference_number
+                    )
+        except Exception:
+            pass
+        AblyRealtimeManager.publish_admin_event("transactions", {"type": "transfer_reversed", "transfer_id": transfer.id})
+        AblyRealtimeManager.publish_balance_update(from_acc.user_id, from_acc.id, from_acc.balance, from_acc.currency)
+        return {"success": True, "message": "Transfer reversed"}
+    except (UnauthorizedError, NotFoundError, ValidationError):
+        raise
+    except Exception as e:
+        logger.error("Reverse transfer failed", error=e)
+        raise InternalServerError(operation="reverse transfer", error_code="TRANSFER_REVERSE_FAILED", original_error=e)
 
 @router.post("/deposits/approve", response_model=DepositApprovalResponse)
 async def approve_deposit(
@@ -1566,7 +1904,7 @@ async def admin_realtime_token(
     admin = admin_result.scalar()
     if not admin:
         raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
-    token_request = get_admin_ably_token_request(admin_id)
+    token_request = await get_admin_ably_token_request(admin_id)
     if token_request is None:
         raise InternalServerError(operation="get admin ably token", error_code="ABLY_TOKEN_FAILED", original_error=Exception("No Ably client"))
     return token_request

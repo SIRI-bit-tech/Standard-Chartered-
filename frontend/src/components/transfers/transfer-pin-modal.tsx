@@ -19,6 +19,7 @@ interface TransferPinModalProps {
   onConfirm: (pin: string) => Promise<void>
   error?: string
   onClearError?: () => void
+  onForgotPin?: () => void
 }
 
 /** Modal for entering 4-digit transfer PIN before confirming transfer. */
@@ -28,6 +29,7 @@ export function TransferPinModal({
   onConfirm,
   error,
   onClearError,
+  onForgotPin,
 }: TransferPinModalProps) {
   const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
@@ -84,6 +86,17 @@ export function TransferPinModal({
               <InputOTPSlot index={3} className="h-12 w-12 text-lg" />
             </InputOTPGroup>
           </InputOTP>
+          <button
+            type="button"
+            className="self-end text-xs underline"
+            onClick={() => {
+              onOpenChange(false)
+              onForgotPin?.()
+            }}
+            style={{ color: colors.textSecondary }}
+          >
+            Forgot PIN?
+          </button>
           <Button
             className="w-full"
             onClick={handleConfirm}

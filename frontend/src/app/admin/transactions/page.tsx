@@ -3,7 +3,7 @@
  import { useEffect, useState } from 'react'
  import { apiClient } from '@/lib/api-client'
  import { logger } from '@/lib/logger'
- import { AdminTransactionsTable } from '@/components/admin/admin-transactions-table'
+import { AdminTransactionsTable } from '@/components/admin/admin-transactions-table'
  import { Input } from '@/components/ui/input'
  import {
    Select,
@@ -15,16 +15,7 @@
 import { colors } from '@/types'
 import { useAdminRealtime } from '@/hooks/use-admin-realtime'
  
- interface AdminTransactionRow {
-   id: string
-   description: string
-   amount: number
-   currency: string
-   status: string
-   created_at?: string | null
-   account_number: string
-   user: { id: string; name: string; display_id: string }
- }
+import type { AdminTransactionRow } from '@/types'
  
  export default function AdminTransactionsPage() {
    const [items, setItems] = useState<AdminTransactionRow[]>([])

@@ -14,7 +14,7 @@ async def get_realtime_token(
     current_user_id: str = Depends(get_current_user_id),
 ):
     from utils.ably import get_ably_token_request
-    token_request = get_ably_token_request(current_user_id)
+    token_request = await get_ably_token_request(current_user_id)
     if token_request is None:
         raise HTTPException(status_code=500, detail="Real-time service unavailable")
     return token_request

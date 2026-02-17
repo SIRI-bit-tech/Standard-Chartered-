@@ -62,6 +62,82 @@ export interface Transfer {
   description?: string
 }
 
+// Transfer history list types
+export interface TransferHistoryItem {
+  id: string
+  date: string
+  counterparty: string
+  subtitle?: string
+  bank_name?: string
+  reference: string
+  account_masked: string
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'reversed'
+  amount: number
+  currency: string
+  direction: 'debit' | 'credit'
+  transfer_id?: string | null
+}
+
+export interface TransferHistoryMetrics {
+  sent_monthly: number
+  sent_count: number
+  received_monthly: number
+  received_count: number
+  pending_amount: number
+  pending_count: number
+}
+
+export interface TransferHistoryResponse {
+  items: TransferHistoryItem[]
+  total: number
+  page: number
+  page_size: number
+  metrics: TransferHistoryMetrics
+}
+
+export interface ReceiptData {
+  id?: string
+  status: string
+  type: string
+  amount: number
+  currency: string
+  reference?: string
+  created_at?: string
+  from_account_id?: string
+  message?: string
+  error?: string
+}
+
+export interface TransferReceipt {
+  id: string
+  type: string
+  status: string
+  amount: number
+  currency: string
+  fee_amount: number
+  total_amount: number
+  reference_number: string
+  created_at: string | null
+  processed_at: string | null
+  from_account_masked?: string | null
+  recipient_bank?: string | null
+  recipient_name?: string | null
+  recipient_account_masked?: string | null
+  description?: string | null
+}
+
+export interface AdminTransactionRow {
+  id: string
+  description: string
+  amount: number
+  currency: string
+  status: string
+  created_at?: string | null
+  account_number: string
+  user: { id: string; name: string; display_id: string }
+  transfer_id?: string | null
+}
+
 /** Form state for internal transfer (own accounts) */
 export interface InternalTransferForm {
   from_account_id: string
@@ -98,10 +174,11 @@ export interface ACHTransferForm {
   from_account_id: string
   recipient_name: string
   account_type: 'checking' | 'savings'
+  bank_name: string
   routing_number: string
   account_number: string
   amount: number
-  schedule: 'now' | 'future'
+  description?: string
 }
 
 /** Transfer summary shown in sidebar (real-time) */

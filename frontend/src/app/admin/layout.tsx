@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { apiClient } from '@/lib/api-client'
 import { AdminSidebar } from '@/components/admin/admin-sidebar'
 import { AdminHeader } from '@/components/admin/admin-header'
 
@@ -10,12 +9,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Attach admin token for admin API calls.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const token = localStorage.getItem('admin_token')
-    if (token) apiClient.setAuthToken(token)
-  }, [])
+  // Do not set global Authorization header here; the API client attaches admin/user tokens per-request.
 
   // Keep auth pages clean (no admin chrome).
   const isAuthRoute = pathname?.startsWith('/admin/auth')
@@ -31,4 +25,3 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </div>
   )
 }
-

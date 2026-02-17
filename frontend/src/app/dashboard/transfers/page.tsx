@@ -23,7 +23,13 @@ import { SectionCard } from '@/components/transfers/section-card'
 import { TransferSummaryCard } from '@/components/transfers/transfer-summary-card'
 import { InfoBanner } from '@/components/transfers/info-banner'
 import { TransferPinModal } from '@/components/transfers/transfer-pin-modal'
-import { colors } from '@/types'
+import { ResetPinModal } from '@/components/transfers/reset-pin-modal'
+import { ReceiptModal } from '@/components/transfers/receipt-modal'
+import { colors, type TransferHistoryItem, type TransferHistoryMetrics, type TransferHistoryResponse } from '@/types'
+import { HistoryFilters, type HistoryFilterState } from '@/components/transfers/history-filters'
+import { HistoryKpis } from '@/components/transfers/history-kpis'
+import { HistoryTable } from '@/components/transfers/history-table'
+import { CountrySelector } from '@/components/ui/country-selector'
 import type {
   Account,
   Transfer,
@@ -128,8 +134,20 @@ export default function TransfersPage() {
   const [loadingAccounts, setLoadingAccounts] = useState(true)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState<string>('')
+  const [historyItems, setHistoryItems] = useState<TransferHistoryItem[]>([])
+  const [historyMetrics, setHistoryMetrics] = useState<TransferHistoryMetrics | null>(null)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyPageSize, setHistoryPageSize] = useState(10)
+  const [filters, setFilters] = useState<HistoryFilterState>({
+    q: '',
+    period: '30',
+    type: 'all',
+    status: 'all',
+  })
   const [submitting, setSubmitting] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [resetPinOpen, setResetPinOpen] = useState(false)
   const [pinError, setPinError] = useState('')
   const [transferError, setTransferError] = useState('')
 
@@ -163,11 +181,16 @@ export default function TransfersPage() {
     from_account_id: '',
     recipient_name: '',
     account_type: 'checking',
+    bank_name: '',
     routing_number: '',
     account_number: '',
     amount: 0,
-    schedule: 'now',
   })
+  const [routingValid, setRoutingValid] = useState<boolean | null>(null)
+  const [routingChecking, setRoutingChecking] = useState(false)
+  const [routingErrorMsg, setRoutingErrorMsg] = useState<string>('')
+  const [receiptOpen, setReceiptOpen] = useState(false)
+  const [receiptData, setReceiptData] = useState<any | null>(null)
 
   // Load accounts and optionally hydrate account store
   useEffect(() => {
@@ -176,9 +199,7 @@ export default function TransfersPage() {
       if (!user?.id) return
       setLoadingAccounts(true)
       try {
-        const res = await apiClient.get<{ success: boolean; data: Account[] }>(
-          `/api/v1/accounts`,
-        )
+        const res = await apiClient.get<{ success: boolean; data: Account[] }>(`/api/v1/accounts/`)
         if (cancelled) return
         if (res.success && Array.isArray(res.data)) {
           setAccountsList(res.data)
@@ -201,11 +222,23 @@ export default function TransfersPage() {
 
     setHistoryError('')
     setLoadingHistory(true)
+    const qs = new URLSearchParams({
+      q: filters.q,
+      period: filters.period,
+      type: filters.type,
+      status: filters.status,
+      page: String(historyPage),
+      page_size: String(historyPageSize),
+    })
     apiClient
-      .get<{ success: boolean; data: Transfer[] }>(`/api/v1/transfers/history?limit=50`)
+      .get<{ success: boolean; data: TransferHistoryResponse }>(`/api/v1/transfers/history?${qs.toString()}`)
       .then((res) => {
         if (cancelled) return
-        if (res.success && Array.isArray(res.data)) setTransfers(res.data)
+        if (res.success && res.data) {
+          setHistoryItems(res.data.items || [])
+          setHistoryMetrics(res.data.metrics)
+          setHistoryTotal(res.data.total || 0)
+        }
       })
       .catch((err) => {
         console.error('Failed to load transfer history:', err)
@@ -224,7 +257,7 @@ export default function TransfersPage() {
     return () => {
       cancelled = true
     }
-  }, [activeTab, user?.id])
+  }, [activeTab, user?.id, filters.q, filters.period, filters.status, filters.type, historyPage, historyPageSize])
 
   // Sync "from account" into each form when switching type
   const currentFromAccountId =
@@ -294,8 +327,10 @@ export default function TransfersPage() {
     // ACH
     if (!achForm.from_account_id) return 'Select a “From” account.'
     if (!achForm.recipient_name.trim()) return 'Enter the recipient name.'
+    if (!achForm.bank_name.trim()) return 'Enter the recipient bank name.'
     if (!achForm.routing_number.trim()) return 'Enter a routing number.'
     if (!/^\d{9}$/.test(achForm.routing_number.trim())) return 'Routing number must be 9 digits.'
+    if (routingValid === false) return routingErrorMsg || 'Invalid routing number.'
     if (!achForm.account_number.trim()) return 'Enter an account number.'
     if (!/^[0-9]{4,17}$/.test(achForm.account_number.trim())) return 'Account number must be 4-17 digits.'
     return null
@@ -346,7 +381,15 @@ export default function TransfersPage() {
         )
         if (res.success) {
           setInternalForm({ from_account_id: '', to_account_id: '', amount: 0, reference_memo: '' })
-          alert(res.message ?? 'Transfer completed successfully.')
+          setReceiptData({
+            id: res.data?.transfer_id,
+            status: 'processing',
+            type: 'internal',
+            amount: internalForm.amount,
+            currency,
+            reference: res.data?.reference,
+          })
+          setReceiptOpen(true)
         }
       } else if (transferType === 'domestic') {
         const payload = {
@@ -372,7 +415,15 @@ export default function TransfersPage() {
             memo: '',
           })
           setSelectedRecipient(null)
-          alert(res.message ?? 'Domestic transfer submitted.')
+          setReceiptData({
+            id: res.data?.transfer_id,
+            status: 'processing',
+            type: 'domestic',
+            amount: domesticForm.amount,
+            currency,
+            reference: res.data?.reference,
+          })
+          setReceiptOpen(true)
         }
       } else if (transferType === 'international') {
         const payload = {
@@ -403,7 +454,15 @@ export default function TransfersPage() {
             amount: 0,
             purpose: '',
           })
-          alert(res.message ?? 'International transfer submitted.')
+          setReceiptData({
+            id: res.data?.transfer_id,
+            status: 'processing',
+            type: 'international',
+            amount: internationalForm.amount,
+            currency,
+            reference: res.data?.reference,
+          })
+          setReceiptOpen(true)
         }
       } else {
         const payload = {
@@ -411,9 +470,10 @@ export default function TransfersPage() {
           from_account_id: achForm.from_account_id,
           routing_number: achForm.routing_number,
           account_number: achForm.account_number,
+          bank_name: achForm.bank_name,
           account_holder: achForm.recipient_name,
           amount: achForm.amount,
-          description: undefined,
+          description: achForm.description || undefined,
         }
         const res = await apiClient.post<{ success: boolean; transfer_id?: string; message?: string }>(
           '/api/v1/transfers/ach',
@@ -424,18 +484,34 @@ export default function TransfersPage() {
             from_account_id: '',
             recipient_name: '',
             account_type: 'checking',
+            bank_name: '',
             routing_number: '',
             account_number: '',
             amount: 0,
-            schedule: 'now',
+            description: '',
           })
-          alert(res.message ?? 'ACH transfer submitted.')
+          setReceiptData({
+            id: res.transfer_id,
+            status: 'processing',
+            type: 'ach',
+            amount: achForm.amount,
+            currency,
+          })
+          setReceiptOpen(true)
         }
       }
     } catch (err) {
       console.error('Transfer failed:', err)
       const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       setTransferError(detail ?? 'Transfer failed. Please try again.')
+      setReceiptData({
+        status: 'failed',
+        type: transferType,
+        amount,
+        currency,
+        error: typeof detail === 'string' ? detail : 'Transfer failed',
+      })
+      setReceiptOpen(true)
       throw err
     } finally {
       setSubmitting(false)
@@ -736,21 +812,15 @@ export default function TransfersPage() {
                             <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
                               Country
                             </Label>
-                            <Select
-                              value={internationalForm.country}
-                              onValueChange={(v) => setInternationalForm((p) => ({ ...p, country: v }))}
-                            >
-                              <SelectTrigger className="mt-1.5 w-full" style={{ borderColor: colors.border }}>
-                                <SelectValue placeholder="Select destination country" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {COUNTRIES.map((c) => (
-                                  <SelectItem key={c.code} value={c.code}>
-                                    {c.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <div className="mt-1.5">
+                              <CountrySelector
+                                value={internationalForm.country}
+                                onChange={(code) => setInternationalForm((p) => ({ ...p, country: code }))}
+                                placeholder="Select destination country"
+                                className="w-full"
+                                returnType="code"
+                              />
+                            </div>
                           </div>
                           <div>
                             <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
@@ -840,6 +910,17 @@ export default function TransfersPage() {
                               className="mt-1.5"
                             />
                           </div>
+                      <div>
+                        <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                          Recipient Bank Name
+                        </Label>
+                        <Input
+                          placeholder="Enter bank name"
+                          value={achForm.bank_name}
+                          onChange={(e) => setAchForm((p) => ({ ...p, bank_name: e.target.value }))}
+                          className="mt-1.5"
+                        />
+                      </div>
                           <div>
                             <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
                               Account Type
@@ -857,33 +938,56 @@ export default function TransfersPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                          {user?.country === 'US' && (
-                            <>
-                              <div>
-                                <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                                  Recipient Routing Number (9 digits)
-                                </Label>
-                                <Input
-                                  placeholder="000000000"
-                                  maxLength={9}
-                                  value={achForm.routing_number}
-                                  onChange={(e) => setAchForm((p) => ({ ...p, routing_number: e.target.value.replace(/\D/g, '') }))}
-                                  className="mt-1.5"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                                  Recipient Account Number
-                                </Label>
-                                <Input
-                                  placeholder="Enter account number"
-                                  value={achForm.account_number}
-                                  onChange={(e) => setAchForm((p) => ({ ...p, account_number: e.target.value }))}
-                                  className="mt-1.5"
-                                />
-                              </div>
-                            </>
-                          )}
+                      <>
+                        <div>
+                          <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                            Recipient Routing Number (9 digits)
+                          </Label>
+                          <Input
+                            placeholder="000000000"
+                            maxLength={9}
+                            value={achForm.routing_number}
+                            onChange={async (e) => {
+                              const val = e.target.value.replace(/\D/g, '')
+                              setAchForm((p) => ({ ...p, routing_number: val }))
+                              setRoutingErrorMsg('')
+                              setRoutingValid(null)
+                              if (val.length === 9) {
+                                try {
+                                  setRoutingChecking(true)
+                                  const resp = await apiClient.get<{ valid: boolean; bank_name?: string }>(`/api/v1/transfers/validate-routing?number=${val}`)
+                                  const isValid = !!resp?.valid
+                                  setRoutingValid(isValid)
+                                  if (isValid && resp.bank_name) {
+                                    setAchForm((p) => ({ ...p, bank_name: resp.bank_name || p.bank_name }))
+                                  }
+                                  if (!isValid) setRoutingErrorMsg('Invalid routing number')
+                                } catch {
+                                  setRoutingValid(false)
+                                  setRoutingErrorMsg('Validation service unavailable')
+                                } finally {
+                                  setRoutingChecking(false)
+                                }
+                              }
+                            }}
+                            className="mt-1.5"
+                          />
+                          {routingChecking && <p className="mt-1 text-xs" style={{ color: colors.textSecondary }}>Validating routing number…</p>}
+                          {routingValid === false && <p className="mt-1 text-xs" style={{ color: colors.error }}>{routingErrorMsg || 'Invalid routing number'}</p>}
+                          {routingValid && <p className="mt-1 text-xs" style={{ color: colors.success }}>Routing number recognized</p>}
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                            Recipient Account Number
+                          </Label>
+                          <Input
+                            placeholder="Enter account number"
+                            value={achForm.account_number}
+                            onChange={(e) => setAchForm((p) => ({ ...p, account_number: e.target.value }))}
+                            className="mt-1.5"
+                          />
+                        </div>
+                      </>
                           <div className="sm:col-span-2">
                             <AmountInput
                               value={achForm.amount}
@@ -893,32 +997,14 @@ export default function TransfersPage() {
                           </div>
                           <div className="sm:col-span-2">
                             <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                              Schedule Transfer
+                              Description
                             </Label>
-                            <div className="mt-1.5 flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setAchForm((p) => ({ ...p, schedule: 'now' }))}
-                                className="rounded-lg border px-3 py-2 text-sm font-medium"
-                                style={{
-                                  borderColor: achForm.schedule === 'now' ? colors.primary : colors.border,
-                                  color: achForm.schedule === 'now' ? colors.primary : colors.textSecondary,
-                                }}
-                              >
-                                Now
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setAchForm((p) => ({ ...p, schedule: 'future' }))}
-                                className="rounded-lg border px-3 py-2 text-sm font-medium"
-                                style={{
-                                  borderColor: achForm.schedule === 'future' ? colors.primary : colors.border,
-                                  color: achForm.schedule === 'future' ? colors.primary : colors.textSecondary,
-                                }}
-                              >
-                                Future Date
-                              </button>
-                            </div>
+                            <Input
+                              placeholder="e.g. Invoice AWS-INV-00912"
+                              value={achForm.description || ''}
+                              onChange={(e) => setAchForm((p) => ({ ...p, description: e.target.value }))}
+                              className="mt-1.5"
+                            />
                           </div>
                         </div>
                       </SectionCard>
@@ -950,63 +1036,40 @@ export default function TransfersPage() {
             onConfirm={handlePinConfirm}
             error={pinError}
             onClearError={() => setPinError('')}
+            onForgotPin={() => setResetPinOpen(true)}
           />
         </>
       )}
+      <ResetPinModal open={resetPinOpen} onOpenChange={setResetPinOpen} />
+      <ReceiptModal
+        open={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        data={receiptData || { status: 'unknown', type: 'internal', amount: 0, currency }}
+      />
 
       {activeTab === 'history' && (
-        <div className="rounded-xl border p-6" style={{ borderColor: colors.border, backgroundColor: colors.white }}>
-          <h2 className="text-lg font-semibold" style={{ color: colors.textPrimary }}>
-            Recent Transfers
-          </h2>
-          <div className="mt-4 space-y-3">
-            {loadingHistory ? (
-              [1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-lg" />
-              ))
-            ) : historyError ? (
-              <p className="py-8 text-center text-sm" style={{ color: colors.error }}>
-                {historyError}
-              </p>
-            ) : transfers.length > 0 ? (
-              transfers.map((t) => (
-                <div
-                  key={t.id}
-                  className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"
-                  style={{ borderColor: colors.border }}
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl" style={{ color: colors.primary }}>↔</span>
-                    <div>
-                      <p className="font-medium" style={{ color: colors.textPrimary }}>
-                        {t.description ?? `${t.type} transfer`}
-                      </p>
-                      <p className="text-sm" style={{ color: colors.textSecondary }}>
-                        {formatDate(t.created_at)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold" style={{ color: colors.textPrimary }}>
-                      {formatCurrency(t.amount, t.currency)}
-                    </p>
-                    <p
-                      className="text-xs font-medium"
-                      style={{
-                        color: t.status === 'completed' ? colors.success : t.status === 'pending' ? colors.warning : colors.textSecondary,
-                      }}
-                    >
-                      {String(t.status).toUpperCase()}
-                    </p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="py-8 text-center text-sm" style={{ color: colors.textSecondary }}>
-                No transfers yet.
-              </p>
-            )}
-          </div>
+        <div className="space-y-4">
+          {historyMetrics && <HistoryKpis metrics={historyMetrics} />}
+          <HistoryFilters value={filters} onChange={(v) => { setFilters(v); setHistoryPage(1) }} />
+          {loadingHistory ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-24 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : historyError ? (
+            <p className="py-8 text-center text-sm" style={{ color: colors.error }}>
+              {historyError}
+            </p>
+          ) : (
+            <HistoryTable
+              items={historyItems}
+              page={historyPage}
+              total={historyTotal}
+              pageSize={historyPageSize}
+              onPageChange={setHistoryPage}
+            />
+          )}
         </div>
       )}
     </div>

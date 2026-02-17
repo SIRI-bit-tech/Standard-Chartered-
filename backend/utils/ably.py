@@ -1,4 +1,5 @@
 import ably
+import inspect
 from config import settings
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -255,7 +256,7 @@ class AblyRealtimeManager:
             return False
 
 
-def get_ably_token_request(user_id: str) -> Optional[Dict[str, Any]]:
+async def get_ably_token_request(user_id: str) -> Optional[Dict[str, Any]]:
     """Generate Ably token request for client-side connection"""
     ably_client = _get_ably_client()
     if ably_client is None:
@@ -274,12 +275,14 @@ def get_ably_token_request(user_id: str) -> Optional[Dict[str, Any]]:
                 }
             }
         )
+        if inspect.isawaitable(token_request):
+            token_request = await token_request
         return token_request
     except Exception as e:
         print(f"Error creating token request: {e}")
         return None
 
-def get_admin_ably_token_request(admin_id: str) -> Optional[Dict[str, Any]]:
+async def get_admin_ably_token_request(admin_id: str) -> Optional[Dict[str, Any]]:
     ably_client = _get_ably_client()
     if ably_client is None:
         return None
@@ -295,6 +298,8 @@ def get_admin_ably_token_request(admin_id: str) -> Optional[Dict[str, Any]]:
                 }
             }
         )
+        if inspect.isawaitable(token_request):
+            token_request = await token_request
         return token_request
     except Exception:
         return None
