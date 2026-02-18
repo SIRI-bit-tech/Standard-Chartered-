@@ -329,5 +329,30 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send profile update notice to {to_email}: {e}")
             return False
+    
+    def send_support_ticket_reply(self, to_email: str, ticket_number: str, ticket_subject: str, reply_text: str) -> bool:
+        """Notify user by email that an admin replied to their support ticket."""
+        try:
+            subject = f"Support Reply • Ticket #{ticket_number}"
+            body = f"""
+              <p>Hello,</p>
+              <p>We replied to your support ticket <strong>#{ticket_number}</strong> — <em>{ticket_subject}</em>.</p>
+              <div style="margin:12px 0;padding:12px;border:1px solid {self.border};background:{self.brand_light};border-radius:6px;">
+                <p style="margin:0;color:{self.text_primary}"><strong>Our reply:</strong></p>
+                <div style="margin-top:6px;white-space:pre-wrap;color:{self.text_primary}">{reply_text}</div>
+              </div>
+              <p>You can continue the conversation securely from your dashboard.</p>
+              <a href="{settings.FRONTEND_URL}/dashboard/support" style="display:inline-block;background:{self.brand_primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Open Support</a>
+              <p style="margin-top:16px;color:{self.text_secondary}"><strong>Security reminder:</strong> We will never ask for your full card number, CVV, or 2FA codes.</p>
+            """
+            html_content = self._wrap_html("Support Ticket Reply", body)
+            msg = self._build_message(subject, to_email, html_content)
+            with self._create_connection() as server:
+                server.send_message(msg)
+            logger.info(f"Support reply email sent to {to_email} for ticket {ticket_number}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send support reply email to {to_email}: {e}")
+            return False
 # Global email service instance
 email_service = EmailService()

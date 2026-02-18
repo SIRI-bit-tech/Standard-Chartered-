@@ -50,6 +50,7 @@ class AblyRealtimeManager:
         "admin_accounts": "admin:accounts",
         "admin_transactions": "admin:transactions",
         "admin_dashboard": "admin:dashboard",
+        "admin_support": "admin:support",
     }
     
     @staticmethod
@@ -295,6 +296,7 @@ async def get_admin_ably_token_request(admin_id: str) -> Optional[Dict[str, Any]
                     "admin:accounts": ["subscribe"],
                     "admin:transactions": ["subscribe"],
                     "admin:dashboard": ["subscribe"],
+                    "admin:support": ["subscribe"],
                 }
             }
         )

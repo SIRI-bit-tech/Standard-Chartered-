@@ -1,439 +1,135 @@
 'use client'
 
-import React from "react"
-
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
-import { formatDate } from '@/lib/utils'
+import type { SupportTicket, FaqItem, BranchOffice } from '@/types'
+import { QuickActions, type SupportSection } from '@/components/support/QuickActions'
+import { TicketTable } from '@/components/support/TicketTable'
+import { CreateTicketForm } from '@/components/support/CreateTicketForm'
+import { FAQSearch } from '@/components/support/FAQSearch'
+import { ContactInfo } from '@/components/support/ContactInfo'
+import { ChatWidget } from '@/components/support/ChatWidget'
 
 export default function SupportPage() {
-  const [activeTab, setActiveTab] = useState('tickets')
-  const [tickets, setTickets] = useState<any[]>([])
-  const [chats, setChats] = useState<any[]>([])
-  const [selectedChat, setSelectedChat] = useState<any>(null)
-  const [chatMessages, setChatMessages] = useState<any[]>([])
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreateTicket, setShowCreateTicket] = useState(false)
-  const [ticketForm, setTicketForm] = useState({
-    subject: '',
-    description: '',
-    category: 'general',
-    priority: 'medium',
-  })
-  const [messageInput, setMessageInput] = useState('')
+  const [active, setActive] = useState<SupportSection>('chat')
   const { user } = useAuthStore()
 
   useEffect(() => {
-    loadSupportData()
+    load()
   }, [user])
 
-  const loadSupportData = async () => {
+  const load = async () => {
     if (!user) return
-
     try {
-      // Load tickets
-      const ticketsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/support/tickets?limit=10`)
-      if (ticketsResponse.success) {
-        setTickets(ticketsResponse.data)
-      }
-
-      // Load chats
-      const chatsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/support/chats`)
-      if (chatsResponse.success) {
-        setChats(chatsResponse.data)
-      }
-    } catch (error) {
-      console.error('Failed to load support data:', error)
+      const res = await apiClient.get<{ success: boolean; data: SupportTicket[] }>(`/api/v1/support/tickets?limit=5`)
+      if (res?.success) setTickets(res.data)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCreateTicket = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user) return
+  const actions = [
+    { key: 'chat' as const, label: 'Live Chat', subtitle: 'Agent online', icon: 'chat', active: active === 'chat' },
+    { key: 'ticket' as const, label: 'Create Ticket', subtitle: 'Request help', icon: 'ticket', active: active === 'ticket' },
+    { key: 'faq' as const, label: 'FAQs', subtitle: 'Search topics', icon: 'faq', active: active === 'faq' },
+    { key: 'contact' as const, label: 'Contact Info', subtitle: 'Call local branch', icon: 'contact', active: active === 'contact' },
+  ] as const
 
-    setLoading(true)
-    try {
-      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/support/ticket', {
-        ...ticketForm,
-      })
+  const faqs: FaqItem[] = [
+    { id: 'f1', question: 'How do I reset my password?', answer: 'Use “Forgot Password” on the login page and follow the email instructions.', category: 'Security', tags: ['password', 'login'] },
+    { id: 'f2', question: 'What are transfer fees?', answer: 'Internal transfers are free; domestic $2.50; international $25.', category: 'Transfers', tags: ['fees', 'transfers'] },
+    { id: 'f3', question: 'How long do transfers take?', answer: 'Internal instant; domestic 1–2 business days; international 3–5 business days.', category: 'Transfers' },
+    { id: 'f4', question: 'How do I enable two‑factor authentication (2FA)?', answer: 'Go to Profile → Security and select Enable 2FA. Scan the QR code with an authenticator app and confirm with a 6‑digit code.', category: 'Security', tags: ['2fa', 'security'] },
+    { id: 'f5', question: 'How do I dispute a card transaction?', answer: 'Freeze the card if needed, then contact Support via Live Chat or Create Ticket → Transaction dispute. Include date, amount and last 4 digits.', category: 'Cards', tags: ['dispute', 'card'] },
+    { id: 'f6', question: 'Where can I download account statements?', answer: 'Open Accounts, select an account, then Statements to download monthly PDFs.', category: 'Accounts', tags: ['statements'] },
+    { id: 'f7', question: 'What are daily transfer limits?', answer: 'Limits vary by account and verification status. You can see your limit on the transfer review screen; contact Support to request a change.', category: 'Transfers', tags: ['limits'] },
+    { id: 'f8', question: 'How do I update my address or phone number?', answer: 'Go to Profile → Personal Info and edit your details. Changes save immediately.', category: 'Profile', tags: ['profile'] },
+    { id: 'f9', question: 'Why was my international transfer delayed?', answer: 'International transfers can take 3–5 business days due to correspondent banks and compliance checks. We will notify you if additional documents are required.', category: 'Transfers', tags: ['international', 'delay'] },
+    { id: 'f10', question: 'What exchange rate do you use for international transfers?', answer: 'Rates are sourced from our treasury and shown on the transfer review screen before you confirm.', category: 'Transfers', tags: ['fx', 'exchange'] },
+    { id: 'f11', question: 'How do I report a lost or stolen card?', answer: 'Freeze your card immediately in Cards, then contact Support to arrange a replacement.', category: 'Cards', tags: ['lost', 'stolen'] },
+    { id: 'f12', question: 'Can I schedule transfers and bill payments?', answer: 'Yes. On the transfer or bill payment form, set a future date or repeat frequency before confirming.', category: 'Payments', tags: ['schedule'] },
+    { id: 'f13', question: 'How do I cancel a scheduled transfer or bill payment?', answer: 'Open Transfers or Bills → Scheduled, select the item and choose Cancel before the cutoff time.', category: 'Payments', tags: ['scheduled', 'cancel'] },
+    { id: 'f14', question: 'What are the daily cut‑off times for transfers?', answer: 'Domestic transfers submitted after 5:00 PM local time process the next business day. International transfers after 3:00 PM GMT process the next business day.', category: 'Transfers', tags: ['cutoff'] },
+    { id: 'f15', question: 'How do I set or change my transfer PIN?', answer: 'Go to Security → Transfer PIN and follow the prompts to set or update your PIN.', category: 'Security', tags: ['pin'] },
+    { id: 'f16', question: 'How do I activate a new card?', answer: 'Open Cards and select the new card, then choose Activate and follow the on‑screen steps.', category: 'Cards', tags: ['activate'] },
+    { id: 'f17', question: 'Why was my login session ended?', answer: 'For security, sessions expire after a period of inactivity. Log in again and consider enabling 2FA and trusted devices.', category: 'Security', tags: ['session'] },
+    { id: 'f18', question: 'Can I change or remove a saved beneficiary?', answer: 'Yes. During transfer, choose Manage beneficiaries to edit or remove saved recipients.', category: 'Transfers', tags: ['beneficiary'] },
+    { id: 'f19', question: 'How do I update notification preferences?', answer: 'Go to Profile → Notifications to enable or disable email/SMS alerts for transfers, logins and statements.', category: 'Profile', tags: ['notifications'] },
+    { id: 'f20', question: 'What are support hours and response times?', answer: 'Live Chat and tickets are monitored 24/7. Most tickets receive a first response within 24 hours.', category: 'Support', tags: ['support'] },
+  ]
 
-      if (response.success) {
-        alert('Support ticket created successfully!')
-        setTicketForm({ subject: '', description: '', category: 'general', priority: 'medium' })
-        setShowCreateTicket(false)
-        await loadSupportData()
-      }
-    } catch (error) {
-      console.error('Failed to create ticket:', error)
-      alert('Failed to create ticket')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleStartChat = async () => {
-    if (!user) return
-
-    try {
-      const response = await apiClient.post<{ success: boolean; data: any }>('/api/v1/support/chat/start', {})
-
-      if (response.success) {
-        await loadSupportData()
-      }
-    } catch (error) {
-      console.error('Failed to start chat:', error)
-    }
-  }
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedChat || !messageInput.trim() || !user) return
-
-    try {
-      const response = await apiClient.post<{ success: boolean; data: any }>(
-        `/api/v1/support/chat/${selectedChat.id}/message`,
-        {
-          message: messageInput,
-        }
-      )
-
-      if (response.success) {
-        setMessageInput('')
-        // Reload chat messages
-        const messagesResponse = await apiClient.get<{ success: boolean; data: any[] }>(
-          `/api/v1/support/chat/${selectedChat.id}/messages`
-        )
-        if (messagesResponse.success) {
-          setChatMessages(messagesResponse.data)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to send message:', error)
-    }
-  }
+  const branches: BranchOffice[] = [
+    { id: 'b1', country: 'United Kingdom', city: 'London', address: '1 Basinghall Ave, London', phone: '+44 20 1234 0000', hours: 'Mon–Fri 9am–5pm' },
+    { id: 'b2', country: 'Singapore', city: 'Singapore', address: '6 Battery Rd, Singapore', phone: '+65 6225 0000', hours: 'Mon–Fri 9am–5pm' },
+    { id: 'b3', country: 'UAE', city: 'Dubai', address: 'DIFC, Dubai', phone: '+971 4 000 0000', hours: 'Sun–Thu 9am–5pm' },
+    { id: 'b4', country: 'USA', city: 'New York', address: '1095 6th Ave, New York', phone: '+1 212 000 0000', hours: 'Mon–Fri 9am–5pm' },
+  ]
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">Customer Support</h1>
-
-      {/* Tabs */}
-      <div className="bg-white border-b border-border rounded-t-xl">
-        <div className="flex gap-8 px-6 py-4 flex-wrap">
-          <button
-            onClick={() => setActiveTab('tickets')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'tickets'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Support Tickets ({tickets.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'chat'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Live Chat ({chats.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('faq')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'faq'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            FAQ
-          </button>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold">Support & Help Center</h1>
+        <p className="text-muted-foreground">How can we help you today?</p>
       </div>
-
-      {loading ? (
-        <div className="text-center py-12">Loading support data...</div>
-      ) : (
-        <>
-          {/* Support Tickets */}
-          {activeTab === 'tickets' && (
-            <div className="space-y-6">
-              <button
-                onClick={() => setShowCreateTicket(true)}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
-              >
-                + Create Support Ticket
-              </button>
-
-              {showCreateTicket && (
-                <div className="bg-white rounded-xl p-6 border border-border">
-                  <h3 className="text-xl font-bold text-foreground mb-4">Create Support Ticket</h3>
-                  <form onSubmit={handleCreateTicket} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        Subject
-                      </label>
-                      <input
-                        type="text"
-                        value={ticketForm.subject}
-                        onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })}
-                        placeholder="Briefly describe your issue"
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        Category
-                      </label>
-                      <select
-                        value={ticketForm.category}
-                        onChange={(e) =>
-                          setTicketForm({ ...ticketForm, category: e.target.value })
-                        }
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                      >
-                        <option value="general">General Inquiry</option>
-                        <option value="technical">Technical Issue</option>
-                        <option value="billing">Billing Question</option>
-                        <option value="account">Account Issue</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        Priority
-                      </label>
-                      <select
-                        value={ticketForm.priority}
-                        onChange={(e) =>
-                          setTicketForm({ ...ticketForm, priority: e.target.value })
-                        }
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">
-                        Description
-                      </label>
-                      <textarea
-                        value={ticketForm.description}
-                        onChange={(e) =>
-                          setTicketForm({ ...ticketForm, description: e.target.value })
-                        }
-                        placeholder="Please describe your issue in detail"
-                        className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary resize-none"
-                        rows={5}
-                        required
-                      />
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowCreateTicket(false)}
-                        className="flex-1 py-2 border border-border rounded-lg hover:bg-border transition"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="flex-1 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
-                      >
-                        Create Ticket
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              )}
-
-              {tickets.length > 0 ? (
-                <div className="space-y-3">
-                  {tickets.map((ticket) => (
-                    <div key={ticket.id} className="bg-white rounded-lg p-4 border border-border hover:shadow-md transition">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-bold text-foreground">{ticket.ticket_number}</p>
-                            <span
-                              className={`text-xs px-2 py-1 rounded ${
-                                ticket.status === 'open'
-                                  ? 'bg-warning/10 text-warning'
-                                  : ticket.status === 'resolved'
-                                    ? 'bg-success/10 text-success'
-                                    : 'bg-primary/10 text-primary'
-                              }`}
-                            >
-                              {ticket.status}
-                            </span>
-                          </div>
-                          <p className="text-foreground">{ticket.subject}</p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {formatDate(ticket.created_at)}
-                          </p>
-                        </div>
-                        <button className="px-3 py-1 border border-primary text-primary rounded text-sm hover:bg-primary/5 transition">
-                          View
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-white rounded-xl p-12 text-center border border-border">
-                  <p className="text-muted-foreground">No support tickets yet</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Live Chat */}
-          {activeTab === 'chat' && (
-            <div className="space-y-6">
-              <button
-                onClick={handleStartChat}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
-              >
-                + Start New Chat
-              </button>
-
-              {chats.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  <div className="bg-white rounded-xl border border-border max-h-96 overflow-y-auto">
-                    {chats.map((chat) => (
-                      <button
-                        key={chat.id}
-                        onClick={() => setSelectedChat(chat)}
-                        className={`w-full text-left p-4 border-b border-border hover:bg-border-light transition ${
-                          selectedChat?.id === chat.id ? 'bg-primary/5' : ''
-                        }`}
-                      >
-                        <p className="font-medium text-foreground text-sm">Chat #{chat.id.slice(0, 8)}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(chat.created_at)}</p>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="lg:col-span-3 bg-white rounded-xl border border-border flex flex-col">
-                    {selectedChat ? (
-                      <>
-                        <div className="p-4 border-b border-border">
-                          <h3 className="font-semibold text-foreground">
-                            Chat #{selectedChat.id.slice(0, 8)}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">
-                            Status: {selectedChat.status}
-                          </p>
-                        </div>
-
-                        <div className="flex-1 p-4 space-y-4 overflow-y-auto max-h-96">
-                          {chatMessages.length > 0 ? (
-                            chatMessages.map((msg) => (
-                              <div
-                                key={msg.id}
-                                className={`flex ${msg.is_from_agent ? 'justify-start' : 'justify-end'}`}
-                              >
-                                <div
-                                  className={`max-w-xs p-3 rounded-lg ${
-                                    msg.is_from_agent
-                                      ? 'bg-border text-foreground'
-                                      : 'bg-primary text-white'
-                                  }`}
-                                >
-                                  <p className="text-sm">{msg.message}</p>
-                                  <p className="text-xs opacity-70 mt-1">
-                                    {formatDate(msg.created_at)}
-                                  </p>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <p className="text-center text-muted-foreground text-sm">No messages yet</p>
-                          )}
-                        </div>
-
-                        <form onSubmit={handleSendMessage} className="p-4 border-t border-border flex gap-2">
-                          <input
-                            type="text"
-                            value={messageInput}
-                            onChange={(e) => setMessageInput(e.target.value)}
-                            placeholder="Type your message..."
-                            className="flex-1 px-3 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary"
-                          />
-                          <button
-                            type="submit"
-                            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition"
-                          >
-                            Send
-                          </button>
-                        </form>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Select a chat to continue
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-xl p-12 text-center border border-border">
-                  <p className="text-muted-foreground mb-4">No active chats</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* FAQ */}
-          {activeTab === 'faq' && (
-            <div className="bg-white rounded-xl p-8 border border-border">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Frequently Asked Questions</h2>
-
-              <div className="space-y-6">
-                {faqs.map((faq, idx) => (
-                  <div key={idx} className="border-b border-border pb-6 last:border-b-0">
-                    <h3 className="font-semibold text-foreground mb-2">{faq.q}</h3>
-                    <p className="text-muted-foreground">{faq.a}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
+      <QuickActions items={actions as any} onSelect={setActive} />
+      {active === 'chat' && <ChatOnly />}
+      {active === 'ticket' && (
+        <div className="space-y-4">
+          <CreateTicketForm onCreated={load} />
+          <TicketTable items={loading ? [] : tickets} />
+          {loading && <div className="text-center py-8 text-sm text-muted-foreground">Loading tickets…</div>}
+        </div>
+      )}
+      {active === 'faq' && (
+        <div id="faqs" className="space-y-2">
+          <h2 className="text-xl font-semibold">FAQs</h2>
+          <FAQSearch items={faqs} />
+        </div>
+      )}
+      {active === 'contact' && (
+        <div id="contact" className="space-y-2">
+          <h2 className="text-xl font-semibold">Contact & Branches</h2>
+          <ContactInfo branches={branches} />
+        </div>
       )}
     </div>
   )
 }
 
-const faqs = [
-  {
-    q: 'How do I reset my password?',
-    a: 'You can reset your password by clicking "Forgot Password" on the login page. Follow the instructions sent to your registered email address.',
-  },
-  {
-    q: 'What are the transfer fees?',
-    a: 'Transfer fees vary by type: Internal transfers are free, domestic transfers cost $2.50, and international transfers cost $25.',
-  },
-  {
-    q: 'How long do transfers take?',
-    a: 'Internal transfers are instant, domestic transfers typically take 1-2 business days, and international transfers take 3-5 business days.',
-  },
-  {
-    q: 'Is my money safe?',
-    a: 'Yes, we use 128-bit SSL encryption and bank-grade security measures to protect your funds and personal information.',
-  },
-  {
-    q: 'Can I apply for a loan?',
-    a: 'Yes, eligible customers can apply for various loan products through the Loans section of your dashboard.',
-  },
-]
+function ChatOnly() {
+  const openChat = () => {
+    try {
+      const api: any = (window as any).Tawk_API
+      if (api && typeof api.maximize === 'function') {
+        api.maximize()
+      } else {
+        // Retry shortly if the script is still initializing
+        setTimeout(() => {
+          try {
+            const api2: any = (window as any).Tawk_API
+            if (api2 && typeof api2.maximize === 'function') api2.maximize()
+          } catch {}
+        }, 800)
+      }
+    } catch {}
+  }
+
+  return (
+    <div className="rounded-xl border bg-white p-8 flex flex-col items-center justify-center gap-3">
+      <div className="text-lg font-semibold">Live Chat</div>
+      <div className="text-sm text-muted-foreground text-center max-w-prose">
+        Use the chat bubble at the bottom-right to talk to our team. If you don’t see it, click “Open Chat”.
+      </div>
+      <button
+        onClick={openChat}
+        className="mt-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition"
+      >
+        Open Chat
+      </button>
+      <ChatWidget />
+    </div>
+  )
+}
