@@ -105,7 +105,8 @@ class AccountService:
         )
         
         # Add routing number for US users
-        if user_country == "United States":
+        uc = (user_country or "").strip().upper()
+        if uc in ("US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"):
             main_account.routing_number = "026002561"  # Your specified routing number
         
         accounts.append(main_account)
@@ -128,7 +129,8 @@ class AccountService:
         )
         
         # Add routing number for US users
-        if user_country == "United States":
+        uc = (user_country or "").strip().upper()
+        if uc in ("US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"):
             savings_account.routing_number = "026002561"
         
         accounts.append(savings_account)
@@ -149,7 +151,8 @@ class AccountService:
         )
         
         # Add routing number for US users
-        if user_country == "United States":
+        uc = (user_country or "").strip().upper()
+        if uc in ("US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"):
             crypto_account.routing_number = "026002561"
         
         accounts.append(crypto_account)

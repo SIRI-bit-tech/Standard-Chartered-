@@ -199,6 +199,38 @@
     background-color: var(--border-light);
   }
 
+  /* Boot preloader (before hydration) */
+  #app-boot-preloader {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #app-boot-preloader .dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 0 6px rgba(0, 102, 204, 0.15);
+    animation: appPulse 1s infinite ease-in-out;
+  }
+
+  @keyframes appPulse {
+    0%, 100% {
+      transform: scale(0.85);
+      opacity: 0.9;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 1;
+    }
+  }
+
+
   ::-webkit-scrollbar-thumb {
     @apply bg-border rounded-full;
   }

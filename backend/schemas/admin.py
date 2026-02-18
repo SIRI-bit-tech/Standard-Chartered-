@@ -138,10 +138,16 @@ class AdminCreateUserRequest(BaseModel):
 class AdminEditUserRequest(BaseModel):
     """Admin edit user details"""
     user_id: str
+    email: Optional[EmailStr] = None
+    username: Optional[str] = Field(None, min_length=3, max_length=100)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None
     country: Optional[str] = None
+    street_address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    postal_code: Optional[str] = None
     date_joined: Optional[datetime] = Field(None, description="Override user join date")
     is_active: Optional[bool] = None
 

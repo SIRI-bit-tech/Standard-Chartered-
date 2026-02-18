@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
+import { useLoadingStore } from '@/lib/store'
 
 export default function LoginPage() {
   // Login page - updated to use username instead of email
@@ -16,6 +17,37 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const { setUser, setToken } = useAuthStore()
+  const { show, hide } = useLoadingStore()
+
+  const getDeviceInfo = () => {
+    try {
+      let id = localStorage.getItem('device_id')
+      if (!id) {
+        id = crypto.randomUUID()
+        localStorage.setItem('device_id', id)
+      }
+      const ua = navigator.userAgent || ''
+      const platform = (navigator as any).platform || ''
+      const name = `${platform || 'Device'} • ${ua.split(' ').slice(0, 2).join(' ')}`
+      return { device_id: id, device_name: name }
+    } catch {
+      return { device_id: undefined, device_name: undefined }
+    }
+  }
+
+  const getPublicIP = async (): Promise<string | undefined> => {
+    try {
+      const ctrl = new AbortController()
+      const t = setTimeout(() => ctrl.abort(), 2500)
+      const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store', signal: ctrl.signal })
+      clearTimeout(t)
+      if (!res.ok) return undefined
+      const data = await res.json()
+      return data?.ip as string | undefined
+    } catch {
+      return undefined
+    }
+  }
 
   const handleLogin = async (e?: React.MouseEvent) => {
     if (e) {
@@ -25,12 +57,33 @@ export default function LoginPage() {
     
     setLoading(true)
     setError('')
+    show()
 
     try {
-      const response = await apiClient.post<{ success: boolean; data: any; token: any }>('/api/v1/auth/login', {
-        username,
-        password,
-      })
+      const { device_id, device_name } = getDeviceInfo()
+      const publicIp = await getPublicIP()
+      const response = await apiClient.post<{ success: boolean; data: any; token: any }>(
+        '/api/v1/auth/login',
+        {
+          username,
+          password,
+          device_id,
+          device_name,
+        },
+        { headers: { 'X-Show-Loader': '1', ...(publicIp ? { 'X-Client-IP': publicIp } : {}) } }
+      )
+
+      // If backend requires 2FA, redirect to verification flow
+      if (response?.data?.two_factor_required && response?.data?.session_token) {
+        hide()
+        setLoading(false)
+        const params = new URLSearchParams()
+        params.set('session', response.data.session_token)
+        params.set('device', device_id || '')
+        params.set('name', device_name || '')
+        window.location.href = `/auth/verify-2fa?${params.toString()}`
+        return
+      }
 
       if (response.success && response.data && response.token) {
         // Check if token exists before using it
@@ -53,6 +106,7 @@ export default function LoginPage() {
             country: response.data.country || 'United States',
             primary_currency: response.data.primary_currency || 'USD',
             tier: response.data.tier || 'basic',
+            profile_picture_url: response.data.profile_picture_url || null,
             email_verified: response.data.email_verified || false,
             phone_verified: response.data.phone_verified || false,
             identity_verified: response.data.identity_verified || false,
@@ -71,6 +125,7 @@ export default function LoginPage() {
         }
         
         setLoading(false)
+        hide()
         
         // Navigate to dashboard after successful login
         setTimeout(() => {
@@ -78,10 +133,12 @@ export default function LoginPage() {
         }, 500)
       } else {
         setLoading(false)
+        hide()
         setError('Login failed. Please try again.')
       }
     } catch (err: any) {
       setLoading(false)
+      hide()
       setError('Login failed. Please try again.')
     }
   }

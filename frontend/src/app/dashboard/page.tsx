@@ -66,7 +66,13 @@ export default function DashboardPage() {
     ? `Last login: ${formatDate(user.last_login)}`
     : 'Welcome'
 
-  const isUS = user.country === US_COUNTRY_CODE
+  const country = (user.country || '').trim()
+  const cUpper = country.toUpperCase()
+  const isUS =
+    cUpper === US_COUNTRY_CODE ||
+    cUpper === 'USA' ||
+    cUpper === 'UNITED STATES' ||
+    cUpper === 'UNITED STATES OF AMERICA'
   const primaryAccount = accounts.find((a) => a.is_primary) ?? accounts[0]
 
   return (

@@ -10,6 +10,7 @@ import { CountrySelector } from '@/components/ui/country-selector'
 import { apiClient } from '@/lib/api-client'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
+import { useLoadingStore } from '@/lib/store'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -31,6 +32,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const { show, hide } = useLoadingStore()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -50,27 +52,33 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    show()
 
     if (formData.password !== formData.confirm_password) {
       setError('Passwords do not match')
       setLoading(false)
+      hide()
       return
     }
 
     try {
-      const response = await apiClient.post<AuthResponse>('/api/v1/auth/register', {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        username: formData.username,
-        country: formData.country,
-        phone: formData.phone,
-        street_address: formData.street_address,
-        city: formData.city,
-        state: formData.state,
-        postal_code: formData.postal_code,
-        password: formData.password,
-      })
+      const response = await apiClient.post<AuthResponse>(
+        '/api/v1/auth/register',
+        {
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          email: formData.email,
+          username: formData.username,
+          country: formData.country,
+          phone: formData.phone,
+          street_address: formData.street_address,
+          city: formData.city,
+          state: formData.state,
+          postal_code: formData.postal_code,
+          password: formData.password,
+        },
+        { headers: { 'X-Show-Loader': '1' } }
+      )
 
       if (response.success) {
         setSuccess(true)
@@ -99,6 +107,7 @@ export default function RegisterPage() {
       setError(errorMessage)
     } finally {
       setLoading(false)
+      hide()
     }
   }
 

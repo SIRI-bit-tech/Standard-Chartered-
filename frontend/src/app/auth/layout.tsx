@@ -1,6 +1,10 @@
 import React from "react"
 import Link from 'next/link'
 import { Shield, Globe, Zap } from 'lucide-react'
+import { LoadingOverlay } from '@/components/ui/loading-overlay'
+import { RouteChangeLoader } from '@/components/ui/route-change-loader'
+import { LinkClickLoader } from '@/components/ui/link-click-loader'
+import Script from 'next/script'
 
 export default function AuthLayout({
   children,
@@ -9,6 +13,9 @@ export default function AuthLayout({
 }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 to-secondary/10 flex">
+      <Script id="boot-preloader-auth" strategy="beforeInteractive">
+        {`(function(){try{document.documentElement.classList.add('app-preloading');var d=document.createElement('div');d.id='app-boot-preloader';d.innerHTML='<div class="dot"></div>';document.body.appendChild(d);}catch(e){}})();`}
+      </Script>
       {/* Left side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative bg-cover bg-center bg-no-repeat" style={{ backgroundImage: 'url("/standardcharted.png")' }}>
         <div className="absolute inset-0 bg-black/40"></div>
@@ -61,6 +68,9 @@ export default function AuthLayout({
           {children}
         </div>
       </div>
+      <LoadingOverlay />
+      <RouteChangeLoader />
+      <LinkClickLoader />
     </div>
   )
 }

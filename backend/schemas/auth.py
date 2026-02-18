@@ -34,6 +34,8 @@ class LoginRequest(BaseModel):
     """User login request"""
     username: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
+    device_id: Optional[str] = None
+    device_name: Optional[str] = None
 
 
 class PasswordResetRequest(BaseModel):

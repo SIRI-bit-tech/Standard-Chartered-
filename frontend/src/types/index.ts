@@ -11,6 +11,7 @@ export interface User {
   country: string
   primary_currency: string
   tier: 'standard' | 'priority' | 'premium'
+  profile_picture_url?: string | null
   email_verified: boolean
   phone_verified: boolean
   identity_verified: boolean
@@ -252,10 +253,43 @@ export interface AdminUserRow {
   id: string
   user_id: string // e.g. "SC-882104"
   name: string
+  profile_picture_url?: string | null
   country: string
   email: string
   status: AdminUserStatus
   verification: AdminVerificationStatus
+}
+
+// Security types
+export interface TwoFactorState {
+  enabled: boolean
+}
+
+export interface TwoFactorSetupPayload {
+  secret: string
+  otpauth_uri: string
+}
+
+export interface TrustedDevice {
+  id: string
+  device_id: string
+  device_name?: string
+  ip_address?: string
+  user_agent?: string
+  last_seen?: string
+  active: boolean
+}
+
+export interface LoginHistoryItem {
+  id: string
+  created_at: string
+  ip_address?: string
+  city?: string
+  country?: string
+  device_name?: string
+  user_agent?: string
+  status: 'successful' | 'failed'
+  failure_reason?: string | null
 }
 
 export interface AdminUsersListResponse {
@@ -444,3 +478,40 @@ export const colors = {
   border: '#DEE2E6',
   borderLight: '#E9ECEF',
 } as const
+
+// Stores (Zustand) shapes
+export interface AuthStore {
+  user: User | null
+  isAuthenticated: boolean
+  token: string | null
+  setUser: (user: User | null) => void
+  setToken: (token: string | null) => void
+  logout: () => void
+  reinitialize: () => boolean
+}
+
+export interface AccountStore {
+  accounts: Account[]
+  selectedAccount: Account | null
+  loading: boolean
+  setAccounts: (accounts: Account[]) => void
+  setSelectedAccount: (account: Account | null) => void
+  setLoading: (loading: boolean) => void
+}
+
+export interface NotificationStore {
+  notifications: Notification[]
+  unreadCount: number
+  setNotifications: (notifications: Notification[]) => void
+  addNotification: (notification: Notification) => void
+  removeNotification: (id: string) => void
+  setUnreadCount: (count: number) => void
+}
+
+export interface LoadingStore {
+  activeCount: number
+  isLoading: boolean
+  show: () => void
+  hide: () => void
+  reset: () => void
+}

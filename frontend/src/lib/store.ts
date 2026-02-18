@@ -1,34 +1,11 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { User, Account, Notification } from '@/types'
-
-interface AuthStore {
-  user: User | null
-  isAuthenticated: boolean
-  token: string | null
-  setUser: (user: User | null) => void
-  setToken: (token: string | null) => void
-  logout: () => void
-  reinitialize: () => boolean
-}
-
-interface AccountStore {
-  accounts: Account[]
-  selectedAccount: Account | null
-  loading: boolean
-  setAccounts: (accounts: Account[]) => void
-  setSelectedAccount: (account: Account | null) => void
-  setLoading: (loading: boolean) => void
-}
-
-interface NotificationStore {
-  notifications: Notification[]
-  unreadCount: number
-  setNotifications: (notifications: Notification[]) => void
-  addNotification: (notification: Notification) => void
-  removeNotification: (id: string) => void
-  setUnreadCount: (count: number) => void
-}
+import type {
+  AuthStore,
+  AccountStore,
+  NotificationStore,
+  LoadingStore,
+} from '@/types'
 
 export const useAuthStore = create<AuthStore>()(
   persist(
@@ -94,4 +71,18 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
       notifications: state.notifications.filter((n) => n.id !== id),
     })),
   setUnreadCount: (count) => set({ unreadCount: count }),
+}))
+
+export const useLoadingStore = create<LoadingStore>((set, get) => ({
+  activeCount: 0,
+  isLoading: false,
+  show: () => {
+    const next = get().activeCount + 1
+    set({ activeCount: next, isLoading: true })
+  },
+  hide: () => {
+    const next = Math.max(0, get().activeCount - 1)
+    set({ activeCount: next, isLoading: next > 0 })
+  },
+  reset: () => set({ activeCount: 0, isLoading: false }),
 }))
