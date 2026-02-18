@@ -1,6 +1,6 @@
  'use client'
  
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { apiClient } from "@/lib/api-client"
 import type { TrustedDevice, LoginHistoryItem, TwoFactorSetupPayload } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -26,21 +26,7 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState<string | null>(null)
 
-  const deviceInfo = useMemo(() => {
-    try {
-      let id = localStorage.getItem('device_id')
-      if (!id) {
-        id = crypto.randomUUID()
-        localStorage.setItem('device_id', id)
-      }
-      const ua = navigator.userAgent || ''
-      const platform = (navigator as any).platform || ''
-      const name = `${platform || 'Device'} • ${ua.split(' ').slice(0, 2).join(' ')}`
-      return { device_id: id, device_name: name }
-    } catch {
-      return { device_id: undefined, device_name: undefined }
-    }
-  }, [])
+  /* removed unused deviceInfo */
 
   const load = async () => {
     try {
@@ -226,6 +212,7 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
                 <QRCodeSVG
                   value={setupData.otpauth_uri}
                   className="w-40 h-40 border rounded"
+                  title="Authenticator QR code"
                   includeMargin
                 />
                 <div className="flex-1">

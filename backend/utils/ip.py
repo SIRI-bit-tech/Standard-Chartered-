@@ -41,23 +41,30 @@ def get_client_ip(request: Request) -> Optional[str]:
     except Exception:
         remote = None
 
-    # Trust proxy headers normally
-    header_order = ["x-forwarded-for", "cf-connecting-ip", "x-real-ip"]
-    for key in header_order:
-        val = headers.get(key) or headers.get(key.upper())
-        if val:
-            # x-forwarded-for can be a list: client, proxy1, proxy2
-            ip = val.split(",")[0].strip()
-            if ip and ip not in ("::1", "127.0.0.1", "0.0.0.0"):
-                return ip
-
-    # Only accept x-client-ip when request is from a trusted reverse proxy
+    # Only inspect proxy-provided headers when the request originates from a trusted proxy
     if _is_trusted_proxy(remote):
+        header_order = ["x-forwarded-for", "cf-connecting-ip", "x-real-ip"]
+        for key in header_order:
+            val = headers.get(key) or headers.get(key.upper())
+            if val:
+                # x-forwarded-for can be a list: client, proxy1, proxy2
+                ip = val.split(",")[0].strip()
+                if ip and ip not in ("::1", "127.0.0.1", "0.0.0.0"):
+                    return ip
+
+        # Only accept x-client-ip when request is from a trusted reverse proxy
         val = headers.get("x-client-ip") or headers.get("X-CLIENT-IP")
         if val:
             ip = val.split(",")[0].strip()
             if ip and ip not in ("::1", "127.0.0.1", "0.0.0.0"):
                 return ip
+    else:
+        # If not from a trusted proxy, return the direct connection host immediately
+        try:
+            if remote:
+                return remote
+        except Exception:
+            pass
 
     try:
         if remote:
