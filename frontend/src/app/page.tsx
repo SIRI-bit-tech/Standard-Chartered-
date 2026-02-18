@@ -4,6 +4,7 @@ import { Features } from '@/components/landing/features'
 import { Services } from '@/components/landing/services'
 import { CTA } from '@/components/landing/cta'
 import { Footer } from '@/components/landing/footer'
+import { ChatWidget } from '@/components/support/ChatWidget'
 
 export default function HomePage() {
   return (
@@ -13,6 +14,7 @@ export default function HomePage() {
       <Features />
       <Services />
       <CTA />
+      <ChatWidget />
       <Footer />
     </div>
   )

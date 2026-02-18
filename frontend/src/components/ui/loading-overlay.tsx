@@ -4,6 +4,19 @@ import { useEffect, useRef, useState } from 'react'
 import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { useLoadingStore } from '@/lib/store'
 
+export function BrandLoader({ size = 160 }: { size?: number }) {
+  return (
+    <div style={{ width: size, height: size }}>
+      <DotLottieReact
+        src="https://lottie.host/c465a8dc-5928-43d7-8a91-3a3c49bd0d39/KbXu6W3alp.lottie"
+        loop
+        autoplay
+        style={{ width: '100%', height: '100%' }}
+      />
+    </div>
+  )
+}
+
 export function LoadingOverlay() {
   const { isLoading } = useLoadingStore()
   const [visible, setVisible] = useState(false)
@@ -63,14 +76,7 @@ export function LoadingOverlay() {
         opacity: 1
       }}
     >
-      <div style={{ width: 160, height: 160 }}>
-        <DotLottieReact
-          src="https://lottie.host/c465a8dc-5928-43d7-8a91-3a3c49bd0d39/KbXu6W3alp.lottie"
-          loop
-          autoplay
-          style={{ width: '100%', height: '100%' }}
-        />
-      </div>
+      <BrandLoader size={160} />
     </div>
   )
 }

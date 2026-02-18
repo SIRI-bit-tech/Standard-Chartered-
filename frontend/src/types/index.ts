@@ -396,6 +396,11 @@ export interface SupportTicket {
   created_at: string
 }
 
+export interface SupportTicketDetail extends SupportTicket {
+  description?: string
+  category?: string
+}
+
 export interface ChatMessage {
   id: string
   chat_id: string
@@ -403,6 +408,60 @@ export interface ChatMessage {
   message: string
   is_from_agent: boolean
   created_at: string
+}
+
+export interface AdminAuditLog {
+  id: string
+  admin_email: string
+  action: string
+  resource_type: string
+  resource_id: string
+  details?: string
+  created_at: string
+}
+
+export interface SupportAgent {
+  id: string
+  name: string
+  email: string
+}
+
+export interface AdminSupportTicket extends SupportTicket {
+  user_id: string
+  user_name?: string
+  user_email?: string
+  category?: string
+  description?: string
+  assigned_to_id?: string | null
+  assigned_to_name?: string | null
+  updated_at?: string
+}
+
+export interface TicketReply {
+  id: string
+  ticket_id: string
+  author_id: string
+  author_name?: string
+  message: string
+  created_at: string
+}
+
+export interface FaqItem {
+  id: string
+  question: string
+  answer: string
+  category?: string
+  tags?: string[]
+}
+
+export interface BranchOffice {
+  id: string
+  country: string
+  city: string
+  address: string
+  phone: string
+  email?: string
+  hours?: string
 }
 
 // Auth types

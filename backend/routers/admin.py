@@ -6,6 +6,7 @@ import uuid
 import json
 
 from models.admin import AdminUser, AdminAuditLog, AdminRole
+from models.support import SupportTicket, TicketMessage
 from models.user import User
 from models.account import Account, AccountStatus
 from models.transaction import Transaction, TransactionType, TransactionStatus
@@ -36,6 +37,7 @@ from utils.logger import logger
 from utils.ably import AblyRealtimeManager, get_admin_ably_token_request
 from config import settings
 from services.email import email_service
+from models.notification import Notification, NotificationType
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -176,6 +178,231 @@ async def admin_dashboard_overview(
         "activity_feed": activity_feed,
         "system_alerts": system_alerts,
     }}
+
+# -------------------------------
+# Support Tickets (Admin)
+# -------------------------------
+from pydantic import BaseModel
+
+class AssignTicketRequest(BaseModel):
+    agent_id: str | None = None
+
+class UpdateTicketStatusRequest(BaseModel):
+    status: str
+
+class TicketReplyRequest(BaseModel):
+    message: str
+
+def _serialize_admin_ticket(t: SupportTicket, user: User | None, agent: AdminUser | None) -> dict:
+    return {
+        "id": t.id,
+        "ticket_number": t.ticket_number,
+        "subject": t.subject,
+        "status": t.status.value if hasattr(t.status, "value") else t.status,
+        "priority": t.priority.value if hasattr(t.priority, "value") else t.priority,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "updated_at": t.updated_at.isoformat() if getattr(t, "updated_at", None) else None,
+        "user_id": t.user_id,
+        "user_name": f"{getattr(user,'first_name','') } {getattr(user,'last_name','')}".strip() if user else None,
+        "user_email": getattr(user, "email", None) if user else None,
+        "category": getattr(t, "category", None),
+        "description": getattr(t, "description", None),
+        "assigned_to_id": getattr(t, "assigned_to", None),
+        "assigned_to_name": f"{getattr(agent,'first_name','') } {getattr(agent,'last_name','')}".strip() if agent else None,
+    }
+
+@router.get("/support/tickets")
+async def admin_list_tickets(
+    limit: int = Query(50),
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    result = await db.execute(select(SupportTicket).order_by(SupportTicket.created_at.desc()).limit(limit))
+    tickets = result.scalars().all()
+    items = []
+    for t in tickets:
+        user_result = await db.execute(select(User).where(User.id == t.user_id))
+        user = user_result.scalar_one_or_none()
+        agent = None
+        if getattr(t, "assigned_to", None):
+            agent_result = await db.execute(select(AdminUser).where(AdminUser.id == t.assigned_to))
+            agent = agent_result.scalar_one_or_none()
+        items.append(_serialize_admin_ticket(t, user, agent))
+    return {"success": True, "data": items}
+
+@router.get("/support/agents")
+async def admin_list_support_agents(
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    result = await db.execute(select(AdminUser).where(AdminUser.role.in_([AdminRole.SUPPORT, AdminRole.MANAGER, AdminRole.SUPER_ADMIN])))
+    agents = result.scalars().all()
+    data = [{"id": a.id, "name": f"{a.first_name} {a.last_name}".strip(), "email": a.email} for a in agents]
+    return {"success": True, "data": data}
+
+@router.put("/support/tickets/{ticket_id}/assign")
+async def admin_assign_ticket(
+    ticket_id: str,
+    request: AssignTicketRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    t_res = await db.execute(select(SupportTicket).where(SupportTicket.id == ticket_id))
+    t = t_res.scalar_one_or_none()
+    if not t:
+        raise NotFoundError(resource="SupportTicket", error_code="TICKET_NOT_FOUND")
+    t.assigned_to = request.agent_id if request.agent_id else None
+    t.assigned_at = datetime.utcnow()
+    db.add(t)
+    log = AdminAuditLog(
+        id=str(uuid.uuid4()),
+        admin_id=admin.id,
+        admin_email=admin.email,
+        action="ticket_assigned",
+        resource_type="ticket",
+        resource_id=t.id,
+        details=json.dumps({"assigned_to": request.agent_id}),
+    )
+    db.add(log)
+    await db.commit()
+    AblyRealtimeManager.publish_admin_event("support", {"type": "ticket_assigned", "ticket_id": t.id, "agent_id": request.agent_id})
+    return {"success": True, "message": "Ticket assigned"}
+
+@router.put("/support/tickets/{ticket_id}/status")
+async def admin_update_ticket_status(
+    ticket_id: str,
+    request: UpdateTicketStatusRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    t_res = await db.execute(select(SupportTicket).where(SupportTicket.id == ticket_id))
+    t = t_res.scalar_one_or_none()
+    if not t:
+        raise NotFoundError(resource="SupportTicket", error_code="TICKET_NOT_FOUND")
+    prev = t.status.value if hasattr(t.status, "value") else t.status
+    # Assign new status by raw string; SQLAlchemy Enum accepts string name
+    t.status = request.status
+    if request.status in ("resolved", "closed"):
+        t.resolved_at = datetime.utcnow() if request.status == "resolved" else getattr(t, "resolved_at", None)
+        t.closed_at = datetime.utcnow() if request.status == "closed" else getattr(t, "closed_at", None)
+    db.add(t)
+    log = AdminAuditLog(
+        id=str(uuid.uuid4()),
+        admin_id=admin.id,
+        admin_email=admin.email,
+        action="ticket_status_changed",
+        resource_type="ticket",
+        resource_id=t.id,
+        details=json.dumps({"from": prev, "to": request.status}),
+    )
+    db.add(log)
+    await db.commit()
+    AblyRealtimeManager.publish_admin_event("support", {"type": "ticket_status_changed", "ticket_id": t.id, "status": request.status})
+    return {"success": True, "message": "Status updated"}
+
+@router.get("/support/tickets/{ticket_id}/replies")
+async def admin_get_ticket_replies(
+    ticket_id: str,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    t_res = await db.execute(select(SupportTicket).where(SupportTicket.id == ticket_id))
+    t = t_res.scalar_one_or_none()
+    if not t:
+        raise NotFoundError(resource="SupportTicket", error_code="TICKET_NOT_FOUND")
+    msgs_res = await db.execute(select(TicketMessage).where(TicketMessage.ticket_id == t.id).order_by(TicketMessage.created_at.asc()))
+    msgs = msgs_res.scalars().all()
+    # Collect author names for admin/user
+    authors: dict[str, str] = {}
+    # user
+    u_res = await db.execute(select(User).where(User.id == t.user_id))
+    u = u_res.scalar_one_or_none()
+    if u:
+        authors[u.id] = f"{u.first_name} {u.last_name}".strip() or u.email
+    # possible admins
+    admin_ids = list({m.sender_id for m in msgs if m.is_from_staff})
+    if admin_ids:
+        a_res = await db.execute(select(AdminUser).where(AdminUser.id.in_(admin_ids)))
+        for a in a_res.scalars().all():
+            authors[a.id] = f"{a.first_name} {a.last_name}".strip() or a.email
+    data = [
+        {
+            "id": m.id,
+            "ticket_id": t.id,
+            "author_id": m.sender_id,
+            "author_name": authors.get(m.sender_id),
+            "message": m.message,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in msgs
+    ]
+    return {"success": True, "data": data}
+
+@router.post("/support/tickets/{ticket_id}/replies")
+async def admin_post_ticket_reply(
+    ticket_id: str,
+    request: TicketReplyRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    t_res = await db.execute(select(SupportTicket).where(SupportTicket.id == ticket_id))
+    t = t_res.scalar_one_or_none()
+    if not t:
+        raise NotFoundError(resource="SupportTicket", error_code="TICKET_NOT_FOUND")
+    msg = TicketMessage(
+        id=str(uuid.uuid4()),
+        ticket_id=t.id,
+        sender_id=admin.id,
+        is_from_staff=True,
+        message=request.message,
+        created_at=datetime.utcnow(),
+    )
+    db.add(msg)
+    # audit
+    log = AdminAuditLog(
+        id=str(uuid.uuid4()),
+        admin_id=admin.id,
+        admin_email=admin.email,
+        action="ticket_replied",
+        resource_type="ticket",
+        resource_id=t.id,
+        details=json.dumps({"reply_id": msg.id}),
+    )
+    db.add(log)
+    # user notification row
+    # Load user for email + notification
+    u_res = await db.execute(select(User).where(User.id == t.user_id))
+    u = u_res.scalar_one_or_none()
+    snippet = (request.message or "").strip()
+    if len(snippet) > 160:
+        snippet = snippet[:157] + "…"
+    try:
+        notif = Notification(
+            id=str(uuid.uuid4()),
+            user_id=t.user_id,
+            type=NotificationType.SYSTEM,
+            title=f"Support reply on Ticket #{t.ticket_number}",
+            message=snippet or "You have a new reply from Support.",
+            action_url=f"{settings.FRONTEND_URL}/dashboard/support",
+        )
+        db.add(notif)
+    except Exception:
+        pass
+    await db.commit()
+    # realtime: notify admin dashboards + user channels
+    AblyRealtimeManager.publish_admin_event("support", {"type": "ticket_replied", "ticket_id": t.id, "reply_id": msg.id})
+    try:
+        AblyRealtimeManager.publish_support_message(t.id, t.user_id, admin.email, request.message, True)
+        AblyRealtimeManager.publish_notification(t.user_id, "support", f"Support replied to Ticket #{t.ticket_number}", snippet, {"ticket_id": t.id})
+    except Exception:
+        pass
+    # email: optional
+    try:
+        if u and getattr(settings, "SMTP_SERVER", None):
+            email_service.send_support_ticket_reply(u.email, t.ticket_number, t.subject, request.message)
+    except Exception:
+        pass
+    return {"success": True, "data": {"id": msg.id}}
 
 @router.put("/cards/status")
 async def admin_update_card_status(
@@ -1994,29 +2221,28 @@ async def admin_delete_user(
         raise InternalServerError(operation="user deletion", error_code="DELETION_FAILED", original_error=e)
 @router.get("/audit-logs", response_model=list[AdminAuditLogResponse])
 async def get_audit_logs(
-    admin_id: str,
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db)
+    resource_type: str | None = Query(None),
+    resource_id: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
 ):
-    """Get audit logs"""
+    """Get audit logs, optionally filtered by resource type/id. Uses auth token for admin context."""
     try:
-        admin_result = await db.execute(
-            select(AdminUser).where(AdminUser.id == admin_id)
-        )
-        admin = admin_result.scalar()
-        
         if not admin or not AdminPermissionManager.has_permission(admin.role, "audit_logs:view"):
             raise UnauthorizedError(
                 message="You don't have permission to view audit logs",
                 error_code="PERMISSION_DENIED"
             )
-        
-        result = await db.execute(
-            select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc()).offset(offset).limit(limit)
-        )
+        stmt = select(AdminAuditLog).order_by(AdminAuditLog.created_at.desc())
+        if resource_type:
+            stmt = stmt.where(AdminAuditLog.resource_type == resource_type)
+        if resource_id:
+            stmt = stmt.where(AdminAuditLog.resource_id == resource_id)
+        stmt = stmt.offset(offset).limit(limit)
+        result = await db.execute(stmt)
         logs = result.scalars().all()
-        
         return [AdminAuditLogResponse.from_orm(log) for log in logs]
     except UnauthorizedError:
         raise

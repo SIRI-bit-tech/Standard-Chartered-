@@ -1,22 +1,13 @@
- 'use client'
- 
- import { useEffect, useMemo, useState } from 'react'
- import { apiClient } from '@/lib/api-client'
- import { logger } from '@/lib/logger'
- import { AdminAuditTable } from '@/components/admin/admin-audit-table'
- import { Input } from '@/components/ui/input'
- import { colors } from '@/types'
+'use client'
+
+import { useEffect, useMemo, useState } from 'react'
+import { apiClient } from '@/lib/api-client'
+import { logger } from '@/lib/logger'
+import { AdminAuditTable } from '@/components/admin/admin-audit-table'
+import { Input } from '@/components/ui/input'
+import { colors } from '@/types'
 import { useAdminRealtime } from '@/hooks/use-admin-realtime'
- 
- interface AdminAuditLog {
-   id: string
-   admin_email: string
-   action: string
-   resource_type: string
-   resource_id: string
-   details?: string
-   created_at: string
- }
+import type { AdminAuditLog } from '@/types'
  
  export default function AdminSecurityPage() {
    const [items, setItems] = useState<AdminAuditLog[]>([])
@@ -24,28 +15,18 @@ import { useAdminRealtime } from '@/hooks/use-admin-realtime'
  
   async function fetchLogs() {
     try {
-      const adminId = localStorage.getItem('admin_id')
-      if (!adminId) {
-        window.location.href = '/admin/auth/login'
-        return
-      }
-      const qs = new URLSearchParams({
-        admin_id: adminId,
-        limit: '50',
-        offset: '0',
-      })
-      const res = await apiClient.get<AdminAuditLog[]>(
-        `/admin/audit-logs?${qs.toString()}`,
+      const res = await apiClient.get<AdminAuditLog[] | { success: boolean; data: AdminAuditLog[] }>(
+        `/admin/audit-logs?limit=50&offset=0`,
       )
       if (Array.isArray(res)) setItems(res)
+      else if ((res as any)?.success && Array.isArray((res as any).data)) setItems((res as any).data)
     } catch (err: any) {
       logger.error('Failed to fetch audit logs', { error: err })
     }
   }
   useEffect(() => {
-    const t = setTimeout(fetchLogs, 250)
-    return () => clearTimeout(t)
-  }, [q])
+    fetchLogs()
+  }, [])
   useAdminRealtime('admin:dashboard', () => {
     fetchLogs()
   })

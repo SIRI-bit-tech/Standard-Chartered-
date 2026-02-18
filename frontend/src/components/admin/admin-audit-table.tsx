@@ -1,26 +1,17 @@
- 'use client'
- 
- import {
-   Table,
-   TableBody,
-   TableCell,
-   TableHead,
-   TableHeader,
-   TableRow,
- } from '@/components/ui/table'
- import { colors } from '@/types'
- 
- interface AdminAuditLog {
-   id: string
-   admin_email: string
-   action: string
-   resource_type: string
-   resource_id: string
-   details?: string
-   created_at: string
- }
- 
- export function AdminAuditTable({ items }: { items: AdminAuditLog[] }) {
+'use client'
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { colors } from '@/types'
+import type { AdminAuditLog } from '@/types'
+
+export function AdminAuditTable({ items }: { items: AdminAuditLog[] }) {
    return (
      <div className="rounded-xl border bg-white" style={{ borderColor: colors.border }}>
        <Table>

@@ -12,19 +12,26 @@ export async function POST(req: Request | NextRequest) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
     try {
-      const verifyRes = await fetch(`${API_BASE_URL}/api/v1/profile`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
-        // No caching; must validate token freshness
-        cache: 'no-store',
-      })
-      if (!verifyRes.ok) {
-        return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      try {
+        const verifyRes = await fetch(`${API_BASE_URL}/api/v1/profile`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+          // No caching; must validate token freshness
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        if (!verifyRes.ok) {
+          return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+        }
+      } finally {
+        clearTimeout(timeoutId)
       }
     } catch {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
-    
+
     const form = await req.formData()
     const file = form.get('file')
     if (!file || !(file instanceof File)) {

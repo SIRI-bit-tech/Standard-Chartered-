@@ -28,6 +28,7 @@ const NAV = [
   { href: '/admin/cards', label: 'Virtual Cards', icon: CreditCard },
   { href: '/admin/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { href: '/admin/security', label: 'Security', icon: Shield },
+  { href: '/admin/support/tickets', label: 'Support', icon: BarChart3 },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { href: '/admin/settings', label: 'System Settings', icon: Settings },
 ] as const
