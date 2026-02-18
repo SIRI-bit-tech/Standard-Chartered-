@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
 import type { SupportTicket, FaqItem, BranchOffice } from '@/types'
-import { QuickActions, type SupportSection } from '@/components/support/QuickActions'
+import { QuickActions, type SupportSection, type Action } from '@/components/support/QuickActions'
 import { TicketTable } from '@/components/support/TicketTable'
 import { CreateTicketForm } from '@/components/support/CreateTicketForm'
 import { FAQSearch } from '@/components/support/FAQSearch'
@@ -31,12 +31,12 @@ export default function SupportPage() {
     }
   }
 
-  const actions = [
-    { key: 'chat' as const, label: 'Live Chat', subtitle: 'Agent online', icon: 'chat', active: active === 'chat' },
-    { key: 'ticket' as const, label: 'Create Ticket', subtitle: 'Request help', icon: 'ticket', active: active === 'ticket' },
-    { key: 'faq' as const, label: 'FAQs', subtitle: 'Search topics', icon: 'faq', active: active === 'faq' },
-    { key: 'contact' as const, label: 'Contact Info', subtitle: 'Call local branch', icon: 'contact', active: active === 'contact' },
-  ] as const
+  const actions: Action[] = [
+    { key: 'chat', label: 'Live Chat', subtitle: 'Agent online', icon: 'chat', active: active === 'chat' },
+    { key: 'ticket', label: 'Create Ticket', subtitle: 'Request help', icon: 'ticket', active: active === 'ticket' },
+    { key: 'faq', label: 'FAQs', subtitle: 'Search topics', icon: 'faq', active: active === 'faq' },
+    { key: 'contact', label: 'Contact Info', subtitle: 'Call local branch', icon: 'contact', active: active === 'contact' },
+  ]
 
   const faqs: FaqItem[] = [
     { id: 'f1', question: 'How do I reset my password?', answer: 'Use “Forgot Password” on the login page and follow the email instructions.', category: 'Security', tags: ['password', 'login'] },
@@ -74,7 +74,7 @@ export default function SupportPage() {
         <h1 className="text-3xl font-bold">Support & Help Center</h1>
         <p className="text-muted-foreground">How can we help you today?</p>
       </div>
-      <QuickActions items={actions as any} onSelect={setActive} />
+      <QuickActions items={actions} onSelect={setActive} />
       {active === 'chat' && <ChatOnly />}
       {active === 'ticket' && (
         <div className="space-y-4">

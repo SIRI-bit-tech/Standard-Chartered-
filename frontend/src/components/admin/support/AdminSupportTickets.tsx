@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { colors } from '@/types'
 import type { AdminSupportTicket, SupportAgent, TicketReply } from '@/types'
@@ -28,6 +28,8 @@ export function AdminSupportTickets() {
   const [active, setActive] = useState<AdminSupportTicket | null>(null)
   const [replies, setReplies] = useState<TicketReply[]>([])
   const [replyText, setReplyText] = useState('')
+  const activeRef = useRef<AdminSupportTicket | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   async function load() {
     try {
@@ -48,12 +50,16 @@ export function AdminSupportTickets() {
     } catch {}
   }
   useEffect(() => {
+    activeRef.current = active
+  }, [active])
+  useEffect(() => {
     load()
     loadAgents()
   }, [])
   useAdminRealtime('admin:support', () => {
     load()
-    if (active) loadDetail(active.id)
+    const cur = activeRef.current
+    if (cur) loadDetail(cur.id)
   })
 
   const filtered = useMemo(() => {
@@ -66,21 +72,39 @@ export function AdminSupportTickets() {
   }, [q, items])
 
   async function assignTicket(id: string, agentId: string | null) {
-    await apiClient.put(`/admin/support/tickets/${id}/assign`, { agent_id: agentId })
-    await load()
-    if (active?.id === id) await loadDetail(id)
+    setActionError(null)
+    try {
+      await apiClient.put(`/admin/support/tickets/${id}/assign`, { agent_id: agentId })
+      await load()
+      if (active?.id === id) await loadDetail(id)
+    } catch (e: any) {
+      console.error('Failed to assign ticket', e)
+      setActionError('Failed to assign ticket')
+    }
   }
   async function updateStatus(id: string, status: AdminSupportTicket['status']) {
-    await apiClient.put(`/admin/support/tickets/${id}/status`, { status })
-    await load()
-    if (active?.id === id) await loadDetail(id)
+    setActionError(null)
+    try {
+      await apiClient.put(`/admin/support/tickets/${id}/status`, { status })
+      await load()
+      if (active?.id === id) await loadDetail(id)
+    } catch (e: any) {
+      console.error('Failed to update status', e)
+      setActionError('Failed to update status')
+    }
   }
   async function sendReply(id: string) {
     if (!replyText.trim()) return
+    setActionError(null)
     const body = { message: replyText }
-    await apiClient.post(`/admin/support/tickets/${id}/replies`, body)
-    setReplyText('')
-    await loadDetail(id)
+    try {
+      await apiClient.post(`/admin/support/tickets/${id}/replies`, body)
+      setReplyText('')
+      await loadDetail(id)
+    } catch (e: any) {
+      console.error('Failed to send reply', e)
+      setActionError('Failed to send reply')
+    }
   }
 
   return (
@@ -135,6 +159,7 @@ export function AdminSupportTickets() {
           {!active && <div className="text-sm text-muted-foreground">Select a ticket to view details</div>}
           {active && (
             <>
+              {actionError && <div className="text-sm text-red-600">{actionError}</div>}
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold truncate">#{active.ticket_number} • {active.subject}</div>

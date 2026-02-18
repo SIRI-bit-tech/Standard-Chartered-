@@ -13,7 +13,8 @@ export default function Loading() {
 
   const pct = useMemo(() => {
     const p = (ms / 8000) * 100
-    return p > 100 ? 100 : p
+    const clamped = Math.max(0, Math.min(100, p))
+    return clamped
   }, [ms])
 
   const seconds = useMemo(() => (ms / 1000).toFixed(1), [ms])
@@ -28,7 +29,14 @@ export default function Loading() {
         <div className="text-base font-medium text-[#1A1A1A]">
           Loading<span className="mx-1">•</span>{seconds}s
         </div>
-        <div className="w-full h-2 rounded bg-[#E9ECEF] overflow-hidden">
+        <div
+          className="w-full h-2 rounded bg-[#E9ECEF] overflow-hidden"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pct}
+          aria-label="Loading progress"
+        >
           <div
             className="h-full bg-[#0066CC] transition-[width] duration-100 ease-linear"
             style={{ width: `${pct}%` }}
@@ -43,4 +51,3 @@ export default function Loading() {
     </div>
   )
 }
-

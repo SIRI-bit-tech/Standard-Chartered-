@@ -1,3 +1,5 @@
+ 'use client'
+ 
 import { useMemo, useState } from 'react'
 import type { FaqItem } from '@/types'
 import { colors } from '@/types'

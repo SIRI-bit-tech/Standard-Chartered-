@@ -6,8 +6,8 @@ import { SupportTicketDetail as TicketDetail } from '@/components/support/Suppor
 import { colors } from '@/types'
 
 export default function SupportTicketDetailPage() {
-  const params = useParams() as { id?: string }
-  const ticketId = params?.id as string
+  const params = useParams<{ id?: string }>()
+  const ticketId = params.id
   if (!ticketId) {
     return <div className="p-4 text-sm text-muted-foreground">Invalid ticket</div>
   }

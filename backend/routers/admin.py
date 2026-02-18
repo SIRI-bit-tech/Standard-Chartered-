@@ -217,17 +217,40 @@ async def admin_list_tickets(
     db: AsyncSession = Depends(get_db),
     admin: AdminUser = Depends(get_current_admin),
 ):
-    result = await db.execute(select(SupportTicket).order_by(SupportTicket.created_at.desc()).limit(limit))
+    # Load tickets (keep existing query and limit)
+    result = await db.execute(
+        select(SupportTicket)
+        .order_by(SupportTicket.created_at.desc())
+        .limit(limit)
+    )
     tickets = result.scalars().all()
-    items = []
-    for t in tickets:
-        user_result = await db.execute(select(User).where(User.id == t.user_id))
-        user = user_result.scalar_one_or_none()
-        agent = None
-        if getattr(t, "assigned_to", None):
-            agent_result = await db.execute(select(AdminUser).where(AdminUser.id == t.assigned_to))
-            agent = agent_result.scalar_one_or_none()
-        items.append(_serialize_admin_ticket(t, user, agent))
+    if not tickets:
+        return {"success": True, "data": []}
+
+    # Batch-load related users and assigned agents to avoid N+1 queries
+    user_ids = {t.user_id for t in tickets if getattr(t, "user_id", None)}
+    agent_ids = {t.assigned_to for t in tickets if getattr(t, "assigned_to", None)}
+
+    users_map: dict[str, User] = {}
+    agents_map: dict[str, AdminUser] = {}
+
+    if user_ids:
+        u_res = await db.execute(select(User).where(User.id.in_(list(user_ids))))
+        for u in u_res.scalars().all():
+            users_map[u.id] = u
+    if agent_ids:
+        a_res = await db.execute(select(AdminUser).where(AdminUser.id.in_(list(agent_ids))))
+        for a in a_res.scalars().all():
+            agents_map[a.id] = a
+
+    items = [
+        _serialize_admin_ticket(
+            t,
+            users_map.get(t.user_id),
+            agents_map.get(getattr(t, "assigned_to", None))
+        )
+        for t in tickets
+    ]
     return {"success": True, "data": items}
 
 @router.get("/support/agents")

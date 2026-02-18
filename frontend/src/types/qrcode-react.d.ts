@@ -11,11 +11,9 @@ declare module 'qrcode.react' {
     title?: string
     className?: string
   }
-  export interface QRCodeSVGProps extends React.SVGProps<SVGSVGElement>, QRCodeCommonProps {}
-  export interface QRCodeCanvasProps extends React.CanvasHTMLAttributes<HTMLCanvasElement>, QRCodeCommonProps {}
+  export interface QRCodeSVGProps extends React.SVGProps<SVGSVGElement>, QRCodeCommonProps { }
+  export interface QRCodeCanvasProps extends React.CanvasHTMLAttributes<HTMLCanvasElement>, QRCodeCommonProps { }
   export type QRCodeProps = QRCodeSVGProps | QRCodeCanvasProps
   export const QRCodeSVG: React.FC<QRCodeSVGProps>
   export const QRCodeCanvas: React.FC<QRCodeCanvasProps>
-  const _default: React.FC<QRCodeProps>
-  export default _default
 }
