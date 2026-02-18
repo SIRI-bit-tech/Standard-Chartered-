@@ -19,25 +19,12 @@ export default function Verify2FA() {
   const device_id = params.get('device') || ''
   const device_name = params.get('name') || ''
 
-  const getPublicIP = async (): Promise<string | undefined> => {
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 2500)
-      const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store', signal: ctrl.signal })
-      clearTimeout(t)
-      if (!res.ok) return undefined
-      const data = await res.json()
-      return data?.ip as string | undefined
-    } catch {
-      return undefined
-    }
-  }
+  // Do not collect or send client-derived IPs for security decisions.
 
   const handleSubmit = async () => {
     setLoading(true)
     setError(null)
     try {
-      const publicIp = await getPublicIP()
       const res = await apiClient.post<any>(
         '/api/v1/auth/2fa/complete',
         {
@@ -47,7 +34,7 @@ export default function Verify2FA() {
           device_id,
           device_name
         },
-        { headers: { ...(publicIp ? { 'X-Client-IP': publicIp } : {}) } }
+        {}
       )
       if (res?.token?.access_token) {
         localStorage.setItem('access_token', res.token.access_token)

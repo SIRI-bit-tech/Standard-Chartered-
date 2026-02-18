@@ -58,4 +58,8 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     
+    # Networking / Security
+    # Comma-separated list of CIDRs/IPs that are trusted reverse proxies
+    TRUSTED_PROXY_CIDRS: str = ""
+    
 settings = Settings()

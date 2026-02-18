@@ -362,6 +362,9 @@ async def complete_two_factor(
     trust_device = bool(payload.get("trust_device"))
     device_id = (payload.get("device_id") or "").strip() or None
     device_name = (payload.get("device_name") or "").strip() or None
+    # Ensure these are always defined
+    user_agent = http_request.headers.get("User-Agent")
+    ip_address = get_client_ip(http_request)
     payload_decoded = verify_token(session_token)
     if not payload_decoded or payload_decoded.get("purpose") != "2fa":
         raise HTTPException(status_code=401, detail="Invalid or expired session")
@@ -378,13 +381,12 @@ async def complete_two_factor(
     # Trust device if requested
     if trust_device and device_id:
         try:
-            ip_address = get_client_ip(http_request)
             td = TrustedDevice(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
                 device_id=device_id,
                 device_name=device_name or http_request.headers.get("X-Device-Name") or "",
-                user_agent=http_request.headers.get("User-Agent"),
+                user_agent=user_agent,
                 ip_address=ip_address,
                 active=True
             )
@@ -394,13 +396,12 @@ async def complete_two_factor(
             pass
     # Record successful login
     try:
-        ip_address = get_client_ip(http_request)
         geo = geolocate_ip(ip_address) or {}
         lh_ok = LoginHistory(
             id=str(uuid.uuid4()),
             user_id=user.id,
             ip_address=ip_address,
-            user_agent=http_request.headers.get("User-Agent"),
+            user_agent=user_agent,
             device_name=device_name,
             device_type=None,
             country=geo.get("country"),
@@ -421,8 +422,8 @@ async def complete_two_factor(
             action="login_2fa_verified",
             resource_type="auth",
             resource_id=user.id,
-            ip_address=get_client_ip(http_request),
-            user_agent=http_request.headers.get("User-Agent")
+            ip_address=ip_address,
+            user_agent=user_agent
         )
         db.add(log)
         await db.commit()

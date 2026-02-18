@@ -2,23 +2,66 @@ from fastapi import Request
 from typing import Optional, Tuple, Dict, Any
 import json
 import urllib.request
+from ipaddress import ip_address, ip_network
+from config import settings
+
+
+def _parse_trusted_proxies():
+    cidrs = getattr(settings, "TRUSTED_PROXY_CIDRS", "") or ""
+    items = [c.strip() for c in cidrs.split(",") if c.strip()]
+    nets = []
+    for item in items:
+        try:
+            nets.append(ip_network(item, strict=False))
+        except Exception:
+            continue
+    return nets
+
+
+_TRUSTED_PROXY_NETS = _parse_trusted_proxies()
+
+
+def _is_trusted_proxy(remote: Optional[str]) -> bool:
+    if not remote or not _TRUSTED_PROXY_NETS:
+        return False
+    try:
+        rip = ip_address(remote)
+        return any(rip in n for n in _TRUSTED_PROXY_NETS)
+    except Exception:
+        return False
 
 
 def get_client_ip(request: Request) -> Optional[str]:
     """Extract the real client IP from common proxy headers or fallback to connection host."""
     headers = request.headers
-    # Prefer explicit client IP from frontend if provided (dev/proxy environments)
-    for key in ["x-client-ip", "x-forwarded-for", "cf-connecting-ip", "x-real-ip"]:
+    remote = None
+    try:
+        if request.client and request.client.host:
+            remote = request.client.host
+    except Exception:
+        remote = None
+
+    # Trust proxy headers normally
+    header_order = ["x-forwarded-for", "cf-connecting-ip", "x-real-ip"]
+    for key in header_order:
         val = headers.get(key) or headers.get(key.upper())
         if val:
             # x-forwarded-for can be a list: client, proxy1, proxy2
             ip = val.split(",")[0].strip()
             if ip and ip not in ("::1", "127.0.0.1", "0.0.0.0"):
                 return ip
+
+    # Only accept x-client-ip when request is from a trusted reverse proxy
+    if _is_trusted_proxy(remote):
+        val = headers.get("x-client-ip") or headers.get("X-CLIENT-IP")
+        if val:
+            ip = val.split(",")[0].strip()
+            if ip and ip not in ("::1", "127.0.0.1", "0.0.0.0"):
+                return ip
+
     try:
-        if request.client and request.client.host:
-            host = request.client.host
-            return host
+        if remote:
+            return remote
     except Exception:
         pass
     return None
@@ -41,4 +84,3 @@ def geolocate_ip(ip: Optional[str]) -> Optional[Dict[str, Any]]:
     except Exception:
         pass
     return None
-

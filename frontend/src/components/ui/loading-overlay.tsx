@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { useLoadingStore } from '@/lib/store'
 
@@ -8,8 +8,8 @@ export function LoadingOverlay() {
   const { isLoading } = useLoadingStore()
   const [visible, setVisible] = useState(false)
   const [mountAnim, setMountAnim] = useState(false)
-  const [startedAt, setStartedAt] = useState<number | null>(null)
-  const [hideTimer, setHideTimer] = useState<number | null>(null)
+  const startedAtRef = useRef<number | null>(null)
+  const hideTimerRef = useRef<number | null>(null)
   const MIN_VISIBLE_MS = 8000
 
   useEffect(() => {
@@ -24,22 +24,24 @@ export function LoadingOverlay() {
     if (isLoading) {
       setVisible(true)
       setMountAnim(true)
-      setStartedAt(Date.now())
+      startedAtRef.current = Date.now()
     } else {
       const now = Date.now()
-      const started = startedAt ?? now
+      const started = startedAtRef.current ?? now
       const elapsed = now - started
       const remain = Math.max(0, MIN_VISIBLE_MS - elapsed)
       setMountAnim(false)
-      if (hideTimer) {
-        window.clearTimeout(hideTimer)
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current)
       }
-      const t = window.setTimeout(() => {
+      hideTimerRef.current = window.setTimeout(() => {
         setVisible(false)
-        setStartedAt(null)
-        setHideTimer(null)
+        startedAtRef.current = null
+        if (hideTimerRef.current) {
+          window.clearTimeout(hideTimerRef.current)
+          hideTimerRef.current = null
+        }
       }, remain > 0 ? remain : 150)
-      setHideTimer(t)
     }
   }, [isLoading])
 

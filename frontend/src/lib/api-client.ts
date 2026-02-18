@@ -104,37 +104,9 @@ class ApiClient {
     // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => {
-        try {
-          const cfg: any = response.config || {}
-          if (cfg._showLoader) {
-            const state = useLoadingStore.getState()
-            if (!state.isLoading) {
-              state.show()
-            }
-            window.setTimeout(() => {
-              try {
-                useLoadingStore.getState().hide()
-              } catch { }
-            }, 8000)
-          }
-        } catch { }
         return response
       },
       async (error: AxiosError) => {
-        try {
-          const cfg: any = error.config || {}
-          if (cfg?._showLoader) {
-            const state = useLoadingStore.getState()
-            if (!state.isLoading) {
-              state.show()
-            }
-            window.setTimeout(() => {
-              try {
-                useLoadingStore.getState().hide()
-              } catch { }
-            }, 8000)
-          }
-        } catch { }
         const status = error.response?.status
         const failingUrl: string = (error.config?.url as string) || ''
         const isAdminRequest = typeof failingUrl === 'string' && failingUrl.startsWith('/admin')
