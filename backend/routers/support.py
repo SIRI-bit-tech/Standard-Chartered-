@@ -9,6 +9,7 @@ from utils.auth import get_current_user_id
 from pydantic import BaseModel, Field
 from utils.ably import AblyRealtimeManager
 from models.user import User
+from models.admin import AdminUser
 from models.notification import Notification, NotificationType
 from config import settings
 
@@ -267,12 +268,26 @@ async def get_ticket_replies(
         .limit(limit)
     )
     msgs = msgs_res.scalars().all()
+    # Resolve author names for user and any staff members
+    authors: dict[str, str] = {}
+    # User author
+    u_res = await db.execute(select(User).where(User.id == t.user_id))
+    u = u_res.scalar_one_or_none()
+    if u:
+        authors[u.id] = (f"{u.first_name} {u.last_name}".strip() or u.email)
+    # Possible admin authors
+    admin_ids = list({m.sender_id for m in msgs if m.is_from_staff})
+    if admin_ids:
+        a_res = await db.execute(select(AdminUser).where(AdminUser.id.in_(admin_ids)))
+        for a in a_res.scalars().all():
+            authors[a.id] = (f"{a.first_name} {a.last_name}".strip() or a.email)
     return {
         "success": True,
         "data": [
             {
                 "id": m.id,
                 "author_id": m.sender_id,
+                "author_name": authors.get(m.sender_id),
                 "message": m.message,
                 "is_from_staff": m.is_from_staff,
                 "created_at": m.created_at.isoformat()

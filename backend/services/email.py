@@ -3,6 +3,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from typing import Optional
+from html import escape
 from config import settings
 import logging
 import os
@@ -334,12 +335,14 @@ class EmailService:
         """Notify user by email that an admin replied to their support ticket."""
         try:
             subject = f"Support Reply • Ticket #{ticket_number}"
+            safe_subject = escape(ticket_subject or "")
+            safe_reply = escape(reply_text or "").replace("\n", "<br>")
             body = f"""
               <p>Hello,</p>
-              <p>We replied to your support ticket <strong>#{ticket_number}</strong> — <em>{ticket_subject}</em>.</p>
+              <p>We replied to your support ticket <strong>#{ticket_number}</strong> — <em>{safe_subject}</em>.</p>
               <div style="margin:12px 0;padding:12px;border:1px solid {self.border};background:{self.brand_light};border-radius:6px;">
                 <p style="margin:0;color:{self.text_primary}"><strong>Our reply:</strong></p>
-                <div style="margin-top:6px;white-space:pre-wrap;color:{self.text_primary}">{reply_text}</div>
+                <div style="margin-top:6px;white-space:pre-wrap;color:{self.text_primary}">{safe_reply}</div>
               </div>
               <p>You can continue the conversation securely from your dashboard.</p>
               <a href="{settings.FRONTEND_URL}/dashboard/support" style="display:inline-block;background:{self.brand_primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Open Support</a>

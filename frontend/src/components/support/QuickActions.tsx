@@ -3,7 +3,7 @@ import { colors } from '@/types'
 
 export type SupportSection = 'chat' | 'ticket' | 'faq' | 'contact'
 
-interface Action {
+export interface Action {
   key: SupportSection
   label: string
   subtitle: string

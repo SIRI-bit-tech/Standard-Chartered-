@@ -5,14 +5,45 @@ import { DotLottieReact } from '@lottiefiles/dotlottie-react'
 import { useLoadingStore } from '@/lib/store'
 
 export function BrandLoader({ size = 160 }: { size?: number }) {
+  const [unavailable, setUnavailable] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    const check = async () => {
+      try {
+        const res = await fetch('/animations/brand-loader.lottie', { method: 'HEAD' })
+        if (!cancelled && !res.ok) setUnavailable(true)
+      } catch {
+        if (!cancelled) setUnavailable(true)
+      }
+    }
+    check()
+    return () => {
+      cancelled = true
+    }
+  }, [])
   return (
-    <div style={{ width: size, height: size }}>
-      <DotLottieReact
-        src="https://lottie.host/c465a8dc-5928-43d7-8a91-3a3c49bd0d39/KbXu6W3alp.lottie"
-        loop
-        autoplay
-        style={{ width: '100%', height: '100%' }}
-      />
+    <div style={{ width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      {!unavailable ? (
+        <DotLottieReact
+          src="/animations/brand-loader.lottie"
+          loop
+          autoplay
+          style={{ width: '100%', height: '100%' }}
+        />
+      ) : (
+        <div
+          aria-label="Loading"
+          style={{
+            width: Math.max(32, Math.floor(size * 0.4)),
+            height: Math.max(32, Math.floor(size * 0.4)),
+            borderRadius: '50%',
+            border: '4px solid #E9ECEF',
+            borderTopColor: '#0066CC',
+            animation: 'brandloader-spin 0.9s linear infinite',
+          }}
+        />
+      )}
+      <style>{`@keyframes brandloader-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
