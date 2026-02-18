@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { apiClient } from "@/lib/api-client"
 import type { TrustedDevice, LoginHistoryItem, TwoFactorSetupPayload } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { QRCodeSVG } from "qrcode.react"
 
 interface Props {
   onRefreshDevices: () => void
@@ -222,10 +223,10 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
             <div>
               <p className="text-sm mb-3">Scan this QR code in your authenticator app, or enter the code manually.</p>
               <div className="flex items-center gap-6">
-                <img
-                  alt="2FA QR"
+                <QRCodeSVG
+                  value={setupData.otpauth_uri}
                   className="w-40 h-40 border rounded"
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(setupData.otpauth_uri)}`}
+                  includeMargin
                 />
                 <div className="flex-1">
                   <div className="text-xs text-muted-foreground">Manual code</div>

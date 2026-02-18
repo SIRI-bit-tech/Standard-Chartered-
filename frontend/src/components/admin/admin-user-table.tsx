@@ -119,7 +119,7 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
                             }
                             const qs = new URLSearchParams({ admin_id: adminId })
                             await apiClient.put(`/admin/users/edit?${qs.toString()}`, {
-                              user_id: u.user_id,
+                              user_id: u.id,
                               is_active: u.status !== 'active',
                             })
                             window.location.reload()
@@ -143,7 +143,7 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
                               window.location.href = '/admin/auth/login'
                               return
                             }
-                            const qs = new URLSearchParams({ admin_id: adminId, user_id: u.user_id })
+                            const qs = new URLSearchParams({ admin_id: adminId, user_id: u.id })
                             await apiClient.delete(`/admin/users/delete?${qs.toString()}`)
                             window.location.reload()
                           } catch (err: any) {

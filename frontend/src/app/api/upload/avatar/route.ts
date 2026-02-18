@@ -1,11 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
+import { cookies } from 'next/headers'
 
-export async function POST(req: Request) {
+const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg'])
+const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
+
+export async function POST(req: Request | NextRequest) {
   try {
+    const token = cookies().get('accessToken')?.value
+    if (!token) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    
     const form = await req.formData()
     const file = form.get('file')
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ success: false, message: 'file is required' }, { status: 400 })
+    }
+    if (!ALLOWED_TYPES.has((file as File).type)) {
+      return NextResponse.json({ success: false, message: 'Invalid file type. Only PNG or JPEG allowed.' }, { status: 400 })
+    }
+    if (typeof (file as any).size === 'number' && (file as any).size > MAX_BYTES) {
+      return NextResponse.json({ success: false, message: 'File too large. Max 5 MB.' }, { status: 400 })
     }
 
     const hasKey = Boolean(process.env.UPLOADTHING_TOKEN || process.env.UPLOADTHING_SECRET || process.env.UPLOADTHING_API_KEY)

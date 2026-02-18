@@ -35,6 +35,7 @@ export default function LoginPage() {
     }
   }
 
+  // Do not use client-derived public IP for authentication or security decisions.
   const getPublicIP = async (): Promise<string | undefined> => {
     try {
       const ctrl = new AbortController()
@@ -61,7 +62,6 @@ export default function LoginPage() {
 
     try {
       const { device_id, device_name } = getDeviceInfo()
-      const publicIp = await getPublicIP()
       const response = await apiClient.post<{ success: boolean; data: any; token: any }>(
         '/api/v1/auth/login',
         {
@@ -70,7 +70,7 @@ export default function LoginPage() {
           device_id,
           device_name,
         },
-        { headers: { 'X-Show-Loader': '1', ...(publicIp ? { 'X-Client-IP': publicIp } : {}) } }
+        { headers: { 'X-Show-Loader': '1' } }
       )
 
       // If backend requires 2FA, redirect to verification flow
