@@ -31,7 +31,6 @@ export function BillPaymentForm({
   })
   const [pinOpen, setPinOpen] = useState(false)
   const [pinError, setPinError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const [dirOpen, setDirOpen] = useState(false)
 
   const selectedPayee = payees.find((p) => p.id === values.payeeId)
@@ -42,13 +41,11 @@ export function BillPaymentForm({
 
   const submitWithPin = async (pin: string) => {
     setPinError('')
-    setSubmitting(true)
     try {
       await apiClient.post('/api/v1/auth/verify-transfer-pin', { transfer_pin: pin })
     } catch (e: any) {
       const msg = e?.response?.data?.detail || 'Invalid transfer PIN'
       setPinError(msg)
-      setSubmitting(false)
       throw new Error('PIN verification failed')
     }
 
@@ -67,7 +64,6 @@ export function BillPaymentForm({
         await onSuccess()
       }
     } finally {
-      setSubmitting(false)
     }
   }
 

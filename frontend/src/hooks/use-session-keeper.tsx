@@ -70,7 +70,7 @@ export function SessionKeeper() {
       } catch {
         // ignore; api-client will handle 401 later
       }
-    }) as unknown as number
+    }, delayMs) as unknown as number
   }, [])
 
   const resetIdle = useCallback(() => {

@@ -27,7 +27,7 @@ export const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ produc
 
     // Form State
     const [formData, setFormData] = useState({
-        employment_status: 'employed',
+        employment_status: 'full_time',
         annual_income: 50000,
         employer_name: '',
         amount: Number(product.min_amount) || 0,
@@ -101,11 +101,11 @@ export const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ produc
                                                     value={formData.employment_status}
                                                     onChange={(e) => setFormData({ ...formData, employment_status: e.target.value })}
                                                 >
-                                                    <option value="employed">Full-time</option>
-                                                    <option value="employed">Part-time</option>
+                                                    <option value="full_time">Full-time</option>
+                                                    <option value="part_time">Part-time</option>
                                                     <option value="self_employed">Self-employed</option>
-                                                    <option value="employed">Contract</option>
-                                                    <option value="unemployed">Student</option>
+                                                    <option value="contract">Contract</option>
+                                                    <option value="student">Student</option>
                                                     <option value="retired">Retired</option>
                                                 </select>
                                             </div>

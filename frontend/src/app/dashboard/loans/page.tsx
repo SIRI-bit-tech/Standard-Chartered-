@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
 import { formatCurrency, formatDate, toTitleCase } from '@/lib/utils'

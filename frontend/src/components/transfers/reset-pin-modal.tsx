@@ -41,7 +41,7 @@ export function ResetPinModal({ open, onOpenChange }: ResetPinModalProps) {
     if (!email) return
     setLoading(true); setError(null); setInfo(null)
     try {
-      const res = await apiClient.post('/api/v1/auth/start-pin-reset', { email }) as { success: boolean; message: string }
+      await apiClient.post<{ success: boolean; message: string }>('/api/v1/auth/start-pin-reset', { email })
       setInfo('We sent a 6-digit code to your email')
       setStep(2)
     } catch (e: any) {
@@ -154,4 +154,3 @@ export function ResetPinModal({ open, onOpenChange }: ResetPinModalProps) {
     </Dialog>
   )
 }
-

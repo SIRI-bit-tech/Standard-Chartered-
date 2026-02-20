@@ -4,14 +4,12 @@ import React from "react"
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
 import { useLoadingStore } from '@/lib/store'
 
 export default function LoginPage() {
   // Login page - updated to use username instead of email
-  const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,21 +30,6 @@ export default function LoginPage() {
       return { device_id: id, device_name: name }
     } catch {
       return { device_id: undefined, device_name: undefined }
-    }
-  }
-
-  // Do not use client-derived public IP for authentication or security decisions.
-  const getPublicIP = async (): Promise<string | undefined> => {
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 2500)
-      const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store', signal: ctrl.signal })
-      clearTimeout(t)
-      if (!res.ok) return undefined
-      const data = await res.json()
-      return data?.ip as string | undefined
-    } catch {
-      return undefined
     }
   }
 

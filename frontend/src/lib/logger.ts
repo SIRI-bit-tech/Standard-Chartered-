@@ -33,12 +33,6 @@ class Logger {
     }
   }
 
-  private formatOutput(level: LogLevel, message: string, data?: unknown): string {
-    const timestamp = this.formatTime()
-    const prefix = `[${timestamp}] [${level.toUpperCase()}]`
-    return data ? `${prefix} ${message}` : `${prefix} ${message}`
-  }
-
   debug(message: string, data?: unknown) {
     if (!this.shouldLog()) return
     const entry: LogEntry = {

@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
-import { formatCurrency, formatDate } from '@/lib/utils'
-import { COUNTRIES, TRANSFER_FEES } from '@/constants'
+import { TRANSFER_FEES } from '@/constants'
 import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
@@ -32,7 +31,6 @@ import { HistoryTable } from '@/components/transfers/history-table'
 import { CountrySelector } from '@/components/ui/country-selector'
 import type {
   Account,
-  Transfer,
   TransferTypeTab,
   TransferSummaryState,
   InternalTransferForm,
@@ -130,7 +128,6 @@ export default function TransfersPage() {
     setSearchQuery('')  // Clear search after selection
   }
   const [accountsList, setAccountsList] = useState<Account[]>([])
-  const [transfers, setTransfers] = useState<Transfer[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(true)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [historyError, setHistoryError] = useState<string>('')
@@ -138,7 +135,7 @@ export default function TransfersPage() {
   const [historyMetrics, setHistoryMetrics] = useState<TransferHistoryMetrics | null>(null)
   const [historyPage, setHistoryPage] = useState(1)
   const [historyTotal, setHistoryTotal] = useState(0)
-  const [historyPageSize, setHistoryPageSize] = useState(10)
+  const [historyPageSize] = useState(10)
   const [filters, setFilters] = useState<HistoryFilterState>({
     q: '',
     period: '30',
@@ -380,7 +377,6 @@ export default function TransfersPage() {
           payload,
         )
         if (res.success) {
-          const receiptId = res.data?.transfer_id
           const receiptRef = res.data?.reference
           const receiptAmt = internalForm.amount
           setReceiptData({
@@ -408,7 +404,6 @@ export default function TransfersPage() {
           payload,
         )
         if (res.success) {
-          const receiptId = res.data?.transfer_id
           const receiptRef = res.data?.reference
           const receiptAmt = domesticForm.amount
           setReceiptData({
@@ -450,7 +445,6 @@ export default function TransfersPage() {
           payload,
         )
         if (res.success) {
-          const receiptId = res.data?.transfer_id
           const receiptRef = res.data?.reference
           const receiptAmt = internationalForm.amount
           setReceiptData({
@@ -489,7 +483,6 @@ export default function TransfersPage() {
           payload,
         )
         if (res.success) {
-          const receiptId = res.transfer_id
           const receiptAmt = achForm.amount
           setReceiptData({
             id: res.transfer_id,

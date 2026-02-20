@@ -48,6 +48,7 @@ async def get_payee_catalog(
     category: str | None = Query(None),
     q: str | None = Query(None),
     country: str | None = Query(None),
+    current_user_id: str = Depends(get_current_user_id),
 ):
     items = global_query_catalog(category=category, q=q, country=country)
     return {"success": True, "data": items, "message": "Biller catalog retrieved"}
@@ -165,7 +166,6 @@ async def pay_bill(
     amount: float | None = Query(None),
     payment_date: str | None = Query(None),
     reference: str | None = Query(None),
-    transfer_pin: str | None = Query(None),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
@@ -176,7 +176,7 @@ async def pay_bill(
     amount = req.amount if req and getattr(req, "amount", None) is not None else amount
     payment_date = req.payment_date if req and getattr(req, "payment_date", None) else payment_date
     reference = req.reference if req and getattr(req, "reference", None) else reference
-    transfer_pin = req.transfer_pin if req and getattr(req, "transfer_pin", None) else transfer_pin
+    transfer_pin = req.transfer_pin if req and getattr(req, "transfer_pin", None) else None
 
     if not account_id or not payee_id or amount is None or not payment_date:
         raise HTTPException(status_code=422, detail="account_id, payee_id, amount, and payment_date are required")
@@ -186,7 +186,9 @@ async def pay_bill(
         await _verify_transfer_pin(db, current_user_id, transfer_pin)
 
     # Validate account ownership and sufficient funds
-    acc_res = await db.execute(select(Account).where(Account.id == account_id))
+    acc_res = await db.execute(
+        select(Account).where(Account.id == account_id).with_for_update()
+    )
     account = acc_res.scalar_one_or_none()
     if not account or account.user_id != current_user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
@@ -367,11 +369,14 @@ async def get_scheduled_payments(
 @router.delete("/scheduled/{schedule_id}")
 async def cancel_scheduled_payment(
     schedule_id: str,
+    current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Cancel scheduled payment"""
     result = await db.execute(
-        select(ScheduledPayment).where(ScheduledPayment.id == schedule_id)
+        select(ScheduledPayment).where(
+            (ScheduledPayment.id == schedule_id) & (ScheduledPayment.user_id == current_user_id)
+        )
     )
     schedule = result.scalar()
     

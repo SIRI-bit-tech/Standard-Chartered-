@@ -3,7 +3,6 @@
 import React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { useAuthContext } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,7 +22,6 @@ const COUNTRIES = [
 ]
 
 export function RegisterForm() {
-  const router = useRouter()
   const { register } = useAuthContext()
   const [formData, setFormData] = useState({
     email: "",

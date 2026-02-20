@@ -3,7 +3,6 @@
 import React from "react"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { useAuthContext } from "@/context/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link"
 
 export function LoginForm() {
-  const router = useRouter()
   const { login } = useAuthContext()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import axios, { AxiosError } from "axios"
+import axios from "axios"
 import { API_BASE_URL, API_ENDPOINTS } from "@/constants"
 
 export interface User {

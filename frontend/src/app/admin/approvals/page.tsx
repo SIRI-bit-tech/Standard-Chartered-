@@ -41,7 +41,13 @@ function ApprovalsContent() {
 
       const res = await apiClient.get<any>(endpoint, { params: { admin_id: adminId } })
       if (res.success) {
-        setItems(res.data || res.data.items || [])
+        const payload = (res as any)?.data
+        const nextItems = Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload)
+            ? payload
+            : []
+        setItems(nextItems)
       }
     } catch (err) {
       logger.error(`Failed to fetch ${activeTab}`, { error: err })

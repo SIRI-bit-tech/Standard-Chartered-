@@ -108,6 +108,24 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
       });
       return;
     }
+    const amtStr = (formData.amount || '').toString().trim();
+    if (!amtStr) {
+      toast({
+        title: 'Error',
+        description: 'Enter the amount',
+        variant: 'destructive'
+      });
+      return;
+    }
+    const validAmount = Number(amtStr);
+    if (!Number.isFinite(validAmount) || validAmount <= 0) {
+      toast({
+        title: 'Error',
+        description: 'Enter a valid amount greater than 0',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -118,7 +136,7 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
         message: string;
       }>('/api/v1/deposits/check-deposit', {
         ...formData,
-        amount: parseFloat(formData.amount)
+        amount: validAmount
       }, {
         params: { user_id: user?.id }
       });

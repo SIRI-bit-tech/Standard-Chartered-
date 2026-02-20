@@ -4,10 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { apiClient } from '@/lib/api-client'
-import { useAuthStore } from '@/lib/store'
-import { formatCurrency } from '@/lib/utils'
 import { colors } from '@/types'
-import type { Account, Transaction, TransferHistoryItem } from '@/types'
+import type { Account, TransferHistoryItem } from '@/types'
 import { AccountBalanceCard } from '@/components/accounts/AccountBalanceCard'
 import { TransactionsTable } from '@/components/accounts/TransactionsTable'
 import { API_BASE_URL, API_ENDPOINTS } from '@/constants'
@@ -20,7 +18,6 @@ export default function AccountDetailPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [txLimit, setTxLimit] = useState(50)
-  const { user } = useAuthStore()
 
   useEffect(() => {
     loadAccountDetails()
@@ -59,9 +56,6 @@ export default function AccountDetailPage() {
       setLoadingMore(false)
     }
   }
-
-  const accountHolderName = user ? `${user.first_name} ${user.last_name}`.trim() || user.email : '—'
-  const isUS = user?.country === 'US'
 
   if (loading) {
     return (

@@ -9,7 +9,7 @@ import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, Trash2, Copy, Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency} from '@/lib/utils';
 
 interface VirtualCard {
   id: string;
@@ -56,13 +56,13 @@ export function VirtualCardList({ cards, loading, onRefresh }: VirtualCardListPr
 
   async function handleBlock(cardId: string) {
     try {
-      const response = await apiClient.post(
+      const response = await apiClient.post<{ success: boolean }>(
         `/api/v1/cards/${cardId}/block`,
         { reason: 'User initiated block' },
         { params: { user_id: user?.id } }
       );
 
-      if (response.data.success) {
+      if (response.success) {
         toast({ title: 'Card Blocked', description: 'The card has been blocked' });
         onRefresh?.();
       }
@@ -79,11 +79,11 @@ export function VirtualCardList({ cards, loading, onRefresh }: VirtualCardListPr
     if (!confirm('Are you sure you want to cancel this card?')) return;
 
     try {
-      const response = await apiClient.delete(`/api/v1/cards/${cardId}`, {
+      const response = await apiClient.delete<{ success: boolean }>(`/api/v1/cards/${cardId}`, {
         params: { user_id: user?.id }
       });
 
-      if (response.data.success) {
+      if (response.success) {
         toast({ title: 'Card Cancelled', description: 'The card has been cancelled' });
         onRefresh?.();
       }

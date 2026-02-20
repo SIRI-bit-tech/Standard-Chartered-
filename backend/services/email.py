@@ -381,7 +381,7 @@ class EmailService:
                 message = f"""
                     <p>We have reviewed your loan application for <strong>{formatted_amount}</strong>.</p>
                     <p>Regrettably, we are unable to approve your application at this time.</p>
-                    {f"<p><strong>Reason:</strong> {reason}</p>" if reason else ""}
+                    {f"<p><strong>Reason:</strong> {escape(reason)}</p>" if reason else ""}
                     <p>If you have any questions, our support team is available to help.</p>
                 """
                 
