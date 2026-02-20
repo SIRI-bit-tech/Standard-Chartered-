@@ -6,10 +6,19 @@ function isUserWithEmail(user: unknown): user is { email: string } {
   return !!user && typeof (user as any).email === "string" && (user as any).email.length > 0
 }
 
+const AUTH_SECRET = process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET
+if (!AUTH_SECRET) {
+  throw new Error("Missing auth secret: set BETTER_AUTH_SECRET or AUTH_SECRET")
+}
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) {
+  throw new Error("Missing JWT secret: set JWT_SECRET")
+}
+
 export const auth = betterAuth({
   baseURL: process.env.NEXT_PUBLIC_FRONTEND_URL || process.env.BETTER_AUTH_URL || "http://localhost:3000",
   basePath: "/api/auth",
-  secret: (process.env.BETTER_AUTH_SECRET || process.env.AUTH_SECRET)!,
+  secret: AUTH_SECRET,
 
   // Database configuration - use your own database
   database: {
@@ -65,7 +74,7 @@ export const auth = betterAuth({
       }
     }
     const msg =
-      `Failed to send verification email to ${payload.email} via ${endpoints.join(", ")}: ` +
+      `Failed to send verification email to [redacted email] via ${endpoints.join(", ")}: ` +
       (lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error"))
     throw new Error(msg)
   },
@@ -90,7 +99,7 @@ export const auth = betterAuth({
       }
     }
     const msg =
-      `Failed to send password reset email to ${payload.email} via ${endpoints.join(", ")}: ` +
+      `Failed to send password reset email to [redacted email] via ${endpoints.join(", ")}: ` +
       (lastError instanceof Error ? lastError.message : String(lastError ?? "unknown error"))
     throw new Error(msg)
   },
@@ -98,6 +107,6 @@ export const auth = betterAuth({
   // JWT configuration
   jwt: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
-    secret: process.env.JWT_SECRET!,
+    secret: JWT_SECRET,
   },
 })

@@ -30,7 +30,7 @@ function CommandListImpl({ className, ...props }: ListProps) {
 type EmptyProps = React.HTMLAttributes<HTMLDivElement> & {
   isEmpty?: boolean
 }
-function CommandEmptyImpl({ className, isEmpty, ...props }: EmptyProps) {
+function CommandEmptyImpl({ className, isEmpty = true, ...props }: EmptyProps) {
   if (!isEmpty) return null
   return <div className={className} {...props} />
 }

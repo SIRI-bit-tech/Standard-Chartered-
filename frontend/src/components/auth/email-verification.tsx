@@ -20,7 +20,7 @@ export function EmailVerification() {
   const [email, setEmail] = useState<string>("")
 
   useEffect(() => {
-    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+    if (typeof window !== "undefined") {
       try {
         const stored = localStorage.getItem("pendingEmailVerification") || ""
         setEmail(stored)
@@ -47,7 +47,12 @@ export function EmailVerification() {
 
       if (response.data.success) {
         setSuccess(true)
-        localStorage.removeItem("pendingEmailVerification")
+        try {
+          localStorage.removeItem("pendingEmailVerification")
+        } catch {
+          // ignore storage errors
+        }
+        setEmail("")
         setTimeout(() => {
           router.push("/dashboard")
         }, 2000)

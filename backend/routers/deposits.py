@@ -96,114 +96,35 @@ async def _fetch_https_via_ip(host: str, port: int, target: str, ips: List[str])
     if not ips:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid IP for image host")
     ip = ips[0]
-    context = ssl.create_default_context()
+    url = f"https://{ip}:{port}{target}"
+    max_bytes = 10 * 1024 * 1024  # 10 MB
+    ssl_context = ssl.create_default_context()
+    transport = httpx.AsyncHTTPTransport(verify=ssl_context)
+    timeout = httpx.Timeout(10.0)
     try:
-        reader, writer = await asyncio.open_connection(ip, port, ssl=context, server_hostname=host)
-        host_header = f"{host}:{port}" if port != 443 else host
-        request = (
-            f"GET {target} HTTP/1.1\r\n"
-            f"Host: {host_header}\r\n"
-            "User-Agent: standard-chartered-backend/1.0\r\n"
-            "Accept: */*\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-        ).encode("ascii")
-        writer.write(request)
-        await writer.drain()
-
-        # Read response headers
-        header_bytes = b""
-        while b"\r\n\r\n" not in header_bytes:
-            chunk = await reader.read(4096)
-            if not chunk:
-                break
-            header_bytes += chunk
-            if len(header_bytes) > 65536:  # 64KB header guard
-                break
-        parts = header_bytes.split(b"\r\n\r\n", 1)
-        if len(parts) != 2:
-            writer.close()
-            try:
-                await writer.wait_closed()
-            finally:
-                pass
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid HTTP response")
-        header_block, remainder = parts
-        lines = header_block.split(b"\r\n")
-        if not lines:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid HTTP response")
-        status_line = lines[0].decode("iso-8859-1", "ignore")
-        try:
-            status_code = int(status_line.split(" ")[1])
-        except Exception:
-            status_code = 0
-        headers = {}
-        for line in lines[1:]:
-            if b":" in line:
-                k, v = line.split(b":", 1)
-                headers[k.decode("iso-8859-1").strip().lower()] = v.decode("iso-8859-1").strip()
-        if status_code < 200 or status_code >= 300:
-            writer.close()
-            try:
-                await writer.wait_closed()
-            finally:
-                pass
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Image fetch failed: {status_code}")
-
-        body = bytearray()
-        te = headers.get("transfer-encoding", "").lower()
-        cl = headers.get("content-length")
-        body.extend(remainder)
-        if "chunked" in te:
-            # Read chunked encoding
-            while True:
-                # read chunk size line
-                line = await reader.readline()
-                if not line:
-                    break
-                line = line.strip()
+        async with httpx.AsyncClient(transport=transport, timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(
+                url,
+                headers={"Host": host, "User-Agent": "standard-chartered-backend/1.0", "Accept": "*/*"},
+                extensions={"sni_hostname": host},
+            )
+            resp.raise_for_status()
+            cl = resp.headers.get("content-length")
+            if cl is not None:
                 try:
-                    size = int(line.split(b";", 1)[0], 16)
-                except Exception:
-                    size = 0
-                if size == 0:
-                    # Read trailing CRLF
-                    await reader.readexactly(2)
-                    break
-                data = await reader.readexactly(size)
-                body.extend(data)
-                # read CRLF after chunk
-                await reader.readexactly(2)
-        elif cl is not None:
-            try:
-                expected = int(cl)
-            except Exception:
-                expected = None
-            if expected is not None:
-                remaining = max(0, expected - len(remainder))
-                if remaining:
-                    body.extend(await reader.readexactly(remaining))
-            else:
-                while True:
-                    data = await reader.read(65536)
-                    if not data:
-                        break
-                    body.extend(data)
-        else:
-            while True:
-                data = await reader.read(65536)
-                if not data:
-                    break
-                body.extend(data)
-        writer.close()
-        try:
-            await writer.wait_closed()
-        finally:
-            pass
-        return bytes(body)
-    except HTTPException:
-        raise
-    except Exception as e:
+                    if int(cl) > max_bytes:
+                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+                except ValueError:
+                    pass
+            content = resp.content
+            if len(content) > max_bytes:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+            return content
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image fetch timed out")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Image fetch failed: {e.response.status_code}")
+    except httpx.RequestError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch image: {str(e)}")
 
 

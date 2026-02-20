@@ -42,6 +42,15 @@ function Calendar({ className, value, onChange }: CalendarProps) {
           onChange?.(undefined)
           return
         }
+        if (m < 1 || m > 12) {
+          onChange?.(undefined)
+          return
+        }
+        const maxD = new Date(y, m, 0).getDate()
+        if (d < 1 || d > maxD) {
+          onChange?.(undefined)
+          return
+        }
         onChange?.(new Date(y, m - 1, d))
       }}
     />
