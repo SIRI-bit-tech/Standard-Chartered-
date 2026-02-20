@@ -27,14 +27,17 @@ function CommandListImpl({ className, ...props }: ListProps) {
   return <div role="listbox" className={className} {...props} />
 }
 
-type EmptyProps = React.HTMLAttributes<HTMLDivElement>
-function CommandEmptyImpl({ className, ...props }: EmptyProps) {
+type EmptyProps = React.HTMLAttributes<HTMLDivElement> & {
+  isEmpty?: boolean
+}
+function CommandEmptyImpl({ className, isEmpty, ...props }: EmptyProps) {
+  if (!isEmpty) return null
   return <div className={className} {...props} />
 }
 
 type GroupProps = React.HTMLAttributes<HTMLDivElement>
 function CommandGroupImpl({ className, ...props }: GroupProps) {
-  return <div className={className} {...props} />
+  return <div {...props} role="group" className={className} />
 }
 
 type SeparatorProps = React.HTMLAttributes<HTMLDivElement>

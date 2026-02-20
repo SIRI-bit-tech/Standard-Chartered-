@@ -1970,13 +1970,19 @@ async def approve_loan(
         prod_result = await db.execute(select(LoanProduct).where(LoanProduct.id == app.product_id))
         product = prod_result.scalar()
 
-        # Update application
-        app.status = LoanApplicationStatus.APPROVED
-        app.approved_amount = request.approved_amount or app.requested_amount
         if not product:
             raise NotFoundError(resource="LoanProduct", error_code="LOAN_PRODUCT_NOT_FOUND")
+        app.status = LoanApplicationStatus.APPROVED
+        app.approved_amount = request.approved_amount or app.requested_amount
         app.approved_interest_rate = request.interest_rate if request.interest_rate is not None else (product.base_interest_rate or 0.0)
-        app.approved_term_months = request.term_months or app.requested_term_months
+        n = request.term_months if request.term_months is not None else app.requested_term_months
+        try:
+            n = int(n) if n is not None else 1
+        except Exception:
+            n = 1
+        if n <= 0:
+            n = 1
+        app.approved_term_months = n
         app.approved_at = datetime.utcnow()
         app.reviewed_at = datetime.utcnow()
         
