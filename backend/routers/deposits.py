@@ -127,7 +127,7 @@ async def _fetch_https_via_ip(host: str, port: int, target: str, ips: List[str])
                     try:
                         resp.raise_for_status()
                     except httpx.HTTPStatusError as e:
-                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Image fetch failed: {e.response.status_code}")
+                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Image fetch failed: {e.response.status_code}") from None
                     cl = resp.headers.get("content-length")
                     if cl is not None:
                         try:
@@ -144,7 +144,7 @@ async def _fetch_https_via_ip(host: str, port: int, target: str, ips: List[str])
     except httpx.TimeoutException:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image fetch timed out") from None
     except httpx.RequestError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch image: {str(e)}") from None
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch image: {e!s}") from None
 
 
 @router.post("/parse-check", response_model=CheckParseResponse)
