@@ -20,7 +20,7 @@ import httpx
 import asyncio
 from utils.ocr import extract_check_details, ocr_status, extract_check_details_remote
 from config import settings
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 import socket
 import ipaddress
 import ssl
@@ -95,37 +95,56 @@ async def _validate_public_https_url(u: str) -> Tuple[str, int, str, List[str]]:
 async def _fetch_https_via_ip(host: str, port: int, target: str, ips: List[str]) -> bytes:
     if not ips:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid IP for image host")
-    ip = ips[0]
-    url = f"https://{ip}:{port}{target}"
     max_bytes = 10 * 1024 * 1024  # 10 MB
     ssl_context = ssl.create_default_context()
     transport = httpx.AsyncHTTPTransport(verify=ssl_context)
     timeout = httpx.Timeout(10.0)
+    redirects_remaining = 3
     try:
-        async with httpx.AsyncClient(transport=transport, timeout=timeout, follow_redirects=True) as client:
-            resp = await client.get(
-                url,
-                headers={"Host": host, "User-Agent": "standard-chartered-backend/1.0", "Accept": "*/*"},
-                extensions={"sni_hostname": host},
-            )
-            resp.raise_for_status()
-            cl = resp.headers.get("content-length")
-            if cl is not None:
-                try:
-                    if int(cl) > max_bytes:
-                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
-                except ValueError:
-                    pass
-            content = resp.content
-            if len(content) > max_bytes:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
-            return content
+        async with httpx.AsyncClient(transport=transport, timeout=timeout, follow_redirects=False) as client:
+            current_host, current_port, current_target, current_ips = host, port, target, ips
+            while True:
+                ip = current_ips[0]
+                url = f"https://{ip}:{current_port}{current_target}"
+                async with client.stream(
+                    "GET",
+                    url,
+                    headers={"Host": current_host, "User-Agent": "standard-chartered-backend/1.0", "Accept": "*/*"},
+                    extensions={"sni_hostname": current_host},
+                ) as resp:
+                    if 300 <= resp.status_code < 400:
+                        location = resp.headers.get("location")
+                        if not location:
+                            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect missing Location header")
+                        base_for_join = f"https://{current_host}:{current_port}{current_target}"
+                        next_url = urljoin(base_for_join, location)
+                        if redirects_remaining <= 0:
+                            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many redirects")
+                        redirects_remaining -= 1
+                        nhost, nport, ntarget, nips = await _validate_public_https_url(next_url)
+                        current_host, current_port, current_target, current_ips = nhost, nport, ntarget, nips
+                        continue
+                    try:
+                        resp.raise_for_status()
+                    except httpx.HTTPStatusError as e:
+                        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Image fetch failed: {e.response.status_code}")
+                    cl = resp.headers.get("content-length")
+                    if cl is not None:
+                        try:
+                            if int(cl) > max_bytes:
+                                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+                        except ValueError:
+                            pass
+                    buf = bytearray()
+                    async for chunk in resp.aiter_bytes():
+                        buf.extend(chunk)
+                        if len(buf) > max_bytes:
+                            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+                    return bytes(buf)
     except httpx.TimeoutException:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image fetch timed out")
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Image fetch failed: {e.response.status_code}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image fetch timed out") from None
     except httpx.RequestError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch image: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch image: {str(e)}") from None
 
 
 @router.post("/parse-check", response_model=CheckParseResponse)
