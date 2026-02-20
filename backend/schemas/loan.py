@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -39,7 +39,7 @@ class LoanApplicationRequest(BaseModel):
     annual_income: Optional[float] = Field(None, gt=0)
     employer_name: Optional[str] = Field(None, max_length=100)
 
-    @validator("employment_status", pre=True)
+    @field_validator("employment_status", mode="before")
     def normalize_employment_status(cls, v):
         if v is None:
             return v

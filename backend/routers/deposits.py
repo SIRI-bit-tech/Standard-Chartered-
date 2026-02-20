@@ -23,6 +23,8 @@ from config import settings
 from urllib.parse import urlparse
 import socket
 import ipaddress
+import ssl
+from typing import List, Tuple
 
 router = APIRouter(tags=["deposits"])
 
@@ -37,9 +39,11 @@ async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
 
 def _is_host_allowed(host: str) -> bool:
     allowlist = getattr(settings, "TRUSTED_STORAGE_DOMAINS", "")
-    if not allowlist:
-        return True
     entries = [e.strip().lower() for e in allowlist.split(",") if e and e.strip()]
+    if not entries:
+        return False
+    if any(e in ("*", "all") for e in entries):
+        return True
     h = (host or "").lower()
     for e in entries:
         if e.startswith("*."):
@@ -51,7 +55,7 @@ def _is_host_allowed(host: str) -> bool:
     return False
 
 
-def _validate_public_https_url(u: str) -> None:
+async def _validate_public_https_url(u: str) -> Tuple[str, int, str, List[str]]:
     try:
         p = urlparse(u)
     except Exception:
@@ -61,9 +65,10 @@ def _validate_public_https_url(u: str) -> None:
     if not _is_host_allowed(p.hostname):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Untrusted image host")
     try:
-        infos = socket.getaddrinfo(p.hostname, None)
+        infos = await asyncio.to_thread(socket.getaddrinfo, p.hostname, None)
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not resolve image host")
+    ips: List[str] = []
     for info in infos:
         ip_str = info[4][0]
         try:
@@ -79,6 +84,127 @@ def _validate_public_https_url(u: str) -> None:
             ip.is_unspecified,
         ]):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed image host address")
+        ips.append(ip_str)
+    target = p.path or "/"
+    if p.query:
+        target = f"{target}?{p.query}"
+    port = p.port or 443
+    return p.hostname, port, target, sorted(set(ips))
+
+
+async def _fetch_https_via_ip(host: str, port: int, target: str, ips: List[str]) -> bytes:
+    if not ips:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid IP for image host")
+    ip = ips[0]
+    context = ssl.create_default_context()
+    try:
+        reader, writer = await asyncio.open_connection(ip, port, ssl=context, server_hostname=host)
+        host_header = f"{host}:{port}" if port != 443 else host
+        request = (
+            f"GET {target} HTTP/1.1\r\n"
+            f"Host: {host_header}\r\n"
+            "User-Agent: standard-chartered-backend/1.0\r\n"
+            "Accept: */*\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        ).encode("ascii")
+        writer.write(request)
+        await writer.drain()
+
+        # Read response headers
+        header_bytes = b""
+        while b"\r\n\r\n" not in header_bytes:
+            chunk = await reader.read(4096)
+            if not chunk:
+                break
+            header_bytes += chunk
+            if len(header_bytes) > 65536:  # 64KB header guard
+                break
+        parts = header_bytes.split(b"\r\n\r\n", 1)
+        if len(parts) != 2:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            finally:
+                pass
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid HTTP response")
+        header_block, remainder = parts
+        lines = header_block.split(b"\r\n")
+        if not lines:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid HTTP response")
+        status_line = lines[0].decode("iso-8859-1", "ignore")
+        try:
+            status_code = int(status_line.split(" ")[1])
+        except Exception:
+            status_code = 0
+        headers = {}
+        for line in lines[1:]:
+            if b":" in line:
+                k, v = line.split(b":", 1)
+                headers[k.decode("iso-8859-1").strip().lower()] = v.decode("iso-8859-1").strip()
+        if status_code < 200 or status_code >= 300:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            finally:
+                pass
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Image fetch failed: {status_code}")
+
+        body = bytearray()
+        te = headers.get("transfer-encoding", "").lower()
+        cl = headers.get("content-length")
+        body.extend(remainder)
+        if "chunked" in te:
+            # Read chunked encoding
+            while True:
+                # read chunk size line
+                line = await reader.readline()
+                if not line:
+                    break
+                line = line.strip()
+                try:
+                    size = int(line.split(b";", 1)[0], 16)
+                except Exception:
+                    size = 0
+                if size == 0:
+                    # Read trailing CRLF
+                    await reader.readexactly(2)
+                    break
+                data = await reader.readexactly(size)
+                body.extend(data)
+                # read CRLF after chunk
+                await reader.readexactly(2)
+        elif cl is not None:
+            try:
+                expected = int(cl)
+            except Exception:
+                expected = None
+            if expected is not None:
+                remaining = max(0, expected - len(remainder))
+                if remaining:
+                    body.extend(await reader.readexactly(remaining))
+            else:
+                while True:
+                    data = await reader.read(65536)
+                    if not data:
+                        break
+                    body.extend(data)
+        else:
+            while True:
+                data = await reader.read(65536)
+                if not data:
+                    break
+                body.extend(data)
+        writer.close()
+        try:
+            await writer.wait_closed()
+        finally:
+            pass
+        return bytes(body)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch image: {str(e)}")
 
 
 @router.post("/parse-check", response_model=CheckParseResponse)
@@ -87,16 +213,12 @@ async def parse_check_image(
     current_user_id: str = Depends(get_current_user_id),
 ):
     try:
-        _validate_public_https_url(request.front_image_url)
+        host, port, target, ips = await _validate_public_https_url(request.front_image_url)
         provider = (settings.OCR_PROVIDER or "").strip().lower()
         if provider:
             result = await extract_check_details_remote(request.front_image_url)
         else:
-            async with httpx.AsyncClient(timeout=20) as client:
-                resp = await client.get(request.front_image_url)
-                if resp.status_code != 200:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not fetch image")
-                content = resp.content
+            content = await _fetch_https_via_ip(host, port, target, ips)
             result = await asyncio.to_thread(extract_check_details, content)
         if not result.get("supported"):
             detail = result.get("error") or "OCR not configured"

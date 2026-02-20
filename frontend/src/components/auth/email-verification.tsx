@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import axios from "axios"
 import { Button } from "@/components/ui/button"
@@ -17,7 +17,18 @@ export function EmailVerification() {
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
-  const email = localStorage.getItem("pendingEmailVerification") || ""
+  const [email, setEmail] = useState<string>("")
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+      try {
+        const stored = localStorage.getItem("pendingEmailVerification") || ""
+        setEmail(stored)
+      } catch {
+        setEmail("")
+      }
+    }
+  }, [])
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
