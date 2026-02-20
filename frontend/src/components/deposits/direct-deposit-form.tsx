@@ -33,13 +33,13 @@ export function DirectDepositForm({ onSuccess }: DirectDepositFormProps) {
     setLoading(true);
 
     try {
-      const response = await apiClient.post(
+      const response = await apiClient.post<{ success: boolean }>(
         '/api/v1/deposits/direct-deposit/setup',
         formData,
         { params: { user_id: user?.id } }
       );
 
-      if (response.data.success) {
+      if (response.success) {
         toast({
           title: 'Direct Deposit Setup Complete',
           description: 'You can now receive employer payments'

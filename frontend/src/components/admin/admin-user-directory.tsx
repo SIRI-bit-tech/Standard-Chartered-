@@ -23,12 +23,6 @@ interface AdminUserDirectoryProps {
   onAddUser: () => void
 }
 
-function statusBadge(status: AdminUserRow['status']) {
-  if (status === 'active') return { bg: `${colors.success}20`, fg: colors.success, label: 'Active' }
-  if (status === 'suspended') return { bg: `${colors.error}20`, fg: colors.error, label: 'Suspended' }
-  return { bg: `${colors.gray300}55`, fg: colors.textSecondary, label: 'Inactive' }
-}
-
 export function AdminUserDirectory({
   items,
   filters,

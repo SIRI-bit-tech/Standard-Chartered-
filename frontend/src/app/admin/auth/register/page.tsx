@@ -66,7 +66,9 @@ export default function AdminRegisterPage() {
         return
       }
 
-      const response = await apiClient.post('/admin/auth/register', {
+      const response = await apiClient.post<{ success: boolean; message?: string }>(
+        '/admin/auth/register',
+        {
         email: formData.email,
         username: formData.username,
         first_name: formData.first_name,
@@ -74,9 +76,10 @@ export default function AdminRegisterPage() {
         password: formData.password,
         admin_code: formData.admin_code,
         department: formData.department || null
-      })
+        }
+      )
 
-      if (response.data.success) {
+      if (response.success) {
         setSuccess(true)
         logger.debug('Admin registered successfully')
         setTimeout(() => {

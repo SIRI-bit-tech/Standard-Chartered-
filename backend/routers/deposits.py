@@ -20,6 +20,9 @@ import httpx
 import asyncio
 from utils.ocr import extract_check_details, ocr_status, extract_check_details_remote
 from config import settings
+from urllib.parse import urlparse
+import socket
+import ipaddress
 
 router = APIRouter(tags=["deposits"])
 
@@ -32,12 +35,59 @@ async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
 
 
+def _is_host_allowed(host: str) -> bool:
+    allowlist = getattr(settings, "TRUSTED_STORAGE_DOMAINS", "")
+    if not allowlist:
+        return True
+    entries = [e.strip().lower() for e in allowlist.split(",") if e and e.strip()]
+    h = (host or "").lower()
+    for e in entries:
+        if e.startswith("*."):
+            suf = e[1:]
+            if h.endswith(suf) or h == e[2:]:
+                return True
+        elif h == e or h.endswith("." + e):
+            return True
+    return False
+
+
+def _validate_public_https_url(u: str) -> None:
+    try:
+        p = urlparse(u)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image URL")
+    if p.scheme != "https" or not p.hostname:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image URL")
+    if not _is_host_allowed(p.hostname):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Untrusted image host")
+    try:
+        infos = socket.getaddrinfo(p.hostname, None)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not resolve image host")
+    for info in infos:
+        ip_str = info[4][0]
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image host address")
+        if any([
+            ip.is_private,
+            ip.is_loopback,
+            ip.is_link_local,
+            ip.is_multicast,
+            ip.is_reserved,
+            ip.is_unspecified,
+        ]):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed image host address")
+
+
 @router.post("/parse-check", response_model=CheckParseResponse)
 async def parse_check_image(
     request: CheckParseRequest,
     current_user_id: str = Depends(get_current_user_id),
 ):
     try:
+        _validate_public_https_url(request.front_image_url)
         provider = (settings.OCR_PROVIDER or "").strip().lower()
         if provider:
             result = await extract_check_details_remote(request.front_image_url)

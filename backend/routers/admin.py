@@ -29,7 +29,7 @@ from schemas.admin import (
 from pydantic import ValidationError as PydanticValidationError
 from utils.admin_auth import AdminAuthManager, AdminPermissionManager, get_current_admin
 from utils.errors import (
-    ValidationError, AuthenticationError, NotFoundError, UnauthorizedError, InternalServerError
+    ValidationError, AuthenticationError, NotFoundError, UnauthorizedError, InternalServerError, ConflictError
 )
 from utils.logger import logger
 from utils.ably import AblyRealtimeManager, get_admin_ably_token_request
@@ -1619,6 +1619,11 @@ async def approve_deposit(
                 resource="Deposit",
                 error_code="DEPOSIT_NOT_FOUND"
             )
+        allowed_statuses = {DepositStatus.PENDING, DepositStatus.PROCESSING, DepositStatus.VERIFIED}
+        if deposit.status not in allowed_statuses:
+            if deposit.status == DepositStatus.COMPLETED:
+                raise ConflictError(message="Deposit already completed", error_code="DEPOSIT_ALREADY_COMPLETED")
+            raise ValidationError(message="Deposit not in approvable state", error_code="DEPOSIT_NOT_APPROVABLE")
         acc_result = await db.execute(select(Account).where(Account.id == deposit.account_id))
         account = acc_result.scalar()
         if not account:
@@ -1968,15 +1973,20 @@ async def approve_loan(
         # Update application
         app.status = LoanApplicationStatus.APPROVED
         app.approved_amount = request.approved_amount or app.requested_amount
-        app.approved_interest_rate = request.interest_rate or product.base_interest_rate
+        if not product:
+            raise NotFoundError(resource="LoanProduct", error_code="LOAN_PRODUCT_NOT_FOUND")
+        app.approved_interest_rate = request.interest_rate if request.interest_rate is not None else (product.base_interest_rate or 0.0)
         app.approved_term_months = request.term_months or app.requested_term_months
         app.approved_at = datetime.utcnow()
         app.reviewed_at = datetime.utcnow()
         
         # Calculate monthly payment (simple amortization)
-        rate = app.approved_interest_rate / 12 / 100
+        rate = (app.approved_interest_rate or 0.0) / 12 / 100
         n = app.approved_term_months
-        app.monthly_payment = (app.approved_amount * rate) / (1 - (1 + rate)**-n)
+        if rate == 0:
+            app.monthly_payment = app.approved_amount / max(1, n)
+        else:
+            app.monthly_payment = (app.approved_amount * rate) / (1 - (1 + rate)**-n)
 
         # Create Active Loan
         new_loan = Loan(
@@ -2757,58 +2767,13 @@ async def get_all_loan_applications(
                 for a in applications
             ]
         }
+    except UnauthorizedError:
+        raise
     except Exception as e:
         logger.error("Failed to fetch loan applications", error=e)
         raise InternalServerError(operation="fetch loan apps", error_code="FETCH_FAILED", original_error=e)
 
-@router.get("/realtime/token")
-async def get_admin_realtime_token(
-    admin_id: str = Query(...),
-    db: AsyncSession = Depends(get_db)
-):
-    """Generate Ably token request for admin connections"""
-    try:
-        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
-        admin = admin_result.scalar()
-        if not admin:
-             raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
-             
-        from utils.ably import get_admin_ably_token_request
-        token_request = await get_admin_ably_token_request(admin.id)
-        if token_request is None:
-            raise HTTPException(status_code=500, detail="Real-time service unavailable")
-        return token_request
-    except (UnauthorizedError, HTTPException):
-        raise
-    except Exception as e:
-        logger.error("Failed to generate admin realtime token", error=e)
-        raise InternalServerError(operation="gen admin token", error_code="TOKEN_GEN_FAILED", original_error=e)
-
-@router.get("/system/settings")
-async def get_system_settings(
-    admin_id: str = Query(...),
-    db: AsyncSession = Depends(get_db)
-):
-    """Get system-wide settings for admin dashboard"""
-    try:
-        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
-        admin = admin_result.scalar()
-        if not admin:
-             raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
-             
-        return {
-            "success": True,
-            "data": {
-                "real_time_enabled": True,
-                "notifications_enabled": True,
-                "maintenance_mode": False
-            }
-        }
-    except UnauthorizedError:
-        raise
-    except Exception as e:
-        logger.error("Failed to fetch system settings", error=e)
-        raise InternalServerError(operation="fetch settings", error_code="FETCH_FAILED", original_error=e)
+ 
 
 @router.post("/loans/products")
 async def create_loan_product(

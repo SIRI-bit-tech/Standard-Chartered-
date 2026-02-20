@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { Command as CommandPrimitive } from 'cmdk'
 import { SearchIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -12,6 +11,50 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+
+type RootProps = React.HTMLAttributes<HTMLDivElement>
+function CommandRoot({ className, ...props }: RootProps) {
+  return <div className={className} {...props} />
+}
+
+type InputProps = React.InputHTMLAttributes<HTMLInputElement>
+function CommandInputImpl({ className, ...props }: InputProps) {
+  return <input className={className} {...props} />
+}
+
+type ListProps = React.HTMLAttributes<HTMLDivElement>
+function CommandListImpl({ className, ...props }: ListProps) {
+  return <div role="listbox" className={className} {...props} />
+}
+
+type EmptyProps = React.HTMLAttributes<HTMLDivElement>
+function CommandEmptyImpl({ className, ...props }: EmptyProps) {
+  return <div className={className} {...props} />
+}
+
+type GroupProps = React.HTMLAttributes<HTMLDivElement>
+function CommandGroupImpl({ className, ...props }: GroupProps) {
+  return <div className={className} {...props} />
+}
+
+type SeparatorProps = React.HTMLAttributes<HTMLDivElement>
+function CommandSeparatorImpl({ className, ...props }: SeparatorProps) {
+  return <div role="separator" className={className} {...props} />
+}
+
+type ItemProps = React.HTMLAttributes<HTMLDivElement>
+function CommandItemImpl({ className, ...props }: ItemProps) {
+  return <div role="option" className={className} {...props} />
+}
+
+const CommandPrimitive = Object.assign(CommandRoot, {
+  Input: CommandInputImpl,
+  List: CommandListImpl,
+  Empty: CommandEmptyImpl,
+  Group: CommandGroupImpl,
+  Separator: CommandSeparatorImpl,
+  Item: CommandItemImpl,
+})
 
 function Command({
   className,

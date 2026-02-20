@@ -54,7 +54,7 @@ export function TransactionsTable({ items = [], historyItems = [], onLoadMore, c
   const filtered = useMemo(() => {
     if (isUsingHistory) return []
     return items.filter((t) => {
-      if (typeFilter !== 'all' && typeFilter !== 'debit' && typeFilter !== 'credit' && t.type !== typeFilter) return false
+      if (typeFilter !== 'all' && t.type !== typeFilter) return false
       if (periodFilter === '30') {
         const d = new Date(t.created_at)
         const cutoff = new Date()

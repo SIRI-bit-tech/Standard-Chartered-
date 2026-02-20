@@ -1,6 +1,6 @@
 import { colors, type TransferReceipt } from '@/types'
 import { Button } from '@/components/ui/button'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 
 interface Props {
@@ -44,18 +44,6 @@ export function ReceiptModal({ open, onClose, data }: Props) {
   }
 
   if (!open) return null
-
-  const shareLink = data.id ? `${window.location.origin}/dashboard/transfers/receipt/${data.id}` : null
-
-  const copyShareLink = async () => {
-    if (!shareLink) return
-    try {
-      await navigator.clipboard.writeText(shareLink)
-      alert('Share link copied to clipboard')
-    } catch {
-      alert(shareLink)
-    }
-  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">

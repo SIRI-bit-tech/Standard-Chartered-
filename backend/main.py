@@ -220,6 +220,60 @@ async def lifespan(app: FastAPI):
                     except Exception: pass
             except Exception: pass
             
+            # Deposit enum and data migration (ensure uppercase values)
+            try:
+                await conn.execute(text("COMMIT"))
+                # Ensure enum labels exist (PostgreSQL) - add both cases defensively
+                for val in ['PENDING','PROCESSING','VERIFIED','COMPLETED','FAILED','REJECTED','CANCELLED',
+                            'pending','processing','verified','completed','failed','rejected','cancelled']:
+                    try:
+                        await conn.execute(text(f"ALTER TYPE depositstatus ADD VALUE IF NOT EXISTS '{val}'"))
+                    except Exception:
+                        pass
+                for val in ['CHECK_DEPOSIT','DIRECT_DEPOSIT','MOBILE_CHECK_DEPOSIT',
+                            'check_deposit','direct_deposit','mobile_check_deposit']:
+                    try:
+                        await conn.execute(text(f"ALTER TYPE deposittype ADD VALUE IF NOT EXISTS '{val}'"))
+                    except Exception:
+                        pass
+                # Update existing rows to uppercase (works for enum via direct value change)
+                status_map = {
+                    'pending': 'PENDING',
+                    'processing': 'PROCESSING',
+                    'verified': 'VERIFIED',
+                    'completed': 'COMPLETED',
+                    'failed': 'FAILED',
+                    'rejected': 'REJECTED',
+                    'cancelled': 'CANCELLED',
+                }
+                for old, new in status_map.items():
+                    try:
+                        await conn.execute(text(f"UPDATE deposits SET status = '{new}' WHERE status = '{old}'"))
+                    except Exception:
+                        # Fallback for non-enum/text columns
+                        try:
+                            await conn.execute(text("UPDATE deposits SET status = UPPER(status)"))
+                            break
+                        except Exception:
+                            pass
+                type_map = {
+                    'check_deposit': 'CHECK_DEPOSIT',
+                    'direct_deposit': 'DIRECT_DEPOSIT',
+                    'mobile_check_deposit': 'MOBILE_CHECK_DEPOSIT',
+                }
+                for old, new in type_map.items():
+                    try:
+                        await conn.execute(text(f"UPDATE deposits SET type = '{new}' WHERE type = '{old}'"))
+                    except Exception:
+                        try:
+                            await conn.execute(text("UPDATE deposits SET type = UPPER(type)"))
+                            break
+                        except Exception:
+                            pass
+            except Exception:
+                # Best effort; do not fail startup
+                pass
+            
             print("Database migrations completed successfully!")
             
             # Seed default loan products if none exist

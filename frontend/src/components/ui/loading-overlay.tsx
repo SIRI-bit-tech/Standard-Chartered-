@@ -16,7 +16,6 @@ export function BrandLoader({ size = 160 }: { size?: number }) {
 export function LoadingOverlay() {
   const { isLoading } = useLoadingStore()
   const [visible, setVisible] = useState(false)
-  const [mountAnim, setMountAnim] = useState(false)
   const startedAtRef = useRef<number | null>(null)
   const hideTimerRef = useRef<number | null>(null)
   const MIN_VISIBLE_MS = 8000
@@ -32,14 +31,12 @@ export function LoadingOverlay() {
   useEffect(() => {
     if (isLoading) {
       setVisible(true)
-      setMountAnim(true)
       startedAtRef.current = Date.now()
     } else {
       const now = Date.now()
       const started = startedAtRef.current ?? now
       const elapsed = now - started
       const remain = Math.max(0, MIN_VISIBLE_MS - elapsed)
-      setMountAnim(false)
       if (hideTimerRef.current) {
         window.clearTimeout(hideTimerRef.current)
       }

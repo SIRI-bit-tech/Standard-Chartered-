@@ -9,7 +9,6 @@ export function useUserRealtime(channelName: string, onUpdate: (payload: any) =>
     const channelRef = useRef<Ably.Types.RealtimeChannelCallbacks | null>(null)
 
     useEffect(() => {
-        let cancelled = false
         const token = typeof window !== 'undefined' ? (localStorage.getItem('access_token') || localStorage.getItem('accessToken')) : null
         if (!token || !channelName) return
         if (typeof window !== 'undefined' && sessionStorage.getItem('realtimeDisabled') === '1') return
@@ -55,7 +54,6 @@ export function useUserRealtime(channelName: string, onUpdate: (payload: any) =>
         connect()
 
         return () => {
-            cancelled = true
             try {
                 channelRef.current?.unsubscribe()
                 clientRef.current?.close()

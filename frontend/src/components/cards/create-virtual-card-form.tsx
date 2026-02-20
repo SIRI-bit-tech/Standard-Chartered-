@@ -42,7 +42,7 @@ export function CreateVirtualCardForm({ onSuccess }: CreateVirtualCardFormProps)
     setLoading(true);
 
     try {
-      const response = await apiClient.post(
+      const response = await apiClient.post<{ success: boolean }>(
         '/api/v1/cards/create',
         {
           ...formData,
@@ -53,7 +53,7 @@ export function CreateVirtualCardForm({ onSuccess }: CreateVirtualCardFormProps)
         { params: { user_id: user?.id } }
       );
 
-      if (response.data.success) {
+      if (response.success) {
         toast({
           title: 'Virtual Card Created',
           description: 'Your new virtual card is ready to use'

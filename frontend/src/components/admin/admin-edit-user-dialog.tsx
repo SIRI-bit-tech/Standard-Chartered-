@@ -44,7 +44,6 @@ export function AdminEditUserDialog({
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState<UserDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [originalJoinedAt, setOriginalJoinedAt] = useState<string | null>(null)
   const todayISO = new Date().toISOString().slice(0, 10)
 
   useEffect(() => {
@@ -64,7 +63,6 @@ export function AdminEditUserDialog({
         })
         if (res?.success) {
           setForm(res.data)
-          setOriginalJoinedAt(res.data.created_at || null)
         }
       } catch (e: any) {
         logger.error('Failed to fetch user detail', { error: e })

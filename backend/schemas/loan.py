@@ -35,9 +35,22 @@ class LoanApplicationRequest(BaseModel):
     duration_months: int = Field(..., ge=1, le=360)
     purpose: str = Field(..., max_length=500)
     account_id: str
-    employment_status: Optional[str] = Field(None, pattern="^(employed|self_employed|unemployed|retired)$")
+    employment_status: Optional[str] = Field(None, pattern="^(employed|self_employed|unemployed|retired|full_time|part_time|contract|student)$")
     annual_income: Optional[float] = Field(None, gt=0)
     employer_name: Optional[str] = Field(None, max_length=100)
+
+    @validator("employment_status", pre=True)
+    def normalize_employment_status(cls, v):
+        if v is None:
+            return v
+        s = str(v).lower()
+        mapping = {
+            "full_time": "employed",
+            "part_time": "employed",
+            "contract": "employed",
+            "student": "unemployed",
+        }
+        return mapping.get(s, s)
 
 
 class LoanApplicationResponse(BaseModel):
