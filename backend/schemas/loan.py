@@ -30,37 +30,29 @@ class LoanApplicationStatus(str, Enum):
 
 class LoanApplicationRequest(BaseModel):
     """Loan application request"""
-    loan_type: LoanType
+    product_id: str
     amount: float = Field(..., gt=0, le=1000000)
-    currency: str = Field(..., min_length=3, max_length=3)
     duration_months: int = Field(..., ge=1, le=360)
     purpose: str = Field(..., max_length=500)
-    employment_status: str = Field(..., pattern="^(employed|self_employed|unemployed|retired)$")
-    annual_income: float = Field(..., gt=0)
-    employment_type: Optional[str] = Field(None, max_length=100)
+    account_id: str
+    employment_status: Optional[str] = Field(None, pattern="^(employed|self_employed|unemployed|retired)$")
+    annual_income: Optional[float] = Field(None, gt=0)
     employer_name: Optional[str] = Field(None, max_length=100)
-    
-    @validator('currency')
-    def validate_currency(cls, v):
-        return v.upper()
 
 
 class LoanApplicationResponse(BaseModel):
     """Loan application response"""
     id: str
     user_id: str
-    loan_type: LoanType
+    product_id: str
+    account_id: Optional[str]
     amount: float
-    currency: str
     duration_months: int
-    interest_rate: float
-    monthly_payment: float
     status: LoanApplicationStatus
-    purpose: str
+    purpose: Optional[str]
     applied_at: datetime
     decision_at: Optional[datetime] = None
     rejection_reason: Optional[str] = None
-    reference_number: str
     
     class Config:
         from_attributes = True

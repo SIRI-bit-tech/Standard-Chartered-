@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import axios, { AxiosError } from "axios"
+import { API_BASE_URL, API_ENDPOINTS } from "@/constants"
 
 export interface User {
   id: string
@@ -40,8 +41,6 @@ export interface RegisterData {
   password: string
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-
 export function useAuth() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
@@ -63,7 +62,7 @@ export function useAuth() {
 
           // Verify token is still valid
           try {
-            const response = await axios.get(`${API_BASE_URL}/api/users/me`, {
+            const response = await axios.get(`${API_BASE_URL}${API_ENDPOINTS.PROFILE}`, {
               headers: {
                 Authorization: `Bearer ${storedAccessToken}`,
               },
@@ -92,7 +91,7 @@ export function useAuth() {
     async (email: string, password: string) => {
       setLoading(true)
       try {
-        const response = await axios.post(`${API_BASE_URL}/api/auth/login`, {
+        const response = await axios.post(`${API_BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, {
           email,
           password,
         })
@@ -124,7 +123,7 @@ export function useAuth() {
     async (data: RegisterData) => {
       setLoading(true)
       try {
-        const response = await axios.post(`${API_BASE_URL}/api/auth/register`, {
+        const response = await axios.post(`${API_BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`, {
           email: data.email,
           username: data.username,
           first_name: data.firstName,
@@ -162,7 +161,7 @@ export function useAuth() {
       // Call logout endpoint if needed
       if (accessToken) {
         try {
-          await axios.post(`${API_BASE_URL}/api/auth/logout`, {}, {
+          await axios.post(`${API_BASE_URL}${API_ENDPOINTS.AUTH_LOGOUT}`, {}, {
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },
@@ -194,7 +193,7 @@ export function useAuth() {
     }
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+      const response = await axios.post(`${API_BASE_URL}${API_ENDPOINTS.AUTH_REFRESH}`, {
         refresh_token: refreshToken,
       })
 

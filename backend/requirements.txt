@@ -18,3 +18,5 @@ fastapi-cors
 pytest
 pytest-asyncio
 httpx
+pytesseract
+Pillow

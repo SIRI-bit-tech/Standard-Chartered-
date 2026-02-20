@@ -8,6 +8,7 @@ from database import get_db
 import uuid
 from datetime import datetime, timedelta
 from utils.auth import get_current_user_id
+import json
 
 router = APIRouter()
 
@@ -32,12 +33,17 @@ async def get_loan_products(
     products = result.scalars().all()
     
     available_products = []
+    def is_true(val):
+        if isinstance(val, bool): return val
+        if isinstance(val, str): return val.lower() == 'true'
+        return bool(val)
+
     for product in products:
-        if user_tier == "standard" and product.available_to_standard:
+        if user_tier == "standard" and is_true(product.available_to_standard):
             available_products.append(product)
-        elif user_tier == "priority" and product.available_to_priority:
+        elif user_tier == "priority" and is_true(product.available_to_priority):
             available_products.append(product)
-        elif user_tier == "premium" and product.available_to_premium:
+        elif user_tier == "premium" and is_true(product.available_to_premium):
             available_products.append(product)
     
     return {
@@ -51,7 +57,10 @@ async def get_loan_products(
                 "max_amount": p.max_amount,
                 "interest_rate": p.base_interest_rate,
                 "min_term": p.min_term_months,
-                "max_term": p.max_term_months
+                "max_term": p.max_term_months,
+                "image_url": p.image_url,
+                "tag": p.tag,
+                "features": json.loads(p.features) if p.features else []
             }
             for p in available_products
         ],
@@ -59,20 +68,21 @@ async def get_loan_products(
     }
 
 
+from schemas.loan import LoanApplicationRequest
+from models.transaction import Transaction, TransactionType, TransactionStatus
+
 @router.post("/apply")
 async def apply_for_loan(
-    product_id: str,
-    requested_amount: float,
-    requested_term: int,
-    purpose: str = None,
+    request: LoanApplicationRequest,
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Apply for loan"""
     await _ensure_user_active(db, current_user_id)
+    
     # Verify product exists
     product_result = await db.execute(
-        select(LoanProduct).where(LoanProduct.id == product_id)
+        select(LoanProduct).where(LoanProduct.id == request.product_id)
     )
     product = product_result.scalar()
     
@@ -80,22 +90,52 @@ async def apply_for_loan(
         raise HTTPException(status_code=404, detail="Loan product not found")
     
     # Validate amount
-    if requested_amount < product.min_amount or requested_amount > product.max_amount:
+    if request.amount < product.min_amount or request.amount > product.max_amount:
         raise HTTPException(status_code=400, detail="Amount outside allowed range")
     
+    # Verify account exists and belongs to user
+    account_result = await db.execute(
+        select(Account).where(Account.id == request.account_id, Account.user_id == current_user_id)
+    )
+    account = account_result.scalar()
+    if not account:
+        raise HTTPException(status_code=404, detail="Selected account not found")
+
+    application_id = str(uuid.uuid4())
     new_application = LoanApplication(
-        id=str(uuid.uuid4()),
+        id=application_id,
         user_id=current_user_id,
-        product_id=product_id,
-        requested_amount=requested_amount,
-        requested_term_months=requested_term,
-        purpose=purpose,
+        product_id=request.product_id,
+        account_id=request.account_id,
+        requested_amount=request.amount,
+        requested_term_months=request.duration_months,
+        purpose=request.purpose,
         status=LoanApplicationStatus.SUBMITTED,
+        annual_income=request.annual_income,
+        employment_status=request.employment_status,
+        employer_name=request.employer_name,
         submitted_at=datetime.utcnow(),
         created_at=datetime.utcnow()
     )
     
+    # Create a pending transaction for history
+    pending_tx = Transaction(
+        id=str(uuid.uuid4()),
+        account_id=request.account_id,
+        user_id=current_user_id,
+        type=TransactionType.LOAN,
+        status=TransactionStatus.PENDING,
+        amount=request.amount,
+        currency=account.currency,
+        balance_before=account.balance,
+        balance_after=account.balance, # Pending, so no change yet
+        description=f"Loan Application: {product.name}",
+        reference_number=f"LN-{application_id[:8].upper()}",
+        created_at=datetime.utcnow()
+    )
+    
     db.add(new_application)
+    db.add(pending_tx)
     await db.commit()
     
     return {

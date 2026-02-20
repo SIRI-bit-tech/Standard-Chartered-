@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Card } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { Scan } from 'lucide-react';
+import { FromAccountSelect } from '@/components/transfers/from-account-select';
+import { ImageUpload } from '@/components/ImageUpload';
+import type { Account } from '@/types';
 
 interface CheckDepositFormProps {
   onSuccess?: () => void;
@@ -20,23 +22,88 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState<'form' | 'verify'>('form');
-  const [depositId, setDepositId] = useState<string>('');
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [ocrRunning, setOcrRunning] = useState(false);
   const [formData, setFormData] = useState({
     account_id: '',
     amount: '',
     check_number: '',
     check_issuer_bank: '',
+    name_on_check: '',
+    front_image_url: '',
     currency: 'USD'
   });
-  const [verificationCode, setVerificationCode] = useState('');
+  
+  const [touched, setTouched] = useState({ amount: false, check_number: false });
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await apiClient.get<any>('/api/v1/accounts/');
+        const items: Account[] = Array.isArray(res) ? res : res.data || res.accounts || [];
+        if (mounted) setAccounts(items || []);
+      } catch {
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  async function runOcr(url: string) {
+    try {
+      setOcrRunning(true);
+      const result = await apiClient.post<{ success: boolean; amount?: number; check_number?: string; raw_text?: string }>(
+        '/api/v1/deposits/parse-check',
+        { front_image_url: url }
+      );
+      const amtStr = result?.amount != null ? String(result.amount) : '';
+      const chk = result?.check_number || '';
+      setFormData(prev => ({
+        ...prev,
+        front_image_url: url,
+        // Always prefer fresh OCR results when a new image is chosen,
+        // unless the user has manually edited the fields in this session.
+        amount: touched.amount ? prev.amount : amtStr,
+        check_number: touched.check_number ? prev.check_number : chk,
+      }));
+      toast({
+        title: 'Auto-detect complete',
+        description: `${chk ? 'Check #' + chk : 'No check # found'}${chk && amtStr ? ' • ' : ''}${amtStr ? 'Amount $' + amtStr : 'No amount found'}`,
+      });
+    } catch {
+      toast({
+        title: 'Could not read check',
+        description: 'Enter details manually',
+      });
+    } finally {
+      setOcrRunning(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!formData.account_id) {
       toast({
         title: 'Error',
-        description: 'Please select an account',
+        description: 'Select an account',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (!formData.front_image_url) {
+      toast({
+        title: 'Error',
+        description: 'Upload the front of the check',
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (!formData.name_on_check) {
+      toast({
+        title: 'Error',
+        description: 'Enter the name on the check',
         variant: 'destructive'
       });
       return;
@@ -44,65 +111,38 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
 
     setLoading(true);
     try {
-      const response = await apiClient.post('/api/v1/deposits/check-deposit', {
+      const response = await apiClient.post<{
+        success: boolean;
+        deposit_id: string;
+        status: string;
+        message: string;
+      }>('/api/v1/deposits/check-deposit', {
         ...formData,
         amount: parseFloat(formData.amount)
       }, {
         params: { user_id: user?.id }
       });
 
-      if (response.data.success) {
-        setDepositId(response.data.deposit_id);
-        setStep('verify');
+      if (response.success) {
         toast({
-          title: 'Check Deposit Initiated',
-          description: 'Verification code sent to your phone'
+          title: 'Check submitted',
+          description: 'Your deposit is pending review'
         });
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.detail || 'Failed to initiate deposit',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleVerify(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const response = await apiClient.post(
-        '/api/v1/deposits/verify-check-deposit',
-        {
-          deposit_id: depositId,
-          verification_code: verificationCode
-        },
-        { params: { user_id: user?.id } }
-      );
-
-      if (response.data.success) {
-        toast({
-          title: 'Check Verified',
-          description: 'Your check deposit is being processed'
-        });
-        setStep('form');
         setFormData({
           account_id: '',
           amount: '',
           check_number: '',
           check_issuer_bank: '',
+          name_on_check: '',
+          front_image_url: '',
           currency: 'USD'
         });
-        setVerificationCode('');
         onSuccess?.();
       }
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.response?.data?.detail || 'Verification failed',
+        description: error.response?.data?.detail || 'Failed to submit deposit',
         variant: 'destructive'
       });
     } finally {
@@ -110,61 +150,47 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
     }
   }
 
-  if (step === 'verify') {
-    return (
-      <form onSubmit={handleVerify} className="space-y-4">
-        <Card className="bg-blue-50 border-blue-200 p-4">
-          <div className="flex gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              We sent a verification code to your phone. Enter it below to confirm the check deposit.
-            </div>
-          </div>
-        </Card>
-
-        <div>
-          <Label htmlFor="code">Verification Code</Label>
-          <Input
-            id="code"
-            type="text"
-            placeholder="000000"
-            maxLength={6}
-            value={verificationCode}
-            onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-            disabled={loading}
-            className="text-2xl tracking-widest text-center font-mono"
-          />
-        </div>
-
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setStep('form')}
-            disabled={loading}
-          >
-            Back
-          </Button>
-          <Button type="submit" disabled={loading || verificationCode.length !== 6}>
-            {loading ? 'Verifying...' : 'Verify Deposit'}
-          </Button>
-        </div>
-      </form>
-    );
-  }
+  
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="account">From Account</Label>
-        <Input
-          id="account"
-          type="text"
-          placeholder="Select your account"
-          value={formData.account_id}
-          onChange={(e) => setFormData({ ...formData, account_id: e.target.value })}
-          disabled={loading}
-        />
+      <FromAccountSelect
+        accounts={accounts}
+        value={formData.account_id}
+        onChange={(v) => setFormData({ ...formData, account_id: v })}
+        label="Deposit To"
+        showBalance
+        disabled={loading}
+      />
+
+      <div className="grid grid-cols-1 gap-4">
+        <div>
+          <Label>Front of Check</Label>
+          <ImageUpload
+            value={formData.front_image_url}
+            onChange={(v) => {
+              const isDifferent = v && v !== formData.front_image_url;
+              setFormData(prev => ({
+                ...prev,
+                front_image_url: v,
+                // Clear fields so old values don't linger when a new image is selected
+                amount: isDifferent ? '' : prev.amount,
+                check_number: isDifferent ? '' : prev.check_number,
+              }));
+              if (isDifferent) {
+                setTouched({ amount: false, check_number: false });
+              }
+              if (v) runOcr(v);
+            }}
+            label="Upload front image"
+          />
+          {formData.front_image_url && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+              <Scan className="w-4 h-4" />
+              <span>{ocrRunning ? 'Reading check...' : 'Auto-detect will try to fill details'}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -177,7 +203,10 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
             step="0.01"
             min="0"
             value={formData.amount}
-            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+            onChange={(e) => {
+              setTouched(prev => ({ ...prev, amount: true }));
+              setFormData({ ...formData, amount: e.target.value });
+            }}
             disabled={loading}
           />
         </div>
@@ -194,23 +223,38 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
       </div>
 
       <div>
+        <Label htmlFor="nameOnCheck">Name on Check</Label>
+        <Input
+          id="nameOnCheck"
+          type="text"
+          placeholder="Name written on the check"
+          value={formData.name_on_check}
+          onChange={(e) => setFormData({ ...formData, name_on_check: e.target.value })}
+          disabled={loading}
+        />
+      </div>
+
+      <div>
         <Label htmlFor="checkNumber">Check Number</Label>
         <Input
           id="checkNumber"
           type="text"
           placeholder="e.g., 1234567"
           value={formData.check_number}
-          onChange={(e) => setFormData({ ...formData, check_number: e.target.value })}
+            onChange={(e) => {
+              setTouched(prev => ({ ...prev, check_number: true }));
+              setFormData({ ...formData, check_number: e.target.value });
+            }}
           disabled={loading}
         />
       </div>
 
       <div>
-        <Label htmlFor="issuer">Check Issuer Bank</Label>
+        <Label htmlFor="issuer">Check Issuer Bank (optional)</Label>
         <Input
           id="issuer"
           type="text"
-          placeholder="e.g., Bank of America"
+          placeholder="Bank name"
           value={formData.check_issuer_bank}
           onChange={(e) => setFormData({ ...formData, check_issuer_bank: e.target.value })}
           disabled={loading}
@@ -218,7 +262,7 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
       </div>
 
       <Button type="submit" disabled={loading} className="w-full">
-        {loading ? 'Initiating...' : 'Initiate Check Deposit'}
+        {loading ? 'Submitting...' : 'Submit Check Deposit'}
       </Button>
     </form>
   );

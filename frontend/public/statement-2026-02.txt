@@ -1,0 +1,10 @@
+Account Statement - February 2026
+Generated: 2026-02-18
+
+Account Summary
+---
+checking Account (****1106): $93,975.00
+savings Account (****4394): $7,000.00
+crypto Account (****8345): $0.00
+
+Total Net Worth: $100,975.00

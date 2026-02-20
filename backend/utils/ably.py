@@ -1,4 +1,5 @@
 import ably
+import asyncio
 import inspect
 from config import settings
 from typing import Optional, Dict, Any
@@ -74,7 +75,17 @@ class AblyRealtimeManager:
             if not channel_name:
                 return False
             channel = ably_client.channels.get(channel_name)
-            channel.publish("update", json.dumps({"scope": scope, "data": payload, "timestamp": datetime.utcnow().isoformat()}))
+            res = channel.publish("update", json.dumps({"scope": scope, "data": payload, "timestamp": datetime.utcnow().isoformat()}))
+            if inspect.isawaitable(res):
+                try:
+                    asyncio.get_running_loop()
+                    asyncio.create_task(res)
+                except RuntimeError:
+                    # No running loop; fire-and-forget best effort
+                    try:
+                        asyncio.run(res)
+                    except Exception:
+                        pass
             return True
         except Exception:
             return False
@@ -88,7 +99,16 @@ class AblyRealtimeManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
             
-            channel.publish("update", json.dumps(message_data))
+            res = channel.publish("update", json.dumps(message_data))
+            if inspect.isawaitable(res):
+                try:
+                    asyncio.get_running_loop()
+                    asyncio.create_task(res)
+                except RuntimeError:
+                    try:
+                        asyncio.run(res)
+                    except Exception:
+                        pass
             return True
         except Exception as e:
             print(f"Error publishing transaction update: {e}")
@@ -108,7 +128,16 @@ class AblyRealtimeManager:
                 "action": action,
                 "timestamp": datetime.utcnow().isoformat()
             }
-            channel.publish("update", json.dumps(message_data))
+            res = channel.publish("update", json.dumps(message_data))
+            if inspect.isawaitable(res):
+                try:
+                    asyncio.get_running_loop()
+                    asyncio.create_task(res)
+                except RuntimeError:
+                    try:
+                        asyncio.run(res)
+                    except Exception:
+                        pass
             return True
         except Exception as e:
             print(f"Error publishing card status: {e}")
@@ -136,7 +165,16 @@ class AblyRealtimeManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
             
-            channel.publish("balance", json.dumps(message_data))
+            res = channel.publish("balance", json.dumps(message_data))
+            if inspect.isawaitable(res):
+                try:
+                    asyncio.get_running_loop()
+                    asyncio.create_task(res)
+                except RuntimeError:
+                    try:
+                        asyncio.run(res)
+                    except Exception:
+                        pass
             return True
         except Exception as e:
             print(f"Error publishing balance update: {e}")
@@ -164,7 +202,16 @@ class AblyRealtimeManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
             
-            channel.publish("status", json.dumps(message_data))
+            res = channel.publish("status", json.dumps(message_data))
+            if inspect.isawaitable(res):
+                try:
+                    asyncio.get_running_loop()
+                    asyncio.create_task(res)
+                except RuntimeError:
+                    try:
+                        asyncio.run(res)
+                    except Exception:
+                        pass
             return True
         except Exception as e:
             print(f"Error publishing transfer status: {e}")
@@ -193,7 +240,16 @@ class AblyRealtimeManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
             
-            channel.publish("notification", json.dumps(message_data))
+            res = channel.publish("notification", json.dumps(message_data))
+            if inspect.isawaitable(res):
+                try:
+                    asyncio.get_running_loop()
+                    asyncio.create_task(res)
+                except RuntimeError:
+                    try:
+                        asyncio.run(res)
+                    except Exception:
+                        pass
             return True
         except Exception as e:
             print(f"Error publishing notification: {e}")
@@ -222,7 +278,16 @@ class AblyRealtimeManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
             
-            channel.publish("message", json.dumps(message_data))
+            res = channel.publish("message", json.dumps(message_data))
+            if inspect.isawaitable(res):
+                try:
+                    asyncio.get_running_loop()
+                    asyncio.create_task(res)
+                except RuntimeError:
+                    try:
+                        asyncio.run(res)
+                    except Exception:
+                        pass
             return True
         except Exception as e:
             print(f"Error publishing support message: {e}")
@@ -250,7 +315,16 @@ class AblyRealtimeManager:
                 "timestamp": datetime.utcnow().isoformat()
             }
             
-            channel.publish("status", json.dumps(message_data))
+            res = channel.publish("status", json.dumps(message_data))
+            if inspect.isawaitable(res):
+                try:
+                    asyncio.get_running_loop()
+                    asyncio.create_task(res)
+                except RuntimeError:
+                    try:
+                        asyncio.run(res)
+                    except Exception:
+                        pass
             return True
         except Exception as e:
             print(f"Error publishing loan status: {e}")

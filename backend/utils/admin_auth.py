@@ -85,7 +85,7 @@ class AdminPermissionManager:
             "transactions:edit",
             "deposits:approve", "deposits:decline", "deposits:view",
             "cards:approve", "cards:decline", "cards:view", "cards:update",
-            "loans:approve", "loans:decline", "loans:view",
+            "loans:approve", "loans:decline", "loans:view", "loans:create", "loans:update", "loans:delete",
             "admins:create", "admins:read", "admins:update", "admins:delete",
             "audit_logs:view", "settings:manage"
         ],

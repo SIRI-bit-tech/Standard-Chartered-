@@ -357,5 +357,50 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send support reply email to {to_email}: {e}")
             return False
+
+    def send_loan_status_email(self, to_email: str, status: str, amount: float, reason: str = "") -> bool:
+        """Notify user about loan application status"""
+        try:
+            subject = f"Loan Application {status}"
+            formatted_amount = f"${amount:,.2f}"
+            
+            if status.lower() == "approved":
+                title = "Loan Application Approved"
+                message = f"""
+                    <p>Great news! Your loan application for <strong>{formatted_amount}</strong> has been approved.</p>
+                    <p>The funds have been disbursed to your selected account. You can now access them immediately.</p>
+                    <div style="margin:16px 0;padding:16px;border:1px solid {self.border};background:{self.brand_light};border-radius:8px;">
+                        <p style="margin:0;color:{self.text_primary}">
+                            <strong>Approved Amount:</strong> {formatted_amount}<br/>
+                            <strong>Status:</strong> Disbursement Completed
+                        </p>
+                    </div>
+                """
+            else:
+                title = "Loan Application Update"
+                message = f"""
+                    <p>We have reviewed your loan application for <strong>{formatted_amount}</strong>.</p>
+                    <p>Regrettably, we are unable to approve your application at this time.</p>
+                    {f"<p><strong>Reason:</strong> {reason}</p>" if reason else ""}
+                    <p>If you have any questions, our support team is available to help.</p>
+                """
+                
+            body = f"""
+                <p>Hello,</p>
+                {message}
+                <a href="{settings.FRONTEND_URL}/dashboard/loans" style="display:inline-block;background:{self.brand_primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">View Loan Details</a>
+                <p style="margin-top:16px">Thank you for choosing Standard Chartered Bank.</p>
+            """
+            
+            html_content = self._wrap_html(title, body)
+            msg = self._build_message(subject, to_email, html_content)
+            with self._create_connection() as server:
+                server.send_message(msg)
+            logger.info(f"Loan status email ({status}) sent to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send loan status email to {to_email}: {e}")
+            return False
+
 # Global email service instance
 email_service = EmailService()

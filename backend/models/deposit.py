@@ -6,19 +6,19 @@ from database import Base
 
 
 class DepositType(str, enum.Enum):
-    CHECK_DEPOSIT = "check_deposit"
-    DIRECT_DEPOSIT = "direct_deposit"
-    MOBILE_CHECK_DEPOSIT = "mobile_check_deposit"
+    CHECK_DEPOSIT = "CHECK_DEPOSIT"
+    DIRECT_DEPOSIT = "DIRECT_DEPOSIT"
+    MOBILE_CHECK_DEPOSIT = "MOBILE_CHECK_DEPOSIT"
 
 
 class DepositStatus(str, enum.Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    VERIFIED = "verified"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    REJECTED = "rejected"
-    CANCELLED = "cancelled"
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    VERIFIED = "VERIFIED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
 
 
 class Deposit(Base):
@@ -43,6 +43,7 @@ class Deposit(Base):
     check_number = Column(String, nullable=True)
     check_issuer_bank = Column(String, nullable=True)
     check_routing_number = Column(String, nullable=True)
+    name_on_check = Column(String, nullable=True)
     
     # Mobile check deposit
     front_image_url = Column(String, nullable=True)
