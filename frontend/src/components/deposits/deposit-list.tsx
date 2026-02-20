@@ -6,9 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { Trash2, RefreshCw } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
-import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
+import { apiClient } from '@/lib/api-client';
 
 interface Deposit {
   id: string;
@@ -28,24 +27,27 @@ interface DepositListProps {
 }
 
 const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
+  pending: 'bg-red-100 text-red-800',
+  PENDING: 'bg-red-100 text-red-800',
   processing: 'bg-blue-100 text-blue-800',
+  PROCESSING: 'bg-blue-100 text-blue-800',
   completed: 'bg-green-100 text-green-800',
+  COMPLETED: 'bg-green-100 text-green-800',
   failed: 'bg-red-100 text-red-800',
-  cancelled: 'bg-gray-100 text-gray-800'
+  FAILED: 'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-100 text-gray-800',
+  CANCELLED: 'bg-gray-100 text-gray-800'
 };
 
 export function DepositList({ deposits, loading, onRefresh }: DepositListProps) {
-  const { user } = useAuth();
   const { toast } = useToast();
 
   async function handleCancel(depositId: string) {
     try {
-      const response = await apiClient.delete(`/api/v1/deposits/${depositId}`, {
-        params: { user_id: user?.id }
-      });
+      const response = await apiClient.delete<any>(`/api/v1/deposits/${depositId}`);
 
-      if (response.data.success) {
+      // Handle both {success: true} and possibly just {message: ...} if success is implied or missing
+      if (response && (response.success || response.message)) {
         toast({
           title: 'Deposit Cancelled',
           description: 'The deposit has been cancelled successfully'
@@ -87,7 +89,7 @@ export function DepositList({ deposits, loading, onRefresh }: DepositListProps) 
             <div className="flex-1">
               <div className="flex items-center gap-3">
                 <div>
-                  <p className="font-semibold capitalize">{deposit.type.replace('_', ' ')}</p>
+                  <p className="font-semibold capitalize">{deposit.type.toLowerCase().replace(/_/g, ' ')}</p>
                   <p className="text-sm text-muted-foreground">{deposit.reference_number}</p>
                 </div>
               </div>
@@ -103,7 +105,7 @@ export function DepositList({ deposits, loading, onRefresh }: DepositListProps) 
                 {deposit.status}
               </Badge>
 
-              {deposit.status === 'pending' && (
+              {(deposit.status || '').toLowerCase() === 'pending' && (
                 <Button
                   variant="ghost"
                   size="sm"

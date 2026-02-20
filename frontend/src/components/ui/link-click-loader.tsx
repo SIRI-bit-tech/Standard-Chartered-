@@ -20,6 +20,11 @@ export function LinkClickLoader() {
   const FALLBACK_HIDE_MS = 9000
 
   useEffect(() => {
+    const originalError = console.error
+    console.error = (...args: unknown[]) => {
+      if (args.length === 1 && typeof args[0] === 'boolean') return
+      return originalError(...args)
+    }
     const onClick = (e: MouseEvent) => {
       if (e.defaultPrevented) return
       if (isModifiedEvent(e)) return
@@ -48,6 +53,7 @@ export function LinkClickLoader() {
     document.addEventListener('click', onClick, { capture: true })
     return () => {
       document.removeEventListener('click', onClick, { capture: true } as any)
+      console.error = originalError
       if (fallbackTimer.current) {
         window.clearTimeout(fallbackTimer.current)
         fallbackTimer.current = null

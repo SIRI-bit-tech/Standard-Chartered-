@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import { Bell, HelpCircle, Menu, User, LogOut, Settings } from 'lucide-react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useAuthStore, useNotificationStore } from '@/lib/store'
@@ -18,6 +19,7 @@ import { getInitials, formatDate } from '@/lib/utils'
 import { colors } from '@/types'
 import type { Notification } from '@/types'
 import { useUserRealtime } from '@/hooks/use-user-realtime'
+import { apiClient } from '@/lib/api-client'
 
 interface DashboardHeaderProps {
   onOpenMobileMenu?: () => void
@@ -26,9 +28,26 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
   const router = useRouter()
   const isMobile = useIsMobile()
-  const { user, logout } = useAuthStore()
+  const { user, logout, setUser } = useAuthStore()
   const { notifications, setNotifications, addNotification } = useNotificationStore()
   const hasUnread = notifications.some((n) => n.status === 'unread')
+
+  useEffect(() => {
+    let active = true
+    ;(async () => {
+      try {
+        if (!user || user.profile_picture_url) return
+        const res = await apiClient.get<{ success: boolean; data: any }>('/api/v1/profile')
+        if (!active) return
+        if (res?.success && res?.data && setUser) {
+          setUser({ ...user, profile_picture_url: res.data.profile_picture_url || user.profile_picture_url })
+        }
+      } catch { }
+    })()
+    return () => {
+      active = false
+    }
+  }, [user, setUser])
 
   const notifChannel = user?.id ? `banking:notifications:${user.id}` : undefined
   useUserRealtime(notifChannel as string, (payload) => {

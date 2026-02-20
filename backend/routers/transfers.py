@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from models.transfer import Transfer, TransferStatus, TransferType, Beneficiary
+from models.bill_payment import BillPayment, BillPayee
 from models.account import Account, AccountStatus
 from models.user import User
 from models.transaction import Transaction, TransactionType as TxType, TransactionStatus as TxStatus
@@ -895,12 +896,23 @@ async def get_transfer_history(
             return ""
         return f"...{acc.account_number[-4:]} ({acc.nickname or acc.account_type.value.title()})"
     
-    # Batch load transfers related to current page for counterparty resolution
+    # Batch load transfers related to current page for counterparty or metadata resolution
     transfer_ids = [getattr(t, "transfer_id", None) for t in page_items if getattr(t, "transfer_id", None)]
     transfer_map = {}
     if transfer_ids:
         tr_res = await db.execute(select(Transfer).where(Transfer.id.in_(transfer_ids)))
         transfer_map = {tr.id: tr for tr in tr_res.scalars().all()}
+    # Batch load bill payments for payment-linked transactions
+    payment_ids = [getattr(t, "payment_id", None) for t in page_items if getattr(t, "payment_id", None)]
+    bill_map = {}
+    payee_map = {}
+    if payment_ids:
+        bp_res = await db.execute(select(BillPayment).where(BillPayment.id.in_(payment_ids)))
+        bill_map = {bp.id: bp for bp in bp_res.scalars().all()}
+        payee_ids = [bp.payee_id for bp in bill_map.values()]
+        if payee_ids:
+            py_res = await db.execute(select(BillPayee).where(BillPayee.id.in_(payee_ids)))
+            payee_map = {py.id: py for py in py_res.scalars().all()}
     # Batch load accounts for transfer endpoints
     to_ids = [tr.to_account_id for tr in transfer_map.values() if getattr(tr, "to_account_id", None)]
     from_ids = [tr.from_account_id for tr in transfer_map.values() if getattr(tr, "from_account_id", None)]
@@ -933,6 +945,7 @@ async def get_transfer_history(
             "international": "International Transfer",
             "ach": "ACH Transfer",
             "wire": "Wire Transfer",
+            "loan": "Loan Disbursement",
         }.get(tval, tval.title())
 
     items = []
@@ -981,7 +994,17 @@ async def get_transfer_history(
                             bank_name = parts[1]
                 except Exception:
                     bank_name = None
-        # Fallbacks if no transfer link
+        # If this is a bill payment, prefer payee name and 'Bill Payment'
+        if not counterparty and getattr(t, "payment_id", None):
+            bp = bill_map.get(getattr(t, "payment_id"))
+            if bp:
+                payee = payee_map.get(getattr(bp, "payee_id", None))
+                if payee:
+                    counterparty = payee.name
+                    subtitle = "Bill Payment"
+                    bank_name = getattr(payee, "category", None)
+
+        # Fallbacks if no transfer/bill link
         if not counterparty:
             if t.description:
                 counterparty = t.description

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from datetime import datetime, timedelta
 import uuid
 import random
@@ -11,12 +11,17 @@ from models.user import User
 from database import get_db
 from schemas.deposit import (
     CheckDepositRequest, DirectDepositSetupRequest, DepositResponse,
-    DepositListResponse, DepositVerificationRequest, DepositStatusUpdateResponse
+    DepositListResponse, DepositVerificationRequest, DepositStatusUpdateResponse,
+    CheckParseRequest, CheckParseResponse
 )
 from utils.ably import AblyRealtimeManager
 from utils.auth import get_current_user_id
+import httpx
+import asyncio
+from utils.ocr import extract_check_details, ocr_status, extract_check_details_remote
+from config import settings
 
-router = APIRouter(prefix="/deposits", tags=["deposits"])
+router = APIRouter(tags=["deposits"])
 
 async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
     result = await db.execute(select(User).where(User.id == user_id))
@@ -26,6 +31,47 @@ async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
 
+
+@router.post("/parse-check", response_model=CheckParseResponse)
+async def parse_check_image(
+    request: CheckParseRequest,
+    current_user_id: str = Depends(get_current_user_id),
+):
+    try:
+        provider = (settings.OCR_PROVIDER or "").strip().lower()
+        if provider:
+            result = await extract_check_details_remote(request.front_image_url)
+        else:
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.get(request.front_image_url)
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not fetch image")
+                content = resp.content
+            result = await asyncio.to_thread(extract_check_details, content)
+        if not result.get("supported"):
+            detail = result.get("error") or "OCR not configured"
+            raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=detail)
+        return {
+            "success": True,
+            "amount": result.get("amount"),
+            "check_number": result.get("check_number"),
+            "raw_text": result.get("text"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/ocr-health")
+async def get_ocr_health(
+    current_user_id: str = Depends(get_current_user_id),
+):
+    try:
+        status_info = ocr_status()
+        return {"success": True, "status": status_info}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.post("/check-deposit", response_model=DepositStatusUpdateResponse)
 async def initiate_check_deposit(
@@ -64,27 +110,31 @@ async def initiate_check_deposit(
             currency=request.currency,
             check_number=request.check_number,
             check_issuer_bank=request.check_issuer_bank,
+            name_on_check=request.name_on_check,
+            front_image_url=request.front_image_url,
             reference_number=f"CHK-{uuid.uuid4().hex[:12].upper()}",
-            verification_code=verification_code,
+            is_verified=True,  # Auto-verify submission for now
             created_at=datetime.utcnow()
         )
         
         db.add(deposit)
         await db.commit()
         await db.refresh(deposit)
-        
-        AblyRealtimeManager.publish_notification(
-            current_user_id,
-            "check_deposit_initiated",
-            "Check Deposit Initiated",
-            f"Check deposit of {request.currency} {request.amount} initiated. Verification code sent."
-        )
+        try:
+            AblyRealtimeManager.publish_notification(
+                current_user_id,
+                "check_deposit_submitted",
+                "Check Deposit Submitted",
+                f"Check deposit of {request.currency} {request.amount} has been submitted and is pending review."
+            )
+        except Exception:
+            pass
         
         return {
             "success": True,
             "deposit_id": deposit.id,
             "status": DepositStatus.PENDING,
-            "message": "Check deposit initiated. Verification code sent to your phone."
+            "message": "Check deposit submitted successfully and is pending review."
         }
     except HTTPException:
         raise
@@ -127,13 +177,15 @@ async def verify_check_deposit(
         deposit.status = DepositStatus.VERIFIED
         db.add(deposit)
         await db.commit()
-        
-        AblyRealtimeManager.publish_notification(
-            current_user_id,
-            "check_deposit_verified",
-            "Check Verified",
-            f"Check deposit of {deposit.currency} {deposit.amount} has been verified and is being processed."
-        )
+        try:
+            AblyRealtimeManager.publish_notification(
+                current_user_id,
+                "check_deposit_verified",
+                "Check Verified",
+                f"Check deposit of {deposit.currency} {deposit.amount} has been verified and is being processed."
+            )
+        except Exception:
+            pass
         
         return {
             "success": True,
@@ -220,17 +272,41 @@ async def list_deposits(
 ):
     """List all deposits for user"""
     try:
-        deposits_result = await db.execute(
-            select(Deposit).where(Deposit.user_id == current_user_id)
-        )
-        deposits = deposits_result.scalars().all()
-        
-        pending_count = sum(1 for d in deposits if d.status == DepositStatus.PENDING)
-        completed_count = sum(1 for d in deposits if d.status == DepositStatus.COMPLETED)
-        
+        acc_res = await db.execute(select(Account.id).where(Account.user_id == current_user_id))
+        acc_ids = [row[0] for row in acc_res.all()]
+        q = select(Deposit).where(
+            or_(
+                Deposit.user_id == current_user_id,
+                Deposit.account_id.in_(acc_ids) if acc_ids else False,
+            )
+        ).order_by(Deposit.created_at.desc())
+        deposits_result = await db.execute(q)
+        records = deposits_result.scalars().all()
+        deposits = [
+            {
+                "id": d.id,
+                "account_id": d.account_id,
+                "type": getattr(d.type, "value", str(d.type)),
+                "status": getattr(d.status, "value", str(d.status)),
+                "amount": d.amount,
+                "currency": d.currency,
+                "reference_number": d.reference_number,
+                "check_number": d.check_number,
+                "name_on_check": d.name_on_check,
+                "front_image_url": d.front_image_url,
+                "created_at": d.created_at,
+                "completed_at": d.completed_at,
+                "is_verified": d.is_verified,
+            }
+            for d in records
+        ]
+        pending_count = sum(1 for d in records if getattr(d.status, "value", str(d.status)) == DepositStatus.PENDING.value)
+        completed_count = sum(1 for d in records if getattr(d.status, "value", str(d.status)) == DepositStatus.COMPLETED.value)
+        deposits.sort(key=lambda x: x["created_at"] or 0, reverse=True)
         return {
-            "deposits": [DepositResponse.from_orm(d) for d in deposits],
-            "total_count": len(deposits),
+            "success": True,
+            "deposits": deposits,
+            "total_count": len(records),
             "pending_count": pending_count,
             "completed_count": completed_count
         }

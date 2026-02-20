@@ -14,6 +14,7 @@ class TransactionType(str, enum.Enum):
     WITHDRAWAL = "withdrawal"
     INTEREST = "interest"
     FEE = "fee"
+    LOAN = "loan"
 
 
 class TransactionStatus(str, enum.Enum):

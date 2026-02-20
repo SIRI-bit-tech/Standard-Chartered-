@@ -235,7 +235,7 @@ export interface AdminSystemAlert {
   title: string
   message: string
   severity: 'critical' | 'warning' | 'notice'
-  cta?: { label: string; action: string }
+  cta?: { label: string; action?: string; url?: string }
 }
 
 export interface AdminDashboardOverviewResponse {
@@ -315,22 +315,32 @@ export interface LoanProduct {
   id: string
   name: string
   type: string
+  description?: string
   min_amount: number
   max_amount: number
   interest_rate: number
   min_term: number
   max_term: number
+  image_url?: string
+  features?: string[]
+  tag?: string
 }
 
 export interface LoanApplication {
   id: string
+  user_id: string
+  product_id: string
+  account_id?: string
   status: 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected'
   requested_amount: number
   requested_term: number
   approved_amount?: number
   approved_interest_rate?: number
+  approved_term_months?: number
   monthly_payment?: number
+  purpose?: string
   created_at: string
+  rejection_reason?: string
 }
 
 export interface Loan {
@@ -342,7 +352,7 @@ export interface Loan {
   monthly_payment: number
   payments_made: number
   next_payment_date: string
-  status: string
+  status: 'active' | 'completed' | 'defaulted' | 'pending_approval'
 }
 
 // Notification types

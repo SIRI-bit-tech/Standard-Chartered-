@@ -53,7 +53,7 @@
     "allowJs": true,
     "noEmit": true,
     "incremental": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "isolatedModules": true,
     "plugins": [
       {

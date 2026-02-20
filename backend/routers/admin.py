@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, text
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 import json
 
@@ -14,19 +14,17 @@ from models.notification import Notification, NotificationType
 from models.transfer import Transfer, TransferStatus
 from models.deposit import Deposit, DepositStatus
 from models.virtual_card import VirtualCard, VirtualCardStatus
-from models.loan import Loan, LoanStatus
-
-# Explicit import to avoid any issues
-CardStatus = VirtualCardStatus
+from models.loan import Loan, LoanStatus, LoanApplication, LoanApplicationStatus, LoanProduct, LoanType
 from database import get_db
 from schemas.admin import (
     AdminRegisterRequest, AdminLoginRequest, AdminResponse,
     ApproveTransferRequest, DeclineTransferRequest, TransferApprovalResponse,
     ApproveDepositRequest, DeclineDepositRequest, DepositApprovalResponse,
     ApproveVirtualCardRequest, DeclineVirtualCardRequest, VirtualCardApprovalResponse,
+    ApproveLoanRequest, DeclineLoanRequest, LoanApprovalResponse,
     AdminCreateUserRequest, AdminEditUserRequest, AdminAuditLogResponse,
     AdminAccountStatusRequest, AdminAdjustBalanceRequest, AdminUpdateCardStatusRequest, AdminCardActionRequest,
-    AdminStatisticsResponse
+    AdminStatisticsResponse, AdminCreateLoanProductRequest
 )
 from pydantic import ValidationError as PydanticValidationError
 from utils.admin_auth import AdminAuthManager, AdminPermissionManager, get_current_admin
@@ -161,13 +159,21 @@ async def admin_dashboard_overview(
         else:
             severity = "warning"
 
+        cta = None
+        if "loan" in n.title.lower():
+            cta = {"label": "Review Application", "url": "/admin/approvals?tab=loans"}
+        elif "verification" in n.title.lower() or "kyc" in n.title.lower():
+            cta = {"label": "Verify User", "url": "/admin/users"}
+        elif "transfer" in n.title.lower():
+            cta = {"label": "Review Transfer", "url": "/admin/approvals?tab=transfers"}
+
         system_alerts.append(
             {
                 "id": n.id,
                 "title": n.title,
                 "message": n.message,
                 "severity": severity,
-                "cta": None,
+                "cta": cta,
             }
         )
 
@@ -1517,6 +1523,67 @@ async def admin_reverse_transfer(
         logger.error("Reverse transfer failed", error=e)
         raise InternalServerError(operation="reverse transfer", error_code="TRANSFER_REVERSE_FAILED", original_error=e)
 
+@router.get("/deposits/list")
+async def list_deposits(
+    admin_id: str,
+    status: str | None = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        if not AdminPermissionManager.has_permission(admin.role, "deposits:approve"):
+            raise UnauthorizedError(message="You don't have permission to view deposits", error_code="PERMISSION_DENIED")
+        query = select(Deposit)
+        if status:
+            try:
+                ds = DepositStatus(status)
+                query = query.where(Deposit.status == ds)
+            except Exception:
+                pass
+        result = await db.execute(query.order_by(Deposit.created_at.desc()))
+        items = result.scalars().all()
+        users_map = {}
+        users_res = await db.execute(select(User.id, User.email))
+        for uid, email in users_res.all():
+            users_map[uid] = email
+        data = []
+        for d in items:
+            # Fetch account number to show masked account
+            acc_num = "—"
+            try:
+                ares = await db.execute(select(Account.account_number).where(Account.id == d.account_id))
+                anum = ares.scalar()
+                if anum:
+                    acc_num = f"...{anum[-4:]}"
+            except Exception:
+                pass
+
+            data.append({
+                "id": d.id,
+                "type": getattr(d.type, "value", str(d.type)),
+                "user_id": d.user_id,
+                "user_email": users_map.get(d.user_id),
+                "account_id": d.account_id,
+                "amount": d.amount,
+                "currency": d.currency,
+                "status": getattr(d.status, "value", str(d.status)),
+                "created_at": d.created_at,
+                "check_number": d.check_number,
+                "name_on_check": d.name_on_check,
+                "front_image_url": d.front_image_url,
+                # 'details' is used by the frontend purely for display
+                "details": f"Check #{d.check_number or '—'} • Acc: {acc_num}"
+            })
+        return {"success": True, "data": data}
+    except (UnauthorizedError, NotFoundError):
+        raise
+    except Exception as e:
+        logger.error("List deposits failed", error=e)
+        raise InternalServerError(operation="list deposits", error_code="LIST_DEPOSITS_FAILED", original_error=e)
+
 @router.post("/deposits/approve", response_model=DepositApprovalResponse)
 async def approve_deposit(
     admin_id: str,
@@ -1552,12 +1619,34 @@ async def approve_deposit(
                 resource="Deposit",
                 error_code="DEPOSIT_NOT_FOUND"
             )
-        
-        # Approve deposit
-        deposit.status = DepositStatus.APPROVED
-        if request.confirmation_code:
-            deposit.confirmation_code = request.confirmation_code
-        
+        acc_result = await db.execute(select(Account).where(Account.id == deposit.account_id))
+        account = acc_result.scalar()
+        if not account:
+            raise NotFoundError(resource="Account", error_code="ACCOUNT_NOT_FOUND")
+        balance_before = account.balance
+        account.balance = (account.balance or 0) + float(deposit.amount)
+        account.available_balance = (account.available_balance or 0) + float(deposit.amount)
+        reference = f"DEP-{uuid.uuid4().hex[:10].upper()}"
+        tx = Transaction(
+            id=str(uuid.uuid4()),
+            account_id=account.id,
+            user_id=deposit.user_id,
+            type=TransactionType.DEPOSIT,
+            status=TransactionStatus.COMPLETED,
+            amount=float(deposit.amount),
+            currency=deposit.currency,
+            balance_before=balance_before,
+            balance_after=account.balance,
+            description="Mobile check deposit",
+            reference_number=reference
+        )
+        deposit.status = DepositStatus.COMPLETED
+        deposit.completed_at = datetime.utcnow()
+        deposit.transaction_id = tx.id
+        if getattr(request, "confirmation_code", None):
+            setattr(deposit, "confirmation_code", request.confirmation_code)
+        db.add(account)
+        db.add(tx)
         db.add(deposit)
         
         # Log audit
@@ -1579,17 +1668,18 @@ async def approve_deposit(
             deposit.user_id,
             "deposit_approved",
             "Deposit Approved",
-            f"Your {deposit.deposit_type} deposit of {deposit.currency} {deposit.amount} has been approved."
+            f"Your {getattr(deposit.type, 'value', str(deposit.type))} deposit of {deposit.currency} {deposit.amount} has been approved."
         )
-        AblyRealtimeManager.publish_admin_event("accounts", {"type": "deposit_approved", "deposit_id": deposit.id})
+        AblyRealtimeManager.publish_balance_update(account.user_id, account.id, account.balance, account.currency)
+        AblyRealtimeManager.publish_admin_event("accounts", {"type": "deposit_completed", "deposit_id": deposit.id})
         
         logger.info(f"Deposit approved by {admin.email}: {deposit.id}")
         
         return {
             "success": True,
             "deposit_id": deposit.id,
-            "status": DepositStatus.APPROVED,
-            "message": "Deposit approved successfully"
+            "status": DepositStatus.COMPLETED,
+            "message": "Deposit completed and account credited"
         }
     except (UnauthorizedError, NotFoundError):
         raise
@@ -1638,7 +1728,8 @@ async def decline_deposit(
                 error_code="DEPOSIT_NOT_FOUND"
             )
         
-        deposit.status = DepositStatus.DECLINED
+        deposit.status = DepositStatus.REJECTED
+        deposit.rejection_reason = request.reason
         db.add(deposit)
         
         # Log audit
@@ -1660,7 +1751,7 @@ async def decline_deposit(
             deposit.user_id,
             "deposit_declined",
             "Deposit Declined",
-            f"Your {deposit.deposit_type} deposit has been declined. Reason: {request.reason}"
+            f"Your {getattr(deposit.type, 'value', str(deposit.type))} deposit has been declined. Reason: {request.reason}"
         )
         AblyRealtimeManager.publish_admin_event("accounts", {"type": "deposit_declined", "deposit_id": deposit.id})
         
@@ -1669,8 +1760,8 @@ async def decline_deposit(
         return {
             "success": True,
             "deposit_id": deposit.id,
-            "status": DepositStatus.DECLINED,
-            "message": "Deposit declined successfully"
+            "status": DepositStatus.REJECTED,
+            "message": "Deposit rejected successfully"
         }
     except (UnauthorizedError, NotFoundError):
         raise
@@ -1843,6 +1934,262 @@ async def decline_virtual_card(
             error_code="DECLINE_FAILED",
             original_error=e
         )
+
+
+@router.post("/loans/approve", response_model=LoanApprovalResponse)
+async def approve_loan(
+    admin_id: str,
+    request: ApproveLoanRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Approve loan application and disburse funds"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        
+        if not AdminPermissionManager.has_permission(admin.role, "loans:approve"):
+            raise UnauthorizedError(message="You don't have permission to approve loans", error_code="PERMISSION_DENIED")
+        
+        # Get application
+        app_result = await db.execute(select(LoanApplication).where(LoanApplication.id == request.application_id))
+        app = app_result.scalar()
+        if not app:
+            raise NotFoundError(resource="LoanApplication", error_code="APPLICATION_NOT_FOUND")
+        
+        if app.status != LoanApplicationStatus.SUBMITTED:
+             raise ValidationError(message="Only submitted applications can be approved", error_code="INVALID_STATE")
+
+        # Get product
+        prod_result = await db.execute(select(LoanProduct).where(LoanProduct.id == app.product_id))
+        product = prod_result.scalar()
+
+        # Update application
+        app.status = LoanApplicationStatus.APPROVED
+        app.approved_amount = request.approved_amount or app.requested_amount
+        app.approved_interest_rate = request.interest_rate or product.base_interest_rate
+        app.approved_term_months = request.term_months or app.requested_term_months
+        app.approved_at = datetime.utcnow()
+        app.reviewed_at = datetime.utcnow()
+        
+        # Calculate monthly payment (simple amortization)
+        rate = app.approved_interest_rate / 12 / 100
+        n = app.approved_term_months
+        app.monthly_payment = (app.approved_amount * rate) / (1 - (1 + rate)**-n)
+
+        # Create Active Loan
+        new_loan = Loan(
+            id=str(uuid.uuid4()),
+            user_id=app.user_id,
+            account_id=app.account_id,
+            application_id=app.id,
+            type=product.type,
+            status=LoanStatus.ACTIVE,
+            principal_amount=app.approved_amount,
+            interest_rate=app.approved_interest_rate,
+            term_months=app.approved_term_months,
+            monthly_payment=app.monthly_payment,
+            remaining_balance=app.approved_amount,
+            next_payment_date=datetime.utcnow() + timedelta(days=30),
+            originated_at=datetime.utcnow(),
+            maturity_date=datetime.utcnow() + timedelta(days=30 * n)
+        )
+        db.add(new_loan)
+
+        # Disburse funds to selected account
+        if app.account_id:
+            acc_result = await db.execute(select(Account).where(Account.id == app.account_id).with_for_update())
+            account = acc_result.scalar()
+            if account:
+                before = account.balance
+                account.balance += app.approved_amount
+                account.available_balance += app.approved_amount
+                
+                # Update the pending transaction to COMPLETED
+                tx_result = await db.execute(
+                    select(Transaction)
+                    .where(Transaction.account_id == app.account_id, Transaction.description.like(f"%Loan Application%"))
+                    .order_by(Transaction.created_at.desc())
+                    .limit(1)
+                )
+                tx = tx_result.scalar()
+                if tx:
+                    tx.status = TransactionStatus.COMPLETED
+                    tx.type = TransactionType.LOAN # Update to LOAN
+                    tx.balance_before = before
+                    tx.balance_after = account.balance
+                    tx.amount = app.approved_amount
+                    tx.description = f"Loan Disbursement: {product.name}"
+                    db.add(tx)
+                else:
+                    # Create new transaction if not found
+                    disbursement_tx = Transaction(
+                        id=str(uuid.uuid4()),
+                        account_id=app.account_id,
+                        user_id=app.user_id,
+                        type=TransactionType.LOAN,
+                        status=TransactionStatus.COMPLETED,
+                        amount=app.approved_amount,
+                        currency=account.currency,
+                        balance_before=before,
+                        balance_after=account.balance,
+                        description=f"Loan Disbursement: {product.name}",
+                        reference_number=f"LD-{uuid.uuid4().hex[:8].upper()}",
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(disbursement_tx)
+
+        # Audit log
+        audit = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="approve_loan",
+            resource_type="loan_application",
+            resource_id=app.id,
+            details=json.dumps({"amount": app.approved_amount, "notes": request.notes})
+        )
+        db.add(audit)
+        
+        await db.commit()
+
+        # Notifications
+        user_result = await db.execute(select(User).where(User.id == app.user_id))
+        user = user_result.scalar()
+        if user:
+            AblyRealtimeManager.publish_notification(
+                user.id,
+                "loan_approved",
+                "Loan Approved",
+                f"Your loan application for {format(app.approved_amount, ',.2f')} has been approved and funds disbursed."
+            )
+            # In-app notification record
+            notif = Notification(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                type=NotificationType.SYSTEM,
+                title="Loan Approved",
+                message=f"Congratulations! Your loan of {format(app.approved_amount, ',.2f')} has been approved.",
+                action_url=f"{settings.FRONTEND_URL}/dashboard/loans"
+            )
+            db.add(notif)
+            await db.commit()
+
+            # Email
+            try:
+                if getattr(settings, "SMTP_SERVER", None):
+                    email_service.send_loan_status_email(user.email, "Approved", app.approved_amount, "")
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "application_id": app.id,
+            "status": "approved",
+            "message": "Loan application approved and funds disbursed"
+        }
+    except (UnauthorizedError, NotFoundError, ValidationError):
+        raise
+    except Exception as e:
+        logger.error("Loan approval failed", error=e)
+        raise InternalServerError(operation="loan approval", error_code="APPROVAL_FAILED", original_error=e)
+
+
+@router.post("/loans/decline", response_model=LoanApprovalResponse)
+async def decline_loan(
+    admin_id: str,
+    request: DeclineLoanRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Decline loan application"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        
+        if not AdminPermissionManager.has_permission(admin.role, "loans:decline"):
+            raise UnauthorizedError(message="You don't have permission to decline loans", error_code="PERMISSION_DENIED")
+        
+        # Get application
+        app_result = await db.execute(select(LoanApplication).where(LoanApplication.id == request.application_id))
+        app = app_result.scalar()
+        if not app:
+            raise NotFoundError(resource="LoanApplication", error_code="APPLICATION_NOT_FOUND")
+        
+        app.status = LoanApplicationStatus.REJECTED
+        app.rejected_at = datetime.utcnow()
+        app.rejection_reason = request.reason
+        app.reviewed_at = datetime.utcnow()
+
+        # Update pending transaction to FAILED
+        tx_result = await db.execute(
+            select(Transaction)
+            .where(Transaction.account_id == app.account_id, Transaction.description.like(f"%Loan Application%"))
+            .order_by(Transaction.created_at.desc())
+            .limit(1)
+        )
+        tx = tx_result.scalar()
+        if tx:
+            tx.status = TransactionStatus.FAILED
+            tx.description = f"Loan Application Declined: {request.reason[:50]}"
+            db.add(tx)
+
+        # Audit log
+        audit = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="decline_loan",
+            resource_type="loan_application",
+            resource_id=app.id,
+            details=json.dumps({"reason": request.reason})
+        )
+        db.add(audit)
+        
+        await db.commit()
+
+        # Notifications
+        user_result = await db.execute(select(User).where(User.id == app.user_id))
+        user = user_result.scalar()
+        if user:
+            AblyRealtimeManager.publish_notification(
+                user.id,
+                "loan_declined",
+                "Loan Declined",
+                f"Your loan application has been declined. Reason: {request.reason}"
+            )
+            # In-app notification record
+            notif = Notification(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                type=NotificationType.SYSTEM,
+                title="Loan Declined",
+                message=f"We regret to inform you that your loan application has been declined. Reason: {request.reason}",
+                action_url=f"{settings.FRONTEND_URL}/dashboard/loans"
+            )
+            db.add(notif)
+            await db.commit()
+
+            # Email
+            try:
+                if getattr(settings, "SMTP_SERVER", None):
+                    email_service.send_loan_status_email(user.email, "Declined", app.requested_amount, request.reason)
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "application_id": app.id,
+            "status": "rejected",
+            "message": "Loan application declined"
+        }
+    except (UnauthorizedError, NotFoundError):
+        raise
+    except Exception as e:
+        logger.error("Loan decline failed", error=e)
+        raise InternalServerError(operation="loan decline", error_code="DECLINE_FAILED", original_error=e)
 
 
 @router.post("/users/create")
@@ -2372,3 +2719,155 @@ async def get_admin_statistics(
             error_code="FETCH_FAILED",
             original_error=e
         )
+
+@router.get("/loans/applications")
+async def get_all_loan_applications(
+    status: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin)
+):
+    """List all loan applications for admin review"""
+    try:
+        if not AdminPermissionManager.has_permission(admin.role, "loans:view"):
+            raise UnauthorizedError(message="Permission denied", error_code="PERMISSION_DENIED")
+            
+        stmt = select(LoanApplication, User.email, LoanProduct.name).join(User, LoanApplication.user_id == User.id).join(LoanProduct, LoanApplication.product_id == LoanProduct.id)
+        
+        if status:
+            stmt = stmt.where(LoanApplication.status == status)
+        
+        stmt = stmt.order_by(LoanApplication.created_at.desc())
+        
+        result = await db.execute(stmt)
+        applications = result.all()
+        
+        return {
+            "success": True,
+            "data": [
+                {
+                    "id": a.LoanApplication.id,
+                    "user_email": a.email,
+                    "product_name": a.name,
+                    "amount": a.LoanApplication.requested_amount,
+                    "currency": "USD", # Defaulting to USD for now or fetch from account
+                    "status": a.LoanApplication.status,
+                    "created_at": a.LoanApplication.created_at.isoformat(),
+                    "details": f"Loan for {a.LoanApplication.purpose} - {a.LoanApplication.requested_term_months} months"
+                }
+                for a in applications
+            ]
+        }
+    except Exception as e:
+        logger.error("Failed to fetch loan applications", error=e)
+        raise InternalServerError(operation="fetch loan apps", error_code="FETCH_FAILED", original_error=e)
+
+@router.get("/realtime/token")
+async def get_admin_realtime_token(
+    admin_id: str = Query(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Generate Ably token request for admin connections"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+             raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+             
+        from utils.ably import get_admin_ably_token_request
+        token_request = await get_admin_ably_token_request(admin.id)
+        if token_request is None:
+            raise HTTPException(status_code=500, detail="Real-time service unavailable")
+        return token_request
+    except (UnauthorizedError, HTTPException):
+        raise
+    except Exception as e:
+        logger.error("Failed to generate admin realtime token", error=e)
+        raise InternalServerError(operation="gen admin token", error_code="TOKEN_GEN_FAILED", original_error=e)
+
+@router.get("/system/settings")
+async def get_system_settings(
+    admin_id: str = Query(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get system-wide settings for admin dashboard"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+             raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+             
+        return {
+            "success": True,
+            "data": {
+                "real_time_enabled": True,
+                "notifications_enabled": True,
+                "maintenance_mode": False
+            }
+        }
+    except UnauthorizedError:
+        raise
+    except Exception as e:
+        logger.error("Failed to fetch system settings", error=e)
+        raise InternalServerError(operation="fetch settings", error_code="FETCH_FAILED", original_error=e)
+
+@router.post("/loans/products")
+async def create_loan_product(
+    request: AdminCreateLoanProductRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin)
+):
+    """Admin create new loan product"""
+    try:
+        if not AdminPermissionManager.has_permission(admin.role, "loans:create"):
+            raise UnauthorizedError(message="Permission denied", error_code="PERMISSION_DENIED")
+            
+        new_product = LoanProduct(
+            id=request.id or f"lp_{uuid.uuid4().hex[:8]}",
+            name=request.name,
+            type=request.type,
+            description=request.description,
+            min_amount=request.min_amount,
+            max_amount=request.max_amount,
+            base_interest_rate=request.base_interest_rate,
+            min_term_months=request.min_term_months,
+            max_term_months=request.max_term_months,
+            tag=request.tag,
+            image_url=request.image_url,
+            features=json.dumps(request.features),
+            employment_required=request.employment_required,
+            available_to_standard=request.available_to_standard,
+            available_to_priority=request.available_to_priority,
+            available_to_premium=request.available_to_premium,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        db.add(new_product)
+        
+        # Log audit
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="create_loan_product",
+            resource_type="loan_product",
+            resource_id=new_product.id,
+            details=json.dumps({"name": request.name})
+        )
+        db.add(audit_log)
+        
+        await db.commit()
+        
+        return {
+            "success": True,
+            "data": {
+                "id": new_product.id,
+                "name": new_product.name
+            },
+            "message": "Loan product created successfully"
+        }
+    except UnauthorizedError:
+        raise
+    except Exception as e:
+        logger.error("Failed to create loan product", error=e)
+        raise InternalServerError(operation="create loan product", error_code="CREATE_FAILED", original_error=e)

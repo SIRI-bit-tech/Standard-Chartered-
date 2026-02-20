@@ -1,12 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/use-auth';
 import { apiClient } from '@/lib/api-client';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckDepositForm } from '@/components/deposits/check-deposit-form';
-import { DirectDepositForm } from '@/components/deposits/direct-deposit-form';
 import { DepositList } from '@/components/deposits/deposit-list';
 import { ArrowDownLeft, Zap } from 'lucide-react';
 
@@ -22,21 +19,40 @@ interface Deposit {
 }
 
 export default function DepositsPage() {
-  const { user } = useAuth();
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTab, setSelectedTab] = useState('check');
 
   useEffect(() => {
+    // Always attempt to fetch; the API client attaches tokens from storage/cookies
     fetchDeposits();
-  }, [user?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function fetchDeposits() {
     try {
-      if (!user?.id) return;
-      const response = await apiClient.get<{ success: boolean; deposits: Deposit[] }>(`/api/v1/deposits/list`);
-      if (response.success) {
-        setDeposits(response.deposits ?? []);
+      setLoading(true);
+      const response = await apiClient.get<{ success?: boolean; deposits?: Deposit[]; data?: { deposits?: Deposit[] } }>(`/api/v1/deposits/list`);
+      console.log('API Response:', response);
+      if ((response && typeof response === 'object') || Array.isArray(response)) {
+        let items: any = [];
+        if (Array.isArray(response)) {
+          items = response;
+        } else if (response.deposits) {
+          items = response.deposits;
+        } else if ((response as any).data?.deposits) {
+          items = (response as any).data.deposits;
+        }
+        console.log('Raw items from response:', items);
+
+        // Normalize status to lowercase for frontend consistency
+        items = items.map((d: any) => ({
+          ...d,
+          status: (d.status || '').toLowerCase()
+        }));
+        console.log('Normalized deposits:', items);
+        setDeposits(items);
+      } else {
+        console.warn('Unexpected API response format:', response);
       }
     } catch (error) {
       console.error('Failed to fetch deposits:', error);
@@ -49,7 +65,7 @@ export default function DepositsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-balance">Deposits</h1>
-        <p className="text-muted-foreground">Check deposits and direct deposit setup</p>
+        <p className="text-muted-foreground">Deposit checks using your phone</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -67,34 +83,18 @@ export default function DepositsPage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Pending Deposits</p>
-              <p className="text-2xl font-bold">
-                {deposits.filter(d => d.status === 'pending').length}
+              <p className="text-2xl font-bold text-red-600">
+                {deposits.filter(d => (d.status || '').toLowerCase() === 'pending').length}
               </p>
             </div>
-            <Zap className="w-8 h-8 text-yellow-600" />
+            <Zap className="w-8 h-8 text-red-600" />
           </div>
         </Card>
       </div>
 
       <Card className="p-6">
-        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="check">Mobile Check Deposit</TabsTrigger>
-            <TabsTrigger value="direct">Direct Deposit Setup</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="check" className="space-y-4">
-            <div className="pt-4">
-              <CheckDepositForm onSuccess={fetchDeposits} />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="direct" className="space-y-4">
-            <div className="pt-4">
-              <DirectDepositForm onSuccess={fetchDeposits} />
-            </div>
-          </TabsContent>
-        </Tabs>
+        <h3 className="text-lg font-semibold mb-4">Mobile Check Deposit</h3>
+        <CheckDepositForm onSuccess={fetchDeposits} />
       </Card>
 
       <Card className="p-6">

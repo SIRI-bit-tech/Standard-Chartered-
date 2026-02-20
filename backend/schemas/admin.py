@@ -175,6 +175,29 @@ class AdminAuditLogResponse(BaseModel):
         from_attributes = True
 
 
+class ApproveLoanRequest(BaseModel):
+    """Approve loan request"""
+    application_id: str
+    approved_amount: Optional[float] = None
+    interest_rate: Optional[float] = None
+    term_months: Optional[int] = None
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+class DeclineLoanRequest(BaseModel):
+    """Decline loan request"""
+    application_id: str
+    reason: str = Field(..., max_length=500)
+
+
+class LoanApprovalResponse(BaseModel):
+    """Loan approval response"""
+    success: bool
+    application_id: str
+    status: str
+    message: str
+
+
 class AdminStatisticsResponse(BaseModel):
     """Admin dashboard statistics"""
     total_users: int
@@ -187,3 +210,22 @@ class AdminStatisticsResponse(BaseModel):
     pending_loans: int
     total_virtual_cards: int
     pending_cards: int
+
+
+class AdminCreateLoanProductRequest(BaseModel):
+    id: Optional[str] = None
+    name: str = Field(..., min_length=3, max_length=100)
+    type: str
+    description: str = Field(..., max_length=1000)
+    min_amount: float
+    max_amount: float
+    base_interest_rate: float
+    min_term_months: int
+    max_term_months: int
+    tag: str = Field(..., max_length=50)
+    image_url: Optional[str] = None
+    features: List[str] = []
+    employment_required: bool = True
+    available_to_standard: bool = True
+    available_to_priority: bool = True
+    available_to_premium: bool = True

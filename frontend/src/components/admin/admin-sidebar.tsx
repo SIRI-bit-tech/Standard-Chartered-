@@ -14,6 +14,8 @@ import {
   BarChart3,
   Settings,
   CreditCard,
+  FileText,
+  CheckSquare,
 } from 'lucide-react'
 
 interface AdminSidebarProps {
@@ -23,10 +25,12 @@ interface AdminSidebarProps {
 
 const NAV = [
   { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
+  { href: '/admin/approvals', label: 'Approvals', icon: CheckSquare },
   { href: '/admin/users', label: 'User Management', icon: Users },
   { href: '/admin/accounts', label: 'Accounts', icon: Landmark },
   { href: '/admin/cards', label: 'Virtual Cards', icon: CreditCard },
   { href: '/admin/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { href: '/admin/loans', label: 'Loan Management', icon: FileText },
   { href: '/admin/security', label: 'Security', icon: Shield },
   { href: '/admin/support/tickets', label: 'Support', icon: BarChart3 },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3 },

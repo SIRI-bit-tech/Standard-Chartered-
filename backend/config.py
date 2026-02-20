@@ -62,4 +62,9 @@ class Settings(BaseSettings):
     # Comma-separated list of CIDRs/IPs that are trusted reverse proxies
     TRUSTED_PROXY_CIDRS: str = ""
     
+    # OCR
+    TESSERACT_CMD: Optional[str] = None
+    OCR_PROVIDER: Optional[str] = None
+    OCR_SPACE_API_KEY: Optional[str] = None
+    
 settings = Settings()

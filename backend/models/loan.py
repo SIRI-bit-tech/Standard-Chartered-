@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Integer
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Integer, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -56,12 +56,17 @@ class LoanProduct(Base):
     # Requirements
     min_credit_score = Column(Integer, nullable=True)
     min_annual_income = Column(Float, nullable=True)
-    employment_required = Column(String, default=True, nullable=False)
+    employment_required = Column(Boolean, default=True, nullable=False)
     
     # Availability by tier
-    available_to_standard = Column(String, default=True, nullable=False)
-    available_to_priority = Column(String, default=True, nullable=False)
-    available_to_premium = Column(String, default=True, nullable=False)
+    available_to_standard = Column(Boolean, default=True, nullable=False)
+    available_to_priority = Column(Boolean, default=True, nullable=False)
+    available_to_premium = Column(Boolean, default=True, nullable=False)
+    
+    # UI hints
+    image_url = Column(String, nullable=True)
+    tag = Column(String, nullable=True) # e.g. "Low Interest", "Popular"
+    features = Column(String, nullable=True) # JSON string of features
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -103,6 +108,9 @@ class LoanApplication(Base):
     # Documents
     supporting_documents = Column(String, nullable=True)  # JSON array of document URLs
     
+    # Selected account for disbursement
+    account_id = Column(String, ForeignKey("accounts.id"), nullable=True)
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     submitted_at = Column(DateTime, nullable=True)
@@ -142,7 +150,7 @@ class Loan(Base):
     total_payments_made = Column(Integer, default=0, nullable=False)
     
     # Status
-    is_in_arrears = Column(String, default=False, nullable=False)
+    is_in_arrears = Column(Boolean, default=False, nullable=False)
     days_in_arrears = Column(Integer, default=0, nullable=False)
     
     # Timestamps

@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   AUTH_LOGIN: '/api/v1/auth/login',
   AUTH_LOGOUT: '/api/v1/auth/logout',
   AUTH_SESSION: '/api/v1/auth/session',
+  AUTH_REFRESH: '/api/v1/auth/refresh',
 
   // Accounts
   ACCOUNTS: '/api/v1/accounts',

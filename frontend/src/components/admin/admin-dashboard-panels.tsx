@@ -114,7 +114,13 @@ export function AdminSystemAlerts({ items }: { items: AdminSystemAlert[] }) {
                     {a.message}
                   </p>
                   {a.cta && (
-                    <button className="mt-3 text-xs font-semibold uppercase" style={{ color: tone }}>
+                    <button
+                      className="mt-3 text-xs font-semibold uppercase hover:underline"
+                      style={{ color: tone }}
+                      onClick={() => {
+                        if (a.cta?.url) window.location.href = a.cta.url
+                      }}
+                    >
                       {a.cta.label}
                     </button>
                   )}

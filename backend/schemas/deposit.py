@@ -5,18 +5,28 @@ from enum import Enum
 
 
 class DepositType(str, Enum):
-    CHECK_DEPOSIT = "check_deposit"
-    DIRECT_DEPOSIT = "direct_deposit"
-    MOBILE_CHECK_DEPOSIT = "mobile_check_deposit"
+    CHECK_DEPOSIT = "CHECK_DEPOSIT"
+    DIRECT_DEPOSIT = "DIRECT_DEPOSIT"
+    MOBILE_CHECK_DEPOSIT = "MOBILE_CHECK_DEPOSIT"
 
 
 class DepositStatus(str, Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    VERIFIED = "verified"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    REJECTED = "rejected"
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    VERIFIED = "VERIFIED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+
+class CheckParseRequest(BaseModel):
+    front_image_url: str
+
+class CheckParseResponse(BaseModel):
+    success: bool
+    amount: Optional[float] = None
+    check_number: Optional[str] = None
+    raw_text: Optional[str] = None
 
 
 class CheckDepositRequest(BaseModel):
@@ -24,14 +34,10 @@ class CheckDepositRequest(BaseModel):
     account_id: str
     amount: float = Field(..., gt=0)
     check_number: str = Field(..., max_length=20)
-    check_issuer_bank: str = Field(..., max_length=100)
+    check_issuer_bank: Optional[str] = Field(None, max_length=100)
+    name_on_check: str = Field(..., max_length=100)
+    front_image_url: Optional[str] = None
     currency: str = Field(default="USD", min_length=3, max_length=3)
-    
-    @validator('check_number')
-    def validate_check_number(cls, v):
-        if not v.isdigit() and not v.isalnum():
-            raise ValueError('Check number must be alphanumeric')
-        return v
 
 
 class DirectDepositSetupRequest(BaseModel):
@@ -75,6 +81,8 @@ class DepositResponse(BaseModel):
     currency: str
     reference_number: str
     check_number: Optional[str]
+    name_on_check: Optional[str] = None
+    front_image_url: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime]
     is_verified: bool
@@ -85,6 +93,7 @@ class DepositResponse(BaseModel):
 
 class DepositListResponse(BaseModel):
     """List deposits response"""
+    success: bool
     deposits: list[DepositResponse]
     total_count: int
     pending_count: int

@@ -5,6 +5,7 @@ from sqlalchemy import select
 from models.account import Account, Statement
 from models.user import User
 from models.transaction import Transaction
+from models.transfer import Transfer
 from database import get_db
 from utils.auth import get_current_user_id
 from utils.account_helpers import _get_owned_account, _get_statement_by_id
@@ -141,6 +142,151 @@ async def get_transactions(
         "message": "Transactions retrieved",
     }
 
+
+@router.get("/{account_id}/history")
+async def get_account_history(
+    account_id: str,
+    limit: int = Query(20, le=100),
+    offset: int = Query(0),
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return enriched history items for a single account, matching transfers/history formatting."""
+    # Ensure the requester owns this account
+    account = await _get_owned_account(db, account_id, user_id)
+
+    # Load recent transactions for this account
+    tx_res = await db.execute(
+        select(Transaction)
+        .where(Transaction.account_id == account_id)
+        .order_by(Transaction.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    txs = list(tx_res.scalars().all())
+
+    # Batch load transfers referenced by these transactions (if any)
+    transfer_ids = [getattr(t, "transfer_id", None) for t in txs if getattr(t, "transfer_id", None)]
+    transfer_map = {}
+    if transfer_ids:
+        tr_res = await db.execute(select(Transfer).where(Transfer.id.in_(transfer_ids)))
+        transfer_map = {tr.id: tr for tr in tr_res.scalars().all()}
+
+    # Batch load accounts referenced by transfers to resolve names/ownership
+    to_ids = [getattr(tr, "to_account_id", None) for tr in transfer_map.values() if getattr(tr, "to_account_id", None)]
+    from_ids = [getattr(tr, "from_account_id", None) for tr in transfer_map.values() if getattr(tr, "from_account_id", None)]
+    acc_ids = list({*(to_ids or []), *(from_ids or [])})
+    acc_map = {}
+    if acc_ids:
+        acc_res = await db.execute(select(Account).where(Account.id.in_(acc_ids)))
+        acc_map = {a.id: a for a in acc_res.scalars().all()}
+
+    # Batch load users for those accounts to display sender names
+    user_ids = list({a.user_id for a in acc_map.values()}) if acc_map else []
+    user_map = {}
+    if user_ids:
+        u_res = await db.execute(select(User).where(User.id.in_(user_ids)))
+        user_map = {u.id: u for u in u_res.scalars().all()}
+    # Current user display name (sender label for debits)
+    my_display_name = None
+    if user_id:
+        me = user_map.get(user_id)
+        if not me:
+            # If current user wasn't in the above set (possible when only external accounts present), fetch explicitly
+            u_res2 = await db.execute(select(User).where(User.id == user_id))
+            me = u_res2.scalar_one_or_none()
+        if me:
+            full = f"{getattr(me, 'first_name', '')} {getattr(me, 'last_name', '')}".strip()
+            my_display_name = full or getattr(me, "username", None) or "Sender"
+
+    # Helper to mask this account number
+    def mask_account() -> str:
+        acc_label = account.account_type.value if hasattr(account.account_type, "value") else str(account.account_type)
+        last4 = account.account_number[-4:] if getattr(account, "account_number", None) else "—"
+        return f"...{last4} ({acc_label.title()})"
+
+    # Best-effort determine debit/credit using type and amount sign
+    def is_debit(t) -> bool:
+        tval = getattr(getattr(t, "type", None), "value", None) or str(getattr(t, "type", None))
+        tval = tval.lower() if isinstance(tval, str) else str(tval).lower()
+        return tval in ("debit", "withdrawal", "fee", "payment", "transfer")
+
+    def type_label(tr_type) -> str:
+        try:
+            tval = tr_type.value if hasattr(tr_type, "value") else str(tr_type)
+        except Exception:
+            tval = str(tr_type)
+        return {
+            "internal": "Internal Transfer",
+            "domestic": "Domestic Transfer",
+            "international": "International Transfer",
+            "ach": "ACH Transfer",
+            "wire": "Wire Transfer",
+        }.get(str(tval).lower(), str(tval).title())
+
+    items = []
+    for t in txs:
+        direction = "debit" if is_debit(t) else "credit"
+        tr = transfer_map.get(getattr(t, "transfer_id", None))
+
+        counterparty = None
+        subtitle = None
+        bank_name = None
+        if tr:
+            subtitle = type_label(getattr(tr, "type", None))
+            # For outgoing from this account, show current user's name (like transfer history)
+            if direction == "debit":
+                counterparty = my_display_name or "Sender"
+            else:
+                # Incoming: try to resolve sender account/user first
+                src_acc = acc_map.get(getattr(tr, "from_account_id", None)) if acc_map else None
+                if src_acc:
+                    if src_acc.user_id == user_id:
+                        # Sender is one of our own accounts
+                        acc_label = getattr(src_acc.account_type, "value", str(src_acc.account_type)).title()
+                        counterparty = src_acc.nickname or f"Own {acc_label} Account"
+                    else:
+                        u = user_map.get(src_acc.user_id) if user_map else None
+                        if u:
+                            full_name = f"{getattr(u, 'first_name', '')} {getattr(u, 'last_name', '')}".strip()
+                            counterparty = full_name or getattr(u, "username", None) or "Sender"
+                # Fallback: prefer encoded sender name "name | bank" in transfer.description
+                if not counterparty:
+                    try:
+                        desc = getattr(tr, "description", None)
+                        if desc and "|" in str(desc):
+                            parts = [p.strip() for p in str(desc).split("|", 1)]
+                            if parts:
+                                counterparty = parts[0]
+                            if len(parts) == 2:
+                                bank_name = parts[1]
+                    except Exception:
+                        pass
+        # Fallbacks
+        if not counterparty:
+            if getattr(t, "description", None):
+                counterparty = t.description
+            else:
+                counterparty = "External Bank" if direction == "debit" else "Incoming Transfer"
+
+        items.append(
+            {
+                "id": t.id,
+                "date": t.created_at.isoformat(),
+                "counterparty": counterparty,
+                "subtitle": subtitle or ("Credit" if direction == "credit" else "Debit"),
+                "bank_name": bank_name,
+                "reference": getattr(t, "reference_number", None),
+                "account_masked": mask_account(),
+                "status": getattr(getattr(t, "status", None), "value", None) or str(getattr(t, "status", "")),
+                "amount": t.amount if direction == "credit" else -t.amount,
+                "currency": t.currency,
+                "direction": direction,
+                "transfer_id": getattr(t, "transfer_id", None),
+            }
+        )
+
+    return {"success": True, "data": {"items": items, "total": len(items)}, "message": "Account history retrieved"}
 
 @router.get("/{account_id}/statements")
 async def get_statements(
