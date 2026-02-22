@@ -20,11 +20,11 @@ interface CountrySelectorProps {
   disabled?: boolean
 }
 
-export function CountrySelector({ 
-  value, 
-  onChange, 
-  placeholder = "Select your country", 
-  className = "", 
+export function CountrySelector({
+  value,
+  onChange,
+  placeholder = "Select your country",
+  className = "",
   returnType = 'name',
   disabled = false
 }: CountrySelectorProps) {
@@ -70,24 +70,24 @@ export function CountrySelector({
         <div className="flex items-center gap-2">
           {selectedCountry ? (
             <>
-              <Flag 
-                countryCode={selectedCountry.code} 
-                svg 
+              <Flag
+                countryCode={selectedCountry.code}
+                svg
                 style={{
                   width: '1.25rem',
                   height: '1.25rem',
                   marginRight: '0.5rem'
                 }}
               />
-              <span className="text-sm">{selectedCountry.name}</span>
+              <span className="text-sm text-gray-900">{selectedCountry.name}</span>
             </>
           ) : value ? (
-            <span className="text-sm">{value}</span>
+            <span className="text-sm text-gray-900">{value}</span>
           ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
+            <span className="text-gray-400">{placeholder}</span>
           )}
         </div>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && !disabled && (
@@ -100,12 +100,12 @@ export function CountrySelector({
                 placeholder="Search country..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 border border-border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                className="w-full pl-10 pr-3 py-2 border border-border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent text-sm text-gray-900 bg-white placeholder:text-gray-400"
                 autoFocus
               />
             </div>
           </div>
-          
+
           <div className="max-h-48 overflow-y-auto">
             {filteredCountries.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground text-sm">
@@ -117,20 +117,19 @@ export function CountrySelector({
                   key={country.code}
                   type="button"
                   onClick={() => handleSelect(country)}
-                  className={`w-full px-3 py-2 text-left hover:bg-muted transition-colors flex items-center gap-2 text-sm ${
-                    (returnType === 'code' ? country.code === value : country.name === value) ? 'bg-primary/10 text-primary font-medium' : ''
-                  }`}
+                  className={`w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm ${(returnType === 'code' ? country.code === value : country.name === value) ? 'bg-primary/10 text-primary font-medium' : 'text-gray-900'
+                    }`}
                 >
-                  <Flag 
-                    countryCode={country.code} 
-                    svg 
+                  <Flag
+                    countryCode={country.code}
+                    svg
                     style={{
                       width: '1.125rem',
                       height: '1.125rem',
                       marginRight: '0.5rem'
                     }}
                   />
-                  <span className="flex-1">{country.name}</span>
+                  <span className="flex-1 text-gray-900">{country.name}</span>
                 </button>
               ))
             )}
