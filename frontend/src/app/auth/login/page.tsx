@@ -147,7 +147,7 @@ export default function LoginPage() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Enter your username"
-            className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-foreground bg-white placeholder:text-gray-400"
+            className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 bg-white placeholder:text-gray-400"
             required
           />
         </div>
@@ -161,17 +161,17 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter your password"
-            className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-foreground bg-white placeholder:text-gray-400"
+            className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 bg-white placeholder:text-gray-400"
             required
           />
         </div>
 
-        <div className="flex items-center justify-between text-sm">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" className="rounded" />
-            <span className="text-muted-foreground">Remember me</span>
+        <div className="flex items-center justify-between text-sm pt-1">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" className="w-4 h-4 rounded accent-primary" />
+            <span className="text-gray-500">Remember me</span>
           </label>
-          <Link href="/auth/forgot-password" className="text-primary hover:underline">
+          <Link href="/auth/forgot-password" className="text-primary hover:underline font-medium">
             Forgot password?
           </Link>
         </div>

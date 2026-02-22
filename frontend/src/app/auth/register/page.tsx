@@ -148,7 +148,7 @@ export default function RegisterPage() {
               value={formData.first_name}
               onChange={handleChange}
               placeholder="First name"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -159,7 +159,7 @@ export default function RegisterPage() {
               value={formData.last_name}
               onChange={handleChange}
               placeholder="Last name"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -173,7 +173,7 @@ export default function RegisterPage() {
               value={formData.email}
               onChange={handleChange}
               placeholder="Email address"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -184,7 +184,7 @@ export default function RegisterPage() {
               value={formData.username}
               onChange={handleChange}
               placeholder="Username"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -208,7 +208,7 @@ export default function RegisterPage() {
               value={formData.phone}
               onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
               placeholder="+1 (555) 123-4567"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -223,7 +223,7 @@ export default function RegisterPage() {
               value={formData.street_address}
               onChange={handleChange}
               placeholder="Street Address"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -233,7 +233,7 @@ export default function RegisterPage() {
             value={formData.city}
             onChange={handleChange}
             placeholder="City"
-            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
             required
           />
           <input
@@ -242,7 +242,7 @@ export default function RegisterPage() {
             value={formData.state}
             onChange={handleChange}
             placeholder="State/Province"
-            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
             required
           />
           <input
@@ -251,7 +251,7 @@ export default function RegisterPage() {
             value={formData.postal_code}
             onChange={handleChange}
             placeholder="Postal Code"
-            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
             required
           />
         </div>
@@ -265,7 +265,7 @@ export default function RegisterPage() {
               value={formData.password}
               onChange={handleChange}
               placeholder="Password"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -276,7 +276,7 @@ export default function RegisterPage() {
               value={formData.confirm_password}
               onChange={handleChange}
               placeholder="Confirm password"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
           </div>
