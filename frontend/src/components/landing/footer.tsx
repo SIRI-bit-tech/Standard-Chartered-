@@ -3,6 +3,7 @@
 import { Facebook, Twitter, Linkedin, Instagram, Youtube } from 'lucide-react'
 import { colors } from '@/types'
 import Link from 'next/link'
+import Image from 'next/image'
 
 const socialLinks = [
   { icon: Facebook, href: '#' },
@@ -43,9 +44,11 @@ export function Footer() {
           {/* Company Info */}
           <div className="lg:col-span-2">
             <div className="mb-4">
-              <img
+              <Image
                 src="/logo.png"
                 alt="Standard Chartered"
+                width={200}
+                height={56}
                 className="h-14 w-auto"
               />
             </div>

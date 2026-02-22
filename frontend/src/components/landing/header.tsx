@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { colors } from '@/types'
+import Image from 'next/image'
 
 export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -15,10 +16,13 @@ export function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0">
-              <img
+              <Image
                 src="/logo.png"
                 alt="Standard Chartered"
+                width={200}
+                height={48}
                 className="h-12 w-auto cursor-pointer"
+                priority
               />
             </Link>
           </div>
@@ -60,6 +64,7 @@ export function Header() {
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+              aria-label="Toggle Menu"
             >
               {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>

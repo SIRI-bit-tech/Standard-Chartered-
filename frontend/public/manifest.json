@@ -1,16 +1,63 @@
 {
-  "name": "Standard Chartered Admin Dashboard",
-  "short_name": "SC Admin",
-  "description": "Standard Chartered Banking Admin Dashboard",
-  "start_url": "/",
+  "id": "com.standardchartered.banking",
+  "name": "Standard Chartered Banking",
+  "short_name": "SC Banking",
+  "description": "Secure, professional global banking platform by Standard Chartered.",
+  "start_url": "/?utm_source=pwa",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#0066cc",
+  "theme_color": "#0073CF",
   "icons": [
     {
       "src": "/favicon.ico",
-      "sizes": "any",
-      "type": "image/x-icon"
+      "sizes": "16x16 32x48 64x64",
+      "type": "image/x-icon",
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": [
+    "finance",
+    "banking"
+  ],
+  "shortcuts": [
+    {
+      "name": "Personal Banking",
+      "url": "/banking/personal",
+      "icons": [
+        {
+          "src": "/favicon-32x32.png",
+          "sizes": "32x32"
+        }
+      ]
+    },
+    {
+      "name": "Business Banking",
+      "url": "/banking/business",
+      "icons": [
+        {
+          "src": "/favicon-32x32.png",
+          "sizes": "32x32"
+        }
+      ]
     }
   ]
 }
