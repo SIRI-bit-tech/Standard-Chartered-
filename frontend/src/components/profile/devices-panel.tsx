@@ -1,7 +1,7 @@
-import { Monitor, Smartphone, Trash2, Clock, ShieldCheck } from 'lucide-react'
+import { Monitor, Smartphone, Trash2, Clock, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { apiClient } from '@/lib/api-client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Device {
   id: string
@@ -15,28 +15,33 @@ interface Device {
 
 export function DevicesPanel({ items }: { items: Device[] }) {
   const [deviceList, setDeviceList] = useState<Device[]>(items)
-  const [revokingId, setRevokingId] = useState<string | null>(null)
+  const [revokingDevice, setRevokingDevice] = useState<Device | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
 
-  const handleRevoke = async (deviceId: string) => {
-    if (!confirm('Are you sure you want to revoke access for this device?')) return
+  // Sync state with props if they change
+  useEffect(() => {
+    setDeviceList(items)
+  }, [items])
 
-    setRevokingId(deviceId)
+  const handleRevoke = async () => {
+    if (!revokingDevice) return
+
+    setIsProcessing(true)
     try {
-      const res = await apiClient.delete<{ success: boolean }>(`/api/v1/security/devices/revoke?device_id=${deviceId}`)
+      const res = await apiClient.delete<{ success: boolean }>(`/api/v1/security/devices/revoke?device_id=${revokingDevice.device_id}`)
       if (res.success) {
-        setDeviceList(prev => prev.filter(d => d.device_id !== deviceId))
+        setDeviceList(prev => prev.filter(d => d.device_id !== revokingDevice.device_id))
+        setRevokingDevice(null)
       }
     } catch (err) {
       console.error('Failed to revoke device:', err)
       alert('Failed to revoke device access')
     } finally {
-      setRevokingId(null)
+      setIsProcessing(false)
     }
   }
 
-  const effectiveItems = deviceList.length > 0 ? deviceList : items
-
-  if (!effectiveItems?.length) {
+  if (!deviceList?.length) {
     return (
       <div className="text-center py-10 border border-dashed rounded-xl bg-gray-50/50">
         <ShieldCheck className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -47,7 +52,7 @@ export function DevicesPanel({ items }: { items: Device[] }) {
 
   return (
     <div className="grid grid-cols-1 gap-4">
-      {effectiveItems.map((device) => (
+      {deviceList.map((device) => (
         <div key={device.id} className="p-4 rounded-xl border border-border bg-white shadow-sm hover:border-primary/20 transition-all">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
@@ -76,8 +81,7 @@ export function DevicesPanel({ items }: { items: Device[] }) {
             </div>
 
             <button
-              onClick={() => handleRevoke(device.device_id)}
-              disabled={revokingId === device.device_id}
+              onClick={() => setRevokingDevice(device)}
               className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group"
               title="Revoke Trust"
             >
@@ -86,6 +90,40 @@ export function DevicesPanel({ items }: { items: Device[] }) {
           </div>
         </div>
       ))}
+
+      {/* Revoke Confirmation Modal */}
+      {revokingDevice && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Revoke Device Access?</h3>
+              <p className="text-sm text-gray-500 mt-2">
+                This device <span className="font-semibold">{revokingDevice.device_name}</span> will no longer be trusted and will require a fresh login.
+              </p>
+            </div>
+
+            <div className="p-6 pt-0 flex gap-3">
+              <button
+                onClick={() => setRevokingDevice(null)}
+                disabled={isProcessing}
+                className="flex-1 py-2.5 px-4 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRevoke}
+                disabled={isProcessing}
+                className="flex-1 py-2.5 px-4 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isProcessing ? 'Revoking...' : 'Yes, Revoke'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -64,7 +64,7 @@ export default function ProfilePage() {
 
       // Load login history
       const historyResponse = await apiClient.get<{ success: boolean; data: any[] }>(
-        `/api/v1/profile/login-history?limit=10`
+        `/api/v1/security/login-history?limit=10`
       )
       if (historyResponse.success) {
         setLoginHistory(historyResponse.data)
@@ -128,117 +128,126 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Profile & Settings</h1>
-      <ProfileHeader
-        first_name={user.first_name}
-        last_name={user.last_name}
-        email={user.email}
-        created_at={user.created_at}
-        profile_picture_url={user.profile_picture_url || undefined}
-        rightContent={
-          <ProfileAvatarUploader
-            onUploaded={(url) => {
-              if (user) setUser({ ...user, profile_picture_url: url })
-            }}
-          />
-        }
-      />
-
-      <div className="bg-white border-b border-border rounded-t-xl overflow-x-auto scrollbar-hide">
-        <div className="flex gap-4 sm:gap-8 px-4 sm:px-6 py-4 whitespace-nowrap min-w-max">
-          {[
-            { id: 'personal', label: 'Personal Info' },
-            { id: 'security', label: 'Security' },
-            { id: 'activity', label: 'Activity' },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`py-2 text-sm sm:text-base font-medium transition ${activeTab === tab.id
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-                }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+    <div className="max-w-5xl mx-auto space-y-6 pb-20">
+      <div className="px-1">
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-6">Profile & Settings</h1>
+        <ProfileHeader
+          first_name={user.first_name}
+          last_name={user.last_name}
+          email={user.email}
+          created_at={user.created_at}
+          profile_picture_url={user.profile_picture_url || undefined}
+          rightContent={
+            <ProfileAvatarUploader
+              onUploaded={(url) => {
+                if (user) setUser({ ...user, profile_picture_url: url })
+              }}
+            />
+          }
+        />
       </div>
 
-      {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Loading profile...</div>
-      ) : (
-        <div className="min-h-[400px]">
-          {activeTab === 'personal' && (
-            <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="bg-white rounded-xl p-4 sm:p-8 border border-border shadow-sm">
-                <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <h2 className="text-xl sm:text-2xl font-bold text-foreground">Personal Information</h2>
-                  {!isEditing ? (
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50 transition font-medium"
-                    >
-                      Edit Profile
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
+      <div className="bg-white border border-border rounded-xl overflow-hidden shadow-sm">
+        <div className="border-b border-border bg-gray-50/50 overflow-x-auto scrollbar-hide">
+          <div className="flex px-2 sm:px-6">
+            {[
+              { id: 'personal', label: 'Personal Info' },
+              { id: 'security', label: 'Security' },
+              { id: 'activity', label: 'Activity' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`py-4 px-4 sm:px-6 text-sm sm:text-base font-medium transition-all relative whitespace-nowrap ${activeTab === tab.id
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-gray-100/50'
+                  }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-8 min-h-[400px]">
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="animate-in fade-in duration-500">
+              {activeTab === 'personal' && (
+                <div className="space-y-6">
+                  <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Personal Information</h2>
+                    {!isEditing ? (
                       <button
-                        onClick={() => {
-                          setIsEditing(false)
-                          loadProfileData()
-                        }}
-                        className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50 transition"
+                        onClick={() => setIsEditing(true)}
+                        className="px-6 py-2 bg-white border border-border rounded-xl hover:bg-gray-50 transition-all font-semibold text-gray-700"
                       >
-                        Cancel
+                        Edit Profile
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setIsEditing(false)
+                            loadProfileData()
+                          }}
+                          className="px-6 py-2 border border-border rounded-xl hover:bg-gray-50 transition-all font-semibold text-gray-500"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <PersonalInfoForm
+                    value={profileData}
+                    disabled={!isEditing || loading}
+                    onChange={setProfileData}
+                    onSubmit={handleUpdateProfile}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'security' && (
+                <div className="space-y-6">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">Security Settings</h2>
+                  <SecurityPanel />
+                </div>
+              )}
+
+              {activeTab === 'activity' && (
+                <div className="space-y-10">
+                  <section>
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">Recent Login Activity</h2>
+                    <ActivityList items={loginHistory} />
+                  </section>
+
+                  <section>
+                    <div className="flex items-center justify-between mb-6">
+                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Trusted Devices</h2>
+                      <button
+                        onClick={loadProfileData}
+                        className="text-primary text-sm hover:underline font-bold"
+                      >
+                        Refresh List
                       </button>
                     </div>
-                  )}
+                    <p className="text-sm text-gray-500 mb-6">
+                      These devices have access to your account without requiring additional security prompts.
+                    </p>
+                    <DevicesPanel items={trustedDevices} />
+                  </section>
                 </div>
-                <PersonalInfoForm
-                  value={profileData}
-                  disabled={!isEditing || loading}
-                  onChange={setProfileData}
-                  onSubmit={handleUpdateProfile}
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'security' && (
-            <div className="bg-white rounded-xl p-4 sm:p-8 border border-border shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Security Settings</h2>
-              <SecurityPanel onRefreshDevices={loadProfileData} />
-            </div>
-          )}
-
-          {activeTab === 'activity' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="bg-white rounded-xl p-4 sm:p-8 border border-border shadow-sm">
-                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Recent Login Activity</h2>
-                <ActivityList items={loginHistory} />
-              </div>
-
-              <div className="bg-white rounded-xl p-4 sm:p-8 border border-border shadow-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-foreground">Trusted Devices</h3>
-                  <button
-                    onClick={loadProfileData}
-                    className="text-primary text-sm hover:underline font-medium"
-                  >
-                    Refresh
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground mb-6">
-                  These devices have access to your account without requiring additional security prompts.
-                </p>
-                <DevicesPanel items={trustedDevices} />
-              </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

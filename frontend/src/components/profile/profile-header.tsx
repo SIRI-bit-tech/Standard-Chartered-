@@ -14,26 +14,30 @@ interface Props {
 export function ProfileHeader({ first_name, last_name, email, created_at, profile_picture_url, rightContent }: Props) {
   const initials = getInitials(first_name, last_name)
   return (
-    <div className="bg-white rounded-xl p-6 border" style={{ borderColor: colors.border }}>
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-        <Avatar className="h-16 w-16">
-          {profile_picture_url ? <AvatarImage src={profile_picture_url} alt={`${first_name} ${last_name}`} /> : null}
-          <AvatarFallback className="text-lg">{initials}</AvatarFallback>
-        </Avatar>
-        <div className="flex-1">
-          <h2 className="text-xl font-semibold" style={{ color: colors.textPrimary }}>
-            {first_name} {last_name}
-          </h2>
-          <p className="text-sm" style={{ color: colors.textSecondary }}>{email}</p>
-          {created_at ? (
-            <p className="text-xs mt-1" style={{ color: colors.gray500 }}>
-              Joined {new Date(created_at).toLocaleDateString()}
-            </p>
-          ) : null}
+    <div className="bg-white rounded-xl p-4 sm:p-6 border shadow-sm" style={{ borderColor: colors.border }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+          <Avatar className="h-20 w-20 border-2 border-white shadow-sm">
+            {profile_picture_url ? <AvatarImage src={profile_picture_url} alt={`${first_name} ${last_name}`} /> : null}
+            <AvatarFallback className="text-xl bg-primary/5 text-primary">{initials}</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h2 className="text-xl sm:text-2xl font-bold truncate" style={{ color: colors.textPrimary }}>
+              {first_name} {last_name}
+            </h2>
+            <p className="text-sm truncate" style={{ color: colors.textSecondary }}>{email}</p>
+            {created_at ? (
+              <p className="text-xs mt-1" style={{ color: colors.gray500 }}>
+                Member since {new Date(created_at).toLocaleDateString()}
+              </p>
+            ) : null}
+          </div>
         </div>
-        </div>
-        {rightContent ? <div className="shrink-0">{rightContent}</div> : null}
+        {rightContent ? (
+          <div className="shrink-0 flex justify-center sm:justify-end">
+            {rightContent}
+          </div>
+        ) : null}
       </div>
     </div>
   )

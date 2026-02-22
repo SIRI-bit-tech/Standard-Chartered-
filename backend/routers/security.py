@@ -250,7 +250,9 @@ async def get_login_history(
             "device_name": r.device_name,
             "user_agent": r.user_agent,
             "status": "successful" if r.login_successful else "failed",
-            "failure_reason": r.failure_reason
+            "failure_reason": r.failure_reason,
+            "city": r.city,
+            "country": r.country
         } for r in rows
     ]}
 

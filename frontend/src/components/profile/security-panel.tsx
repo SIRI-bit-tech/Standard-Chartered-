@@ -2,22 +2,19 @@
 
 import { useEffect, useState } from "react"
 import { apiClient } from "@/lib/api-client"
-import type { TrustedDevice, LoginHistoryItem, TwoFactorSetupPayload } from "@/types"
+import type { TwoFactorSetupPayload } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { QRCodeSVG } from "qrcode.react"
+import { ShieldCheck, ShieldAlert, Key, Trash2, ShieldX, AlertTriangle } from 'lucide-react'
 
-interface Props {
-  onRefreshDevices: () => void
-}
-
-export function SecurityPanel({ onRefreshDevices }: Props) {
+export function SecurityPanel() {
   const [busy, setBusy] = useState(false)
   const [enabled, setEnabled] = useState<boolean>(false)
   const [showSetup, setShowSetup] = useState(false)
+  const [showDisableModal, setShowDisableModal] = useState(false)
   const [setupData, setSetupData] = useState<TwoFactorSetupPayload | null>(null)
   const [otp, setOtp] = useState('')
-  const [devices, setDevices] = useState<TrustedDevice[]>([])
-  const [history, setHistory] = useState<LoginHistoryItem[]>([])
+  const [disableOtp, setDisableOtp] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pwdOpen, setPwdOpen] = useState(false)
   const [currentPwd, setCurrentPwd] = useState('')
@@ -26,25 +23,14 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState<string | null>(null)
 
-  /* removed unused deviceInfo */
-
-  const load = async () => {
+  const loadStatus = async () => {
     try {
       const prof = await apiClient.get<{ success: boolean; data: any }>('/api/v1/profile')
       setEnabled(!!prof?.data?.two_factor_enabled)
-      const devs = await apiClient.get<{ success: boolean; data: TrustedDevice[] }>('/api/v1/security/devices')
-      if (devs?.success) setDevices(devs.data)
-      const hist = await apiClient.get<{ success: boolean; data: LoginHistoryItem[] }>('/api/v1/security/login-history?limit=5')
-      if (hist?.success) setHistory(hist.data)
-      try {
-        onRefreshDevices()
-      } catch { /* no-op */ }
-    } catch (e) {
-      // ignore
-    }
+    } catch { /* no-op */ }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { loadStatus() }, [])
 
   const beginSetup = async () => {
     setBusy(true)
@@ -75,7 +61,7 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
         setEnabled(true)
         setShowSetup(false)
         setOtp('')
-        load()
+        loadStatus()
       } else {
         setError('Verification failed. Check the code and try again.')
       }
@@ -86,32 +72,20 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
     }
   }
 
-  const disable2fa = async () => {
-    const code = prompt('Enter a current 2FA code to disable:')
-    if (!code) return
+  const handleDisable2fa = async () => {
+    if (!disableOtp || disableOtp.length !== 6) return
     setBusy(true)
     setError(null)
     try {
-      const res = await apiClient.post<{ success: boolean }>('/api/v1/security/2fa/disable', { code })
+      const res = await apiClient.post<{ success: boolean }>('/api/v1/security/2fa/disable', { code: disableOtp })
       if (res?.success) {
         setEnabled(false)
-        load()
+        setShowDisableModal(false)
+        setDisableOtp('')
+        loadStatus()
       }
     } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Failed to disable 2FA.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const revoke = async (device_id: string) => {
-    setBusy(true)
-    try {
-      await apiClient.delete('/api/v1/security/devices/revoke', { params: { device_id } })
-      setDevices((d) => d.filter((x) => x.device_id !== device_id))
-      try {
-        onRefreshDevices()
-      } catch { /* no-op */ }
+      setError(e?.response?.data?.detail || 'Failed to disable 2FA. Check the code.')
     } finally {
       setBusy(false)
     }
@@ -140,9 +114,7 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
         setCurrentPwd('')
         setNewPwd('')
         setConfirmPwd('')
-        setPwdOpen(false)
-      } else {
-        setPwdError('Failed to change password.')
+        setTimeout(() => setPwdOpen(false), 2000)
       }
     } catch (e: any) {
       setPwdError(e?.response?.data?.detail || 'Failed to change password.')
@@ -152,145 +124,77 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="font-semibold mb-3">Authentication</h3>
-        <div className="flex flex-col md:flex-row gap-3">
-          <button onClick={() => setPwdOpen(true)} className="px-4 py-2 border rounded-lg hover:bg-muted transition" disabled={busy}>
-            Change Password
-          </button>
-          {!enabled ? (
-            <button onClick={beginSetup} className="px-4 py-2 border border-primary text-primary rounded-lg hover:bg-primary/5 transition" disabled={busy}>
-              Enable 2FA
-            </button>
-          ) : (
-            <button onClick={disable2fa} className="px-4 py-2 border border-destructive text-destructive rounded-lg hover:bg-destructive/5 transition" disabled={busy}>
-              Disable 2FA
-            </button>
-          )}
-        </div>
-        {error && <p className="text-sm text-destructive mt-2">{error}</p>}
-        <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Change Password</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              {pwdError && <div className="text-sm text-destructive">{pwdError}</div>}
-              {pwdSuccess && <div className="text-sm text-success">{pwdSuccess}</div>}
-              <div>
-                <label className="text-xs text-muted-foreground">Current Password</label>
-                <input type="password" className="w-full px-3 py-2 border rounded" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">New Password</label>
-                <input type="password" className="w-full px-3 py-2 border rounded" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Confirm New Password</label>
-                <input type="password" className="w-full px-3 py-2 border rounded" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <button className="px-4 py-2 border rounded" onClick={() => setPwdOpen(false)} disabled={busy}>Cancel</button>
-                <button className="px-4 py-2 bg-primary text-white rounded disabled:opacity-50" disabled={busy} onClick={submitPasswordChange}>
-                  Save
+    <div className="space-y-8">
+      {/* 2FA Section */}
+      <div className="p-6 bg-gray-50 rounded-2xl border border-border/50">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
+          <div className={`p-3 rounded-full ${enabled ? 'bg-green-100' : 'bg-primary/10'}`}>
+            {enabled ? <ShieldCheck className="w-6 h-6 text-green-600" /> : <ShieldAlert className="w-6 h-6 text-primary" />}
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-900">Two-Factor Authentication</h3>
+            <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+              Add an extra layer of security to your account by requiring a code from your mobile device.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {!enabled ? (
+                <button
+                  onClick={beginSetup}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-primary text-white rounded-xl hover:opacity-90 transition-all font-semibold shadow-sm shadow-primary/20 disabled:opacity-50"
+                  disabled={busy}
+                >
+                  Enable 2FA
                 </button>
-              </div>
+              ) : (
+                <button
+                  onClick={() => setShowDisableModal(true)}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-white text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-all font-semibold disabled:opacity-50"
+                  disabled={busy}
+                >
+                  Disable 2FA
+                </button>
+              )}
             </div>
-          </DialogContent>
-        </Dialog>
+            {error && <p className="text-sm text-red-600 font-medium mt-3">{error}</p>}
+          </div>
+        </div>
       </div>
-      <Dialog open={showSetup} onOpenChange={(o) => setShowSetup(o)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enable Two-Factor Authentication</DialogTitle>
-          </DialogHeader>
-          {setupData && (
-            <div>
-              <p className="text-sm mb-3">Scan this QR code in your authenticator app, or enter the code manually.</p>
-              <div className="flex items-center gap-6">
-                <QRCodeSVG
-                  value={setupData.otpauth_uri}
-                  className="w-40 h-40 border rounded"
-                  title="Authenticator QR code"
-                  includeMargin
-                />
-                <div className="flex-1">
-                  <div className="text-xs text-muted-foreground">Manual code</div>
-                  <div className="font-mono text-sm mb-2">{setupData.secret}</div>
-                  <input
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                    className="w-full px-3 py-2 border rounded"
-                    placeholder="Enter 6-digit code"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  />
-                  <button onClick={confirmSetup} disabled={busy || otp.length !== 6} className="mt-3 px-4 py-2 bg-primary text-white rounded disabled:opacity-50">
-                    Verify & Enable
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-      <hr className="border-border" />
-      <div>
-        <h3 className="font-semibold mb-3">Trusted Devices</h3>
-        <p className="text-sm text-muted-foreground mb-3">Manage devices that have access to your account.</p>
-        <div className="space-y-2">
-          {devices.length === 0 && <p className="text-sm text-muted-foreground">No trusted devices</p>}
-          {devices.map((d) => (
-            <div key={d.id} className="flex items-center justify-between p-3 border rounded">
-              <div>
-                <p className="text-sm font-medium">{d.device_name || 'Unknown Device'}</p>
-                <p className="text-xs text-muted-foreground">{d.ip_address || '—'} • Last seen {d.last_seen ? new Date(d.last_seen).toLocaleString() : '—'}</p>
-              </div>
-              <button onClick={() => revoke(d.device_id)} className="text-xs px-3 py-1 border rounded hover:bg-muted" disabled={busy}>
-                Revoke
+
+      {/* Password Section */}
+      <div className="p-6 bg-white rounded-2xl border border-border shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
+          <div className="p-3 rounded-full bg-blue-50">
+            <Key className="w-6 h-6 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-900">Account Password</h3>
+            <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+              Update your account password regularly to keep your account secure.
+            </p>
+            <div className="mt-4">
+              <button
+                onClick={() => setPwdOpen(true)}
+                className="w-full sm:w-auto px-6 py-2.5 border border-border rounded-xl hover:bg-gray-50 transition-all font-semibold text-gray-700 disabled:opacity-50"
+                disabled={busy}
+              >
+                Change Password
               </button>
             </div>
-          ))}
+          </div>
         </div>
-        <button className="mt-3 px-4 py-2 border rounded-lg hover:bg-muted transition" onClick={load} disabled={busy}>
-          Refresh
-        </button>
       </div>
-      <hr className="border-border" />
-      <div>
-        <h3 className="font-semibold mb-3">Recent Login Activity</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground">
-                <th className="text-left py-2">Date & Time</th>
-                <th className="text-left py-2">IP</th>
-                <th className="text-left py-2">Location</th>
-                <th className="text-left py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((h) => (
-                <tr key={h.id} className="border-t">
-                  <td className="py-2">{new Date(h.created_at).toLocaleString()}</td>
-                  <td className="py-2">{h.ip_address || '—'}</td>
-                  <td className="py-2">{h.city || '—'}{h.city && h.country ? ', ' : ''}{h.country || ''}</td>
-                  <td className="py-2">{h.status === 'successful' ? 'Successful' : 'Failed'}</td>
-                </tr>
-              ))}
-              {history.length === 0 && (
-                <tr><td className="py-2 text-muted-foreground" colSpan={4}>No login records</td></tr>
-              )}
-            </tbody>
-          </table>
+
+      <hr className="border-border/50" />
+
+      {/* Danger Zone */}
+      <div className="pt-2">
+        <div className="flex items-center gap-2 text-red-600 mb-4 px-2">
+          <Trash2 className="w-5 h-5" />
+          <h3 className="text-lg font-bold">Danger Zone</h3>
         </div>
-        <hr className="border-border" />
-        <div className="pt-4 pb-2">
-          <h3 className="font-semibold text-destructive mb-3 text-lg">Danger Zone</h3>
-          <p className="text-sm text-muted-foreground mb-4 max-w-xl">
-            Once you delete your account, there is no going back. All your data, transaction history, and documents will be permanently removed from our servers.
+        <div className="p-6 border border-red-100 bg-red-50/30 rounded-2xl">
+          <p className="text-sm text-gray-600 leading-relaxed max-w-2xl">
+            Deleting your account is permanent and cannot be undone. All your banking history, documents, and personal data will be erased immediately from our systems.
           </p>
           <button
             onClick={async () => {
@@ -310,13 +214,199 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
                 }
               }
             }}
-            className="px-6 py-2.5 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition text-sm font-semibold shadow-sm"
+            className="w-full sm:w-auto mt-6 px-8 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-bold text-sm shadow-sm"
             disabled={busy}
           >
             {busy ? "Deleting..." : "Delete Account"}
           </button>
         </div>
       </div>
+
+      {/* Password Dialog */}
+      <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
+        <DialogContent className="w-[95%] sm:max-w-md rounded-2xl p-6 shadow-2xl">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl font-bold">Update Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {pwdError && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100 font-medium">{pwdError}</div>}
+            {pwdSuccess && <div className="p-3 bg-green-50 text-green-600 rounded-lg text-sm border border-green-100 font-medium">{pwdSuccess}</div>}
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700">Current Password</label>
+              <input
+                type="password"
+                className="w-full px-4 py-3 bg-gray-50 border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
+                value={currentPwd}
+                onChange={(e) => setCurrentPwd(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700">New Password</label>
+              <input
+                type="password"
+                className="w-full px-4 py-3 bg-gray-50 border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700">Confirm Password</label>
+              <input
+                type="password"
+                className="w-full px-4 py-3 bg-gray-50 border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
+                value={confirmPwd}
+                onChange={(e) => setConfirmPwd(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <button
+                className="flex-1 py-3 border border-border rounded-xl hover:bg-gray-50 transition-all font-bold text-gray-500 order-2 sm:order-1"
+                onClick={() => setPwdOpen(false)}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 py-3 bg-primary text-white rounded-xl hover:opacity-90 transition-all font-bold shadow-lg shadow-primary/20 disabled:opacity-50 order-1 sm:order-2"
+                disabled={busy}
+                onClick={submitPasswordChange}
+              >
+                {busy ? 'Updating...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 2FA Setup Dialog */}
+      <Dialog open={showSetup} onOpenChange={(o) => setShowSetup(o)}>
+        <DialogContent className="w-[95%] sm:max-w-md rounded-2xl overflow-hidden p-0 shadow-2xl">
+          <div className="bg-primary/5 p-6 border-b border-primary/10">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <ShieldCheck className="w-6 h-6 text-primary" />
+              Secure your account
+            </DialogTitle>
+          </div>
+
+          <div className="p-6">
+            {setupData && (
+              <div className="space-y-6">
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Scan this QR code with your authenticator app, or enter the manual code below.
+                </p>
+                <div className="flex flex-col items-center gap-6">
+                  <div className="p-4 bg-white border border-border rounded-2xl shadow-sm">
+                    <QRCodeSVG
+                      value={setupData.otpauth_uri}
+                      className="w-40 h-40 sm:w-48 sm:h-48"
+                      title="Authenticator QR code"
+                    />
+                  </div>
+
+                  <div className="w-full space-y-4">
+                    <div className="p-3 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-center">
+                      <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-1">Manual Setup Code</div>
+                      <div className="font-mono text-base font-bold text-gray-700 tracking-widest uppercase select-all">{setupData.secret}</div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-gray-700">Verification Code</label>
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        className="w-full px-4 py-3.5 bg-white border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all text-center text-xl font-mono tracking-[0.5rem] sm:tracking-[1rem]"
+                        placeholder="000000"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                      />
+                    </div>
+
+                    <button
+                      onClick={confirmSetup}
+                      disabled={busy || otp.length !== 6}
+                      className="w-full py-4 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 transition-all disabled:opacity-50"
+                    >
+                      {busy ? 'Verifying...' : 'Verify & Enable'}
+                    </button>
+
+                    <button
+                      onClick={() => setShowSetup(false)}
+                      className="w-full py-2 text-gray-400 text-sm font-medium hover:text-gray-600 transition-colors"
+                    >
+                      Cancel Setup
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 2FA Disable Dialog */}
+      <Dialog open={showDisableModal} onOpenChange={setShowDisableModal}>
+        <DialogContent className="w-[95%] sm:max-w-md rounded-2xl overflow-hidden p-0 shadow-2xl">
+          <div className="bg-red-50 p-6 border-b border-red-100">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2 text-red-700">
+              <ShieldX className="w-6 h-6" />
+              Disable 2FA
+            </DialogTitle>
+          </div>
+
+          <div className="p-6">
+            <div className="space-y-6">
+              <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800 leading-relaxed">
+                  Disabling Two-Factor Authentication will make your account less secure. Please enter your 6-digit code to proceed.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">Confirmation Code</label>
+                  <input
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    className="w-full px-4 py-3.5 bg-white border border-border rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all text-center text-xl font-mono tracking-[0.5rem] sm:tracking-[1rem]"
+                    placeholder="000000"
+                    value={disableOtp}
+                    onChange={(e) => setDisableOtp(e.target.value.replace(/\D/g, ''))}
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => {
+                      setShowDisableModal(false);
+                      setDisableOtp('');
+                    }}
+                    className="flex-1 py-3 border border-border rounded-xl hover:bg-gray-50 transition-all font-bold text-gray-500 order-2 sm:order-1"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDisable2fa}
+                    disabled={busy || disableOtp.length !== 6}
+                    className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold shadow-lg shadow-red-200 hover:bg-red-700 transition-all disabled:opacity-50 order-1 sm:order-2"
+                  >
+                    {busy ? 'Disabling...' : 'Yes, Disable'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
