@@ -63,8 +63,8 @@ export function DevicesPanel({ items }: { items: Device[] }) {
                   <Monitor className="w-5 h-5 text-primary" />
                 )}
               </div>
-              <div className="min-w-0">
-                <h4 className="font-semibold text-gray-900 truncate">
+              <div className="min-w-0 flex-1">
+                <h4 className="font-semibold text-gray-900 break-words leading-tight">
                   {device.device_name || 'Unknown Device'}
                 </h4>
                 <div className="flex flex-col gap-1 mt-1">

@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { DASHBOARD_NAV_ITEMS } from '@/constants/dashboard'
 import { NeedHelpCard } from './need-help-card'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { colors } from '@/types'
 
@@ -50,32 +49,15 @@ export function SidebarContent({ onLinkClick }: { onLinkClick?: () => void } = {
   )
 }
 
-interface DashboardSidebarProps {
-  mobileOpen?: boolean
-  onMobileOpenChange?: (open: boolean) => void
-}
+interface DashboardSidebarProps { }
 
-export function DashboardSidebar({ mobileOpen = false, onMobileOpenChange }: DashboardSidebarProps) {
-  const closeSheet = () => onMobileOpenChange?.(false)
-
+export function DashboardSidebar({ }: DashboardSidebarProps) {
   return (
-    <>
-      <aside
-        className="hidden w-64 flex-col border-r xl:flex"
-        style={{ backgroundColor: colors.primary, borderColor: colors.primaryDark }}
-      >
-        <SidebarContent />
-      </aside>
-
-      <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
-        <SheetContent
-          side="left"
-          className="w-64 p-0"
-          style={{ backgroundColor: colors.primary, borderColor: colors.primaryDark }}
-        >
-          <SidebarContent onLinkClick={closeSheet} />
-        </SheetContent>
-      </Sheet>
-    </>
+    <aside
+      className="hidden w-64 flex-col border-r xl:flex"
+      style={{ backgroundColor: colors.primary, borderColor: colors.primaryDark }}
+    >
+      <SidebarContent />
+    </aside>
   )
 }

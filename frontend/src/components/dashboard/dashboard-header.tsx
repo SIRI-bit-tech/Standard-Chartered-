@@ -74,6 +74,9 @@ export function DashboardHeader() {
       style={{ borderColor: colors.border }}
     >
       <div className="flex h-14 items-center justify-between gap-2 px-4 sm:px-6">
+        <Link href="/dashboard" className="flex items-center shrink-0">
+          <img src="/logo.png" alt="Standard Chartered" className="h-8 w-auto" />
+        </Link>
         <div className="ml-auto flex items-center justify-end gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

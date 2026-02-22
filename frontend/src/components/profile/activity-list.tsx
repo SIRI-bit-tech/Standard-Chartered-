@@ -37,8 +37,8 @@ export function ActivityList({ items }: { items: Activity[] }) {
                 <div className="mt-1 w-8 h-8 rounded-full bg-primary/5 flex items-center justify-center flex-shrink-0">
                   <Globe className="w-4 h-4 text-primary" />
                 </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 truncate max-w-[200px] sm:max-w-md">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-gray-900 break-words leading-tight">
                     {activity.device_name || 'System Login'}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 mt-0.5">
