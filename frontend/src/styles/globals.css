@@ -4,6 +4,9 @@
 
 /* Root variables */
 :root {
+  /* Lock to light mode — prevents OS dark mode from auto-inverting the app */
+  color-scheme: light;
+
   /* User-defined colors - PRESERVED */
   --primary: #0073CF;
   --primary-dark: #003f7d;

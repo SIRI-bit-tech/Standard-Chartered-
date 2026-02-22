@@ -43,16 +43,19 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-theme="light" style={{ colorScheme: 'light' }}>
       <head>
         <meta charSet="utf-8" />
+        {/* Force light color scheme — prevents phone dark mode from inverting the app */}
+        <meta name="color-scheme" content="light" />
         <link rel="manifest" href="/manifest.json" />
       </head>
-      <body className="bg-background text-foreground antialiased">
+      <body className="bg-background text-foreground antialiased" style={{ colorScheme: 'light' }}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
+          forcedTheme="light"
           disableTransitionOnChange
         >
           {children}

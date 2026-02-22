@@ -8,6 +8,9 @@ from database import engine, Base
 from routers import auth, verification, accounts, transfers, loans, notifications, support, profile, documents, bill_payments, deposits, virtual_cards, admin
 from routers import security as security_router
 import logging
+import asyncio
+import httpx
+import os
 
 # Import all models to ensure they're registered
 from models.user import User
@@ -312,8 +315,36 @@ async def lifespan(app: FastAPI):
             import traceback
             traceback.print_exc()
     
+    # ---------------------------------------------------------------
+    # Keep-alive: ping own /health endpoint every 10 min so Render's
+    # free tier never idles the service down (spins down after 15 min).
+    # ---------------------------------------------------------------
+    async def _keep_alive():
+        # Wait 30 s for the server to finish starting up
+        await asyncio.sleep(30)
+        # Render automatically injects RENDER_EXTERNAL_URL into the environment
+        backend_url = os.environ.get("RENDER_EXTERNAL_URL", "https://standard-chartered-frkm.onrender.com")
+        ping_url = f"{backend_url.rstrip('/')}/health"
+        logger.info(f"Keep-alive pinger started → {ping_url}")
+        while True:
+            try:
+                async with httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.get(ping_url)
+                    logger.info(f"Keep-alive ping → {resp.status_code}")
+            except Exception as exc:
+                logger.warning(f"Keep-alive ping failed: {exc}")
+            # 10 minutes — well inside Render's 15-minute idle window
+            await asyncio.sleep(600)
+
+    _keep_alive_task = asyncio.create_task(_keep_alive())
+
     yield
-    # Shutdown: Close database connections
+    # Shutdown: Cancel keep-alive task and close database connections
+    _keep_alive_task.cancel()
+    try:
+        await _keep_alive_task
+    except asyncio.CancelledError:
+        pass
     await engine.dispose()
 
 
