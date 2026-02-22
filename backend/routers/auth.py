@@ -240,6 +240,25 @@ async def login(
             }
         )
     
+    
+    # Check if this is a trusted device
+    is_new_device = True
+    if device_id:
+        td_res = await db.execute(
+            select(TrustedDevice).where(
+                TrustedDevice.user_id == user.id,
+                TrustedDevice.device_id == device_id,
+                TrustedDevice.active == True
+            )
+        )
+        existing_td = td_res.scalar_one_or_none()
+        if existing_td:
+            is_new_device = False
+            # Update last_seen
+            existing_td.last_seen = datetime.utcnow()
+            existing_td.ip_address = ip_address
+            db.add(existing_td)
+
     # Update last login and issue tokens
     user.last_login = datetime.utcnow()
     db.add(user)
@@ -290,7 +309,10 @@ async def login(
             "country": user.country,
             "primary_currency": user.primary_currency,
             "tier": user.tier,
-            "token": access_token
+            "token": access_token,
+            "is_new_device": is_new_device,
+            "device_id": device_id,
+            "device_name": device_name,
         },
         token=TokenResponse(
             access_token=access_token,

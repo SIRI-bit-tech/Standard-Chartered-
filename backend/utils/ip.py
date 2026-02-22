@@ -1,86 +1,81 @@
 from fastapi import Request
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Dict, Any
 import json
 import urllib.request
 from ipaddress import ip_address, ip_network
-from config import settings
+
+# Private/reserved IP ranges that can never be geolocated
+_PRIVATE_NETS = [
+    ip_network("10.0.0.0/8"),
+    ip_network("172.16.0.0/12"),
+    ip_network("192.168.0.0/16"),
+    ip_network("127.0.0.0/8"),
+    ip_network("169.254.0.0/16"),
+]
 
 
-def _parse_trusted_proxies():
-    cidrs = getattr(settings, "TRUSTED_PROXY_CIDRS", "") or ""
-    items = [c.strip() for c in cidrs.split(",") if c.strip()]
-    nets = []
-    for item in items:
-        try:
-            nets.append(ip_network(item, strict=False))
-        except Exception:
-            continue
-    return nets
-
-
-_TRUSTED_PROXY_NETS = _parse_trusted_proxies()
-
-
-def _is_trusted_proxy(remote: Optional[str]) -> bool:
-    if not remote or not _TRUSTED_PROXY_NETS:
-        return False
+def _is_private(ip_str: Optional[str]) -> bool:
+    if not ip_str:
+        return True
     try:
-        rip = ip_address(remote)
-        return any(rip in n for n in _TRUSTED_PROXY_NETS)
+        addr = ip_address(ip_str.split("%")[0])  # strip IPv6 zone id
+        if addr.is_loopback or addr.is_link_local or addr.is_private:
+            return True
+        return any(addr in net for net in _PRIVATE_NETS)
     except Exception:
-        return False
+        return True
 
 
 def get_client_ip(request: Request) -> Optional[str]:
-    """Extract the real client IP from common proxy headers or fallback to connection host."""
+    """Extract the real client IP — always check proxy headers first.
+
+    On Render (and most cloud deployments) the direct connection host is
+    always an internal 10.x IP from the ingress router, so we must read
+    the forwarded-for / Cloudflare headers to get the real public IP.
+    """
     headers = request.headers
-    remote = None
+
+    # Priority 1: Cloudflare header — set only by CF, hardest to spoof
+    for cf_key in ("cf-connecting-ip", "CF-Connecting-IP"):
+        cf = headers.get(cf_key)
+        if cf:
+            ip = cf.split(",")[0].strip()
+            if ip and not _is_private(ip):
+                return ip
+
+    # Priority 2: Standard X-Forwarded-For (take the first non-private hop)
+    xff = headers.get("x-forwarded-for") or headers.get("X-Forwarded-For")
+    if xff:
+        for part in xff.split(","):
+            ip = part.strip()
+            if ip and not _is_private(ip):
+                return ip
+
+    # Priority 3: X-Real-IP (nginx / other proxies)
+    for xri_key in ("x-real-ip", "X-Real-IP"):
+        xri = headers.get(xri_key)
+        if xri:
+            ip = xri.strip()
+            if ip and not _is_private(ip):
+                return ip
+
+    # Fallback: direct connection host (may be private on Render)
     try:
         if request.client and request.client.host:
-            remote = request.client.host
-    except Exception:
-        remote = None
-
-    # Only inspect proxy-provided headers when the request originates from a trusted proxy
-    if _is_trusted_proxy(remote):
-        header_order = ["x-forwarded-for", "cf-connecting-ip", "x-real-ip"]
-        for key in header_order:
-            val = headers.get(key) or headers.get(key.upper())
-            if val:
-                # x-forwarded-for can be a list: client, proxy1, proxy2
-                ip = val.split(",")[0].strip()
-                if ip and ip not in ("::1", "127.0.0.1", "0.0.0.0"):
-                    return ip
-
-        # Only accept x-client-ip when request is from a trusted reverse proxy
-        val = headers.get("x-client-ip") or headers.get("X-CLIENT-IP")
-        if val:
-            ip = val.split(",")[0].strip()
-            if ip and ip not in ("::1", "127.0.0.1", "0.0.0.0"):
-                return ip
-    else:
-        # If not from a trusted proxy, return the direct connection host immediately
-        try:
-            if remote:
-                return remote
-        except Exception:
-            pass
-
-    try:
-        if remote:
-            return remote
+            return request.client.host
     except Exception:
         pass
+
     return None
 
 
 def geolocate_ip(ip: Optional[str]) -> Optional[Dict[str, Any]]:
-    """Best-effort geolocation for an IP using a public API. Avoids dependencies."""
-    if not ip or ip in ("127.0.0.1", "::1", "0.0.0.0"):
+    """Best-effort geolocation for an IP using ip-api.com (free, no key needed)."""
+    if not ip or _is_private(ip):
         return None
     try:
         url = f"https://ip-api.com/json/{ip}?fields=status,country,city,timezone,query"
-        with urllib.request.urlopen(url, timeout=4) as resp:
+        with urllib.request.urlopen(url, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if data.get("status") == "success":
                 return {

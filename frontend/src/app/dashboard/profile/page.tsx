@@ -1,8 +1,6 @@
 'use client'
 
-import React from "react"
-
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from "react"
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
 import { ProfileHeader } from '@/components/profile/profile-header'
@@ -12,7 +10,6 @@ import { ActivityList } from '@/components/profile/activity-list'
 import { DevicesPanel } from '@/components/profile/devices-panel'
 import { useUserRealtime } from '@/hooks/use-user-realtime'
 import { ProfileAvatarUploader } from '@/components/profile/profile-avatar-uploader'
-import { formatDate } from '@/lib/utils'
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('personal')
@@ -30,7 +27,7 @@ export default function ProfilePage() {
     email: '',
   })
   const [loginHistory, setLoginHistory] = useState<any[]>([])
-  const [documents, setDocuments] = useState<any[]>([])
+  const [trustedDevices, setTrustedDevices] = useState<any[]>([])
   const { user, setUser } = useAuthStore()
 
   useEffect(() => {
@@ -73,10 +70,10 @@ export default function ProfilePage() {
         setLoginHistory(historyResponse.data)
       }
 
-      // Load documents
-      const documentsResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/profile/documents`)
-      if (documentsResponse.success) {
-        setDocuments(documentsResponse.data)
+      // Load actual trusted devices
+      const devicesResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/security/devices`)
+      if (devicesResponse.success) {
+        setTrustedDevices(devicesResponse.data)
       }
     } catch (error) {
       console.error('Failed to load profile data:', error)
@@ -121,7 +118,6 @@ export default function ProfilePage() {
   useUserRealtime(activityChannel, (payload) => {
     try {
       if (payload?.type === 'login_activity' || payload?.type === 'security_update' || payload?.type === 'profile_update') {
-        // Refresh history and security related widgets
         loadProfileData()
       }
     } catch { /* no-op */ }
@@ -149,21 +145,19 @@ export default function ProfilePage() {
         }
       />
 
-      {/* Tabs - Scrollable on mobile */}
       <div className="bg-white border-b border-border rounded-t-xl overflow-x-auto scrollbar-hide">
         <div className="flex gap-4 sm:gap-8 px-4 sm:px-6 py-4 whitespace-nowrap min-w-max">
           {[
             { id: 'personal', label: 'Personal Info' },
             { id: 'security', label: 'Security' },
-            { id: 'documents', label: 'Documents' },
             { id: 'activity', label: 'Activity' },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`py-2 text-sm sm:text-base font-medium transition ${activeTab === tab.id
-                  ? 'border-b-2 border-primary text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
                 }`}
             >
               {tab.label}
@@ -173,21 +167,20 @@ export default function ProfilePage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12">Loading profile...</div>
+        <div className="text-center py-12 text-muted-foreground">Loading profile...</div>
       ) : (
-        <>
-          {/* Personal Info Tab */}
+        <div className="min-h-[400px]">
           {activeTab === 'personal' && (
-            <div className="grid grid-cols-1 gap-6">
-              <div className="bg-white rounded-xl p-4 sm:p-8 border border-border">
+            <div className="grid grid-cols-1 gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="bg-white rounded-xl p-4 sm:p-8 border border-border shadow-sm">
                 <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h2 className="text-xl sm:text-2xl font-bold text-foreground">Personal Information</h2>
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="px-4 py-2 text-sm border rounded-lg hover:bg-muted transition"
+                      className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50 transition font-medium"
                     >
-                      Edit
+                      Edit Profile
                     </button>
                   ) : (
                     <div className="flex gap-2">
@@ -196,7 +189,7 @@ export default function ProfilePage() {
                           setIsEditing(false)
                           loadProfileData()
                         }}
-                        className="px-4 py-2 text-sm border rounded-lg hover:bg-muted transition"
+                        className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-gray-50 transition"
                       >
                         Cancel
                       </button>
@@ -213,52 +206,38 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Security Tab */}
           {activeTab === 'security' && (
-            <div className="bg-white rounded-xl p-4 sm:p-8 border border-border">
+            <div className="bg-white rounded-xl p-4 sm:p-8 border border-border shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
               <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Security Settings</h2>
-
               <SecurityPanel onRefreshDevices={loadProfileData} />
             </div>
           )}
 
-          {/* Documents Tab */}
-          {activeTab === 'documents' && (
-            <div className="bg-white rounded-xl p-4 sm:p-8 border border-border">
-              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Documents</h2>
-
-              {documents.length > 0 ? (
-                <div className="space-y-3">
-                  {documents.map((doc) => (
-                    <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border rounded-lg gap-4">
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">{doc.filename}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(doc.created_at)}</p>
-                      </div>
-                      <button className="px-3 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 transition text-sm w-full sm:w-auto">
-                        Download
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No documents uploaded yet</p>
-              )}
-            </div>
-          )}
-
-          {/* Activity Tab */}
           {activeTab === 'activity' && (
-            <div className="bg-white rounded-xl p-4 sm:p-8 border border-border">
-              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Login Activity</h2>
-              <ActivityList items={loginHistory} />
-              <div className="mt-8">
-                <h3 className="font-semibold mb-2">Devices</h3>
-                <DevicesPanel items={loginHistory} />
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="bg-white rounded-xl p-4 sm:p-8 border border-border shadow-sm">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Recent Login Activity</h2>
+                <ActivityList items={loginHistory} />
+              </div>
+
+              <div className="bg-white rounded-xl p-4 sm:p-8 border border-border shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-foreground">Trusted Devices</h3>
+                  <button
+                    onClick={loadProfileData}
+                    className="text-primary text-sm hover:underline font-medium"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  These devices have access to your account without requiring additional security prompts.
+                </p>
+                <DevicesPanel items={trustedDevices} />
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
