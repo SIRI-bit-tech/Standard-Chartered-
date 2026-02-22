@@ -34,7 +34,7 @@ export default function BillsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Bills</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold">Bills</h1>
       {loading ? (
         <div className="py-12 text-center">Loading…</div>
       ) : (

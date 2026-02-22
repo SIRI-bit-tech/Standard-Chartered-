@@ -133,7 +133,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">Profile & Settings</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Profile & Settings</h1>
       <ProfileHeader
         first_name={user.first_name}
         last_name={user.last_name}
@@ -149,49 +149,26 @@ export default function ProfilePage() {
         }
       />
 
-      {/* Tabs */}
-      <div className="bg-white border-b border-border rounded-t-xl">
-        <div className="flex gap-8 px-6 py-4 flex-wrap">
-          <button
-            onClick={() => setActiveTab('personal')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'personal'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Personal Info
-          </button>
-          <button
-            onClick={() => setActiveTab('security')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'security'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Security
-          </button>
-          <button
-            onClick={() => setActiveTab('documents')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'documents'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Documents
-          </button>
-          <button
-            onClick={() => setActiveTab('activity')}
-            className={`py-2 font-medium transition ${
-              activeTab === 'activity'
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Activity
-          </button>
+      {/* Tabs - Scrollable on mobile */}
+      <div className="bg-white border-b border-border rounded-t-xl overflow-x-auto scrollbar-hide">
+        <div className="flex gap-4 sm:gap-8 px-4 sm:px-6 py-4 whitespace-nowrap min-w-max">
+          {[
+            { id: 'personal', label: 'Personal Info' },
+            { id: 'security', label: 'Security' },
+            { id: 'documents', label: 'Documents' },
+            { id: 'activity', label: 'Activity' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`py-2 text-sm sm:text-base font-medium transition ${activeTab === tab.id
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -202,13 +179,13 @@ export default function ProfilePage() {
           {/* Personal Info Tab */}
           {activeTab === 'personal' && (
             <div className="grid grid-cols-1 gap-6">
-              <div className="bg-white rounded-xl p-8 border border-border">
-                <div className="mb-6 flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-foreground">Personal Information</h2>
+              <div className="bg-white rounded-xl p-4 sm:p-8 border border-border">
+                <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground">Personal Information</h2>
                   {!isEditing ? (
                     <button
                       onClick={() => setIsEditing(true)}
-                      className="px-4 py-2 border rounded-lg hover:bg-muted transition"
+                      className="px-4 py-2 text-sm border rounded-lg hover:bg-muted transition"
                     >
                       Edit
                     </button>
@@ -219,11 +196,10 @@ export default function ProfilePage() {
                           setIsEditing(false)
                           loadProfileData()
                         }}
-                        className="px-4 py-2 border rounded-lg hover:bg-muted transition"
+                        className="px-4 py-2 text-sm border rounded-lg hover:bg-muted transition"
                       >
                         Cancel
                       </button>
-                      {/* Save button remains inside the form */}
                     </div>
                   )}
                 </div>
@@ -239,8 +215,8 @@ export default function ProfilePage() {
 
           {/* Security Tab */}
           {activeTab === 'security' && (
-            <div className="bg-white rounded-xl p-8 border border-border">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Security Settings</h2>
+            <div className="bg-white rounded-xl p-4 sm:p-8 border border-border">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Security Settings</h2>
 
               <SecurityPanel onRefreshDevices={loadProfileData} />
             </div>
@@ -248,36 +224,36 @@ export default function ProfilePage() {
 
           {/* Documents Tab */}
           {activeTab === 'documents' && (
-            <div className="bg-white rounded-xl p-8 border border-border">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Documents</h2>
+            <div className="bg-white rounded-xl p-4 sm:p-8 border border-border">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Documents</h2>
 
               {documents.length > 0 ? (
                 <div className="space-y-3">
                   {documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                      <div>
-                        <p className="font-medium text-foreground">{doc.filename}</p>
-                        <p className="text-sm text-muted-foreground">{formatDate(doc.created_at)}</p>
+                    <div key={doc.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border rounded-lg gap-4">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground truncate">{doc.filename}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(doc.created_at)}</p>
                       </div>
-                      <button className="px-3 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 transition text-sm">
+                      <button className="px-3 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 transition text-sm w-full sm:w-auto">
                         Download
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No documents uploaded yet</p>
+                <p className="text-sm text-muted-foreground">No documents uploaded yet</p>
               )}
             </div>
           )}
 
           {/* Activity Tab */}
           {activeTab === 'activity' && (
-            <div className="bg-white rounded-xl p-8 border border-border">
-              <h2 className="text-2xl font-bold text-foreground mb-6">Login Activity</h2>
+            <div className="bg-white rounded-xl p-4 sm:p-8 border border-border">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-6">Login Activity</h2>
               <ActivityList items={loginHistory} />
               <div className="mt-8">
-                <h3 className="text-lg font-semibold mb-2">Devices</h3>
+                <h3 className="font-semibold mb-2">Devices</h3>
                 <DevicesPanel items={loginHistory} />
               </div>
             </div>

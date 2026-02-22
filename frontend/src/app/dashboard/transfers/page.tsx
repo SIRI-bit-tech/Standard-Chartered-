@@ -25,6 +25,7 @@ import { TransferPinModal } from '@/components/transfers/transfer-pin-modal'
 import { ResetPinModal } from '@/components/transfers/reset-pin-modal'
 import { ReceiptModal } from '@/components/transfers/receipt-modal'
 import { colors, type TransferHistoryItem, type TransferHistoryMetrics, type TransferHistoryResponse } from '@/types'
+import { getCurrencyFromCountry } from '@/lib/utils'
 import { HistoryFilters, type HistoryFilterState } from '@/components/transfers/history-filters'
 import { HistoryKpis } from '@/components/transfers/history-kpis'
 import { HistoryTable } from '@/components/transfers/history-table'
@@ -96,17 +97,17 @@ export default function TransfersPage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new')
   const [transferType, setTransferType] = useState<TransferTypeTab>('internal')
-  
+
   // State for recipient search and selection
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<RecipientSearchResponse['data']>([])
   const [selectedRecipient, setSelectedRecipient] = useState<SelectedRecipient | null>(null)
   const [loading, setLoading] = useState(false)
-  
+
   // Handler functions
   const handleRecipientSearch = async (query: string) => {
     if (!query.trim()) return
-    
+
     setLoading(true)
     try {
       const response = await apiClient.get('/transfers/recipients/search', { params: { query } }) as { data: RecipientSearchResponse }
@@ -122,7 +123,7 @@ export default function TransfersPage() {
       setLoading(false)
     }
   }
-  
+
   const selectRecipient = (recipient: RecipientSearchResponse['data'][0]) => {
     setSelectedRecipient(recipient as SelectedRecipient)
     setSearchQuery('')  // Clear search after selection
@@ -284,7 +285,10 @@ export default function TransfersPage() {
           : achForm.amount
   const fee = TRANSFER_FEES[FEE_KEYS[transferType]] ?? 0
   const totalToPay = amount + fee
-  const currency = user?.primary_currency ?? 'USD'
+  const primaryAccount = accountsList.find((a) => a.is_primary) ?? accountsList[0]
+  const currency = user?.primary_currency && user?.primary_currency !== 'USD'
+    ? user?.primary_currency
+    : (primaryAccount?.currency || getCurrencyFromCountry(user?.country))
 
   const summary: TransferSummaryState = {
     amount,
@@ -617,6 +621,7 @@ export default function TransfersPage() {
                             </Select>
                           </div>
                           <AmountInput
+                            label={`Amount (${currency})`}
                             value={internalForm.amount}
                             onChange={(v) => setInternalForm((p) => ({ ...p, amount: v }))}
                             currency={currency}
@@ -731,13 +736,13 @@ export default function TransfersPage() {
                                   <select
                                     value={selectedRecipient?.selectedAccount?.id ?? selectedRecipient?.accounts.find((acc) => acc.is_primary)?.id ?? ''}
                                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                                  if (selectedRecipient) {
-                                    setSelectedRecipient({
-                                      ...selectedRecipient,
-                                      selectedAccount: selectedRecipient.accounts.find(acc => acc.id === e.target.value) || null
-                                    })
-                                  }
-                                }}
+                                      if (selectedRecipient) {
+                                        setSelectedRecipient({
+                                          ...selectedRecipient,
+                                          selectedAccount: selectedRecipient.accounts.find(acc => acc.id === e.target.value) || null
+                                        })
+                                      }
+                                    }}
                                     className="mt-1 w-full p-2 border rounded"
                                   >
                                     {selectedRecipient.accounts.map((account: RecipientAccount) => (
@@ -755,7 +760,7 @@ export default function TransfersPage() {
                       <SectionCard number={3} title="Transfer Amount">
                         <div className="space-y-4">
                           <AmountInput
-                            label="Amount (USD)"
+                            label={`Amount (${currency})`}
                             value={domesticForm.amount}
                             onChange={(v) => setDomesticForm((p) => ({ ...p, amount: v }))}
                             currency={currency}
@@ -853,7 +858,7 @@ export default function TransfersPage() {
                       <SectionCard number={3} title="Transfer Amount & Purpose">
                         <div className="space-y-4">
                           <AmountInput
-                            label="Amount to Send"
+                            label={`Amount to Send (${currency})`}
                             value={internationalForm.amount}
                             onChange={(v) => setInternationalForm((p) => ({ ...p, amount: v }))}
                             currency={currency}
@@ -914,17 +919,17 @@ export default function TransfersPage() {
                               className="mt-1.5"
                             />
                           </div>
-                      <div>
-                        <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                          Recipient Bank Name
-                        </Label>
-                        <Input
-                          placeholder="Enter bank name"
-                          value={achForm.bank_name}
-                          onChange={(e) => setAchForm((p) => ({ ...p, bank_name: e.target.value }))}
-                          className="mt-1.5"
-                        />
-                      </div>
+                          <div>
+                            <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                              Recipient Bank Name
+                            </Label>
+                            <Input
+                              placeholder="Enter bank name"
+                              value={achForm.bank_name}
+                              onChange={(e) => setAchForm((p) => ({ ...p, bank_name: e.target.value }))}
+                              className="mt-1.5"
+                            />
+                          </div>
                           <div>
                             <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
                               Account Type
@@ -942,58 +947,59 @@ export default function TransfersPage() {
                               </SelectContent>
                             </Select>
                           </div>
-                      <>
-                        <div>
-                          <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                            Recipient Routing Number (9 digits)
-                          </Label>
-                          <Input
-                            placeholder="000000000"
-                            maxLength={9}
-                            value={achForm.routing_number}
-                            onChange={async (e) => {
-                              const val = e.target.value.replace(/\D/g, '')
-                              setAchForm((p) => ({ ...p, routing_number: val }))
-                              setRoutingErrorMsg('')
-                              setRoutingValid(null)
-                              if (val.length === 9) {
-                                try {
-                                  setRoutingChecking(true)
-                                  const resp = await apiClient.get<{ valid: boolean; bank_name?: string }>(`/api/v1/transfers/validate-routing?number=${val}`)
-                                  const isValid = !!resp?.valid
-                                  setRoutingValid(isValid)
-                                  if (isValid && resp.bank_name) {
-                                    setAchForm((p) => ({ ...p, bank_name: resp.bank_name || p.bank_name }))
+                          <>
+                            <div>
+                              <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                                Recipient Routing Number (9 digits)
+                              </Label>
+                              <Input
+                                placeholder="000000000"
+                                maxLength={9}
+                                value={achForm.routing_number}
+                                onChange={async (e) => {
+                                  const val = e.target.value.replace(/\D/g, '')
+                                  setAchForm((p) => ({ ...p, routing_number: val }))
+                                  setRoutingErrorMsg('')
+                                  setRoutingValid(null)
+                                  if (val.length === 9) {
+                                    try {
+                                      setRoutingChecking(true)
+                                      const resp = await apiClient.get<{ valid: boolean; bank_name?: string }>(`/api/v1/transfers/validate-routing?number=${val}`)
+                                      const isValid = !!resp?.valid
+                                      setRoutingValid(isValid)
+                                      if (isValid && resp.bank_name) {
+                                        setAchForm((p) => ({ ...p, bank_name: resp.bank_name || p.bank_name }))
+                                      }
+                                      if (!isValid) setRoutingErrorMsg('Invalid routing number')
+                                    } catch {
+                                      setRoutingValid(false)
+                                      setRoutingErrorMsg('Validation service unavailable')
+                                    } finally {
+                                      setRoutingChecking(false)
+                                    }
                                   }
-                                  if (!isValid) setRoutingErrorMsg('Invalid routing number')
-                                } catch {
-                                  setRoutingValid(false)
-                                  setRoutingErrorMsg('Validation service unavailable')
-                                } finally {
-                                  setRoutingChecking(false)
-                                }
-                              }
-                            }}
-                            className="mt-1.5"
-                          />
-                          {routingChecking && <p className="mt-1 text-xs" style={{ color: colors.textSecondary }}>Validating routing number…</p>}
-                          {routingValid === false && <p className="mt-1 text-xs" style={{ color: colors.error }}>{routingErrorMsg || 'Invalid routing number'}</p>}
-                          {routingValid && <p className="mt-1 text-xs" style={{ color: colors.success }}>Routing number recognized</p>}
-                        </div>
-                        <div>
-                          <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                            Recipient Account Number
-                          </Label>
-                          <Input
-                            placeholder="Enter account number"
-                            value={achForm.account_number}
-                            onChange={(e) => setAchForm((p) => ({ ...p, account_number: e.target.value }))}
-                            className="mt-1.5"
-                          />
-                        </div>
-                      </>
+                                }}
+                                className="mt-1.5"
+                              />
+                              {routingChecking && <p className="mt-1 text-xs" style={{ color: colors.textSecondary }}>Validating routing number…</p>}
+                              {routingValid === false && <p className="mt-1 text-xs" style={{ color: colors.error }}>{routingErrorMsg || 'Invalid routing number'}</p>}
+                              {routingValid && <p className="mt-1 text-xs" style={{ color: colors.success }}>Routing number recognized</p>}
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                                Recipient Account Number
+                              </Label>
+                              <Input
+                                placeholder="Enter account number"
+                                value={achForm.account_number}
+                                onChange={(e) => setAchForm((p) => ({ ...p, account_number: e.target.value }))}
+                                className="mt-1.5"
+                              />
+                            </div>
+                          </>
                           <div className="sm:col-span-2">
                             <AmountInput
+                              label={`Amount (${currency})`}
                               value={achForm.amount}
                               onChange={(v) => setAchForm((p) => ({ ...p, amount: v }))}
                               currency={currency}
@@ -1053,7 +1059,7 @@ export default function TransfersPage() {
 
       {activeTab === 'history' && (
         <div className="space-y-4">
-          {historyMetrics && <HistoryKpis metrics={historyMetrics} />}
+          {historyMetrics && <HistoryKpis metrics={historyMetrics} currency={currency} />}
           <HistoryFilters value={filters} onChange={(v) => { setFilters(v); setHistoryPage(1) }} />
           {loadingHistory ? (
             <div className="space-y-3">

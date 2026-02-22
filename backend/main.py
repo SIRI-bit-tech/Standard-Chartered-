@@ -88,6 +88,12 @@ async def lifespan(app: FastAPI):
             await conn.execute(text(
                 "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS routing_number VARCHAR"
             ))
+            await conn.execute(text(
+                "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS wallet_id VARCHAR"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS wallet_qrcode VARCHAR"
+            ))
 
             # Loan columns check
             await conn.execute(text(

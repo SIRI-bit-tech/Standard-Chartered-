@@ -3,47 +3,121 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard,
-  CreditCard,
+  Home,
+  Wallet,
   ArrowLeftRight,
-  Banknote,
-  FileText,
-  MessageSquare,
-  User,
+  LifeBuoy,
+  CreditCard,
 } from 'lucide-react'
 
 const navigationItems = [
-  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
-  { href: '/dashboard/accounts', label: 'Accounts', icon: CreditCard },
+  { href: '/dashboard', label: 'Home', icon: Home },
+  { href: '/dashboard/accounts', label: 'Accounts', icon: Wallet },
   { href: '/dashboard/transfers', label: 'Transfer', icon: ArrowLeftRight },
-  { href: '/dashboard/loans', label: 'Loans', icon: Banknote },
-  { href: '/dashboard/bills', label: 'Bills', icon: FileText },
-  { href: '/dashboard/support', label: 'Support', icon: MessageSquare },
-  { href: '/dashboard/profile', label: 'Profile', icon: User },
+  { href: '/dashboard/virtual-cards', label: 'Cards', icon: CreditCard },
+  { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
 ]
 
 export default function BottomNavbar() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-border md:hidden z-40">
-      <div className="flex justify-around items-center h-16">
+    <nav className="fixed bottom-0 left-0 right-0 xl:hidden z-40" style={{ padding: '0 12px 12px 12px' }}>
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          justifyContent: 'space-around',
+          alignItems: 'flex-end',
+          height: 64,
+          background: '#FFFFFF',
+          borderRadius: 20,
+          boxShadow: '0 -2px 24px rgba(0,0,0,0.10), 0 4px 16px rgba(0,0,0,0.06)',
+          paddingBottom: 6,
+          paddingTop: 6,
+        }}
+      >
         {navigationItems.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+          const isActive =
+            pathname === item.href ||
+            (item.href !== '/dashboard' && pathname.startsWith(item.href))
 
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${
-                isActive
-                  ? 'text-primary border-t-2 border-primary'
-                  : 'text-muted-foreground'
-              }`}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                flex: 1,
+                height: '100%',
+                textDecoration: 'none',
+                position: 'relative',
+                gap: 2,
+              }}
             >
-              <Icon size={20} />
-              <span className="text-xs font-medium">{item.label}</span>
+              {isActive ? (
+                <>
+                  {/* Elevated circle for active icon */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: -22,
+                      width: 52,
+                      height: 52,
+                      borderRadius: '50%',
+                      background: '#FFFFFF',
+                      boxShadow: '0 -4px 12px rgba(0,102,204,0.18)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 2,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #0066CC 0%, #0052A3 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Icon size={20} color="#FFFFFF" />
+                    </div>
+                  </div>
+                  {/* Label for active */}
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#0066CC',
+                      marginTop: 28,
+                      letterSpacing: 0.2,
+                    }}
+                  >
+                    {item.label}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Icon size={20} color="#ADB5BD" />
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: '#ADB5BD',
+                    }}
+                  >
+                    {item.label}
+                  </span>
+                </>
+              )}
             </Link>
           )
         })}

@@ -66,56 +66,56 @@ export default function VirtualCardsPage() {
   })
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 px-1 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>
+          <h1 className="text-xl sm:text-2xl font-bold" style={{ color: colors.textPrimary }}>
             Virtual Cards
           </h1>
-          <p className="mt-1 text-sm" style={{ color: colors.textSecondary }}>
+          <p className="mt-1 text-xs sm:text-sm" style={{ color: colors.textSecondary }}>
             Create and manage virtual cards for secure online payments
           </p>
         </div>
-        <Button onClick={() => setShowCreateForm(!showCreateForm)} className="gap-2" disabled={loading || cannotCreate}>
+        <Button onClick={() => setShowCreateForm(!showCreateForm)} className="gap-2 w-full sm:w-auto" disabled={loading || cannotCreate}>
           <PlusIcon className="h-4 w-4" />
           New Card
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card className="p-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm" style={{ color: colors.textSecondary }}>
+              <p className="text-xs sm:text-sm" style={{ color: colors.textSecondary }}>
                 Total Cards
               </p>
-              <p className="text-2xl font-bold" style={{ color: colors.textPrimary }}>
+              <p className="text-xl sm:text-2xl font-bold" style={{ color: colors.textPrimary }}>
                 {metrics.total}
               </p>
             </div>
-            <CreditCard className="h-8 w-8" style={{ color: colors.primary }} />
+            <CreditCard className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: colors.primary }} />
           </div>
         </Card>
-        <Card className="p-6">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>
+        <Card className="p-4 sm:p-6">
+          <p className="text-xs sm:text-sm" style={{ color: colors.textSecondary }}>
             Active Cards
           </p>
-          <p className="text-2xl font-bold" style={{ color: colors.textPrimary }}>
+          <p className="text-xl sm:text-2xl font-bold" style={{ color: colors.textPrimary }}>
             {metrics.active}
           </p>
         </Card>
-        <Card className="p-6">
-          <p className="text-sm" style={{ color: colors.textSecondary }}>
+        <Card className="p-4 sm:p-6">
+          <p className="text-xs sm:text-sm" style={{ color: colors.textSecondary }}>
             Blocked Cards
           </p>
-          <p className="text-2xl font-bold" style={{ color: colors.textPrimary }}>
+          <p className="text-xl sm:text-2xl font-bold" style={{ color: colors.textPrimary }}>
             {metrics.blocked}
           </p>
         </Card>
       </div>
 
       {showCreateForm && (
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <VirtualCardApply
             onCreated={() => {
               setShowCreateForm(false)
@@ -125,8 +125,8 @@ export default function VirtualCardsPage() {
         </Card>
       )}
 
-      <Card className="p-6">
-        <h3 className="mb-4 text-lg font-semibold" style={{ color: colors.textPrimary }}>
+      <Card className="p-4 sm:p-6">
+        <h3 className="mb-4 text-base sm:text-lg font-semibold" style={{ color: colors.textPrimary }}>
           Your Cards
         </h3>
         {loading ? (

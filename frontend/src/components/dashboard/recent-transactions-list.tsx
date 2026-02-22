@@ -42,9 +42,9 @@ export function RecentTransactionsList({
     <div className="space-y-1">
       <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium uppercase" style={{ color: colors.textSecondary }}>
         <span className="flex-1">Transaction</span>
-        <span className="w-48">Reference</span>
-        <span className="w-40">Date</span>
-        <span className="w-28 text-right">Amount</span>
+        <span className="hidden sm:block sm:w-48">Reference</span>
+        <span className="hidden md:block md:w-40">Date</span>
+        <span className="w-24 sm:w-28 text-right">Amount</span>
       </div>
       {items.map((it) => {
         const href = it.transfer_id ? `/dashboard/transfers/receipt/${it.transfer_id}` : '/dashboard/accounts'
@@ -80,16 +80,20 @@ export function RecentTransactionsList({
                 <span className="block text-xs truncate" style={{ color: colors.textSecondary }}>
                   {it.subtitle}
                 </span>
-              ) : null}
+              ) : (
+                <span className="block sm:hidden text-[10px]" style={{ color: colors.textSecondary }}>
+                  {formatDateTime(it.date)}
+                </span>
+              )}
             </span>
-            <span className="w-48 truncate text-sm font-medium" style={{ color: colors.textPrimary }}>
+            <span className="hidden sm:block sm:w-48 truncate text-sm font-medium" style={{ color: colors.textPrimary }}>
               {it.reference}
             </span>
-            <span className="w-40 shrink-0 text-sm" style={{ color: colors.textSecondary }}>
+            <span className="hidden md:block md:w-40 shrink-0 text-sm" style={{ color: colors.textSecondary }}>
               {formatDateTime(it.date)}
             </span>
             <span
-              className="w-28 shrink-0 text-right text-sm font-semibold"
+              className="w-24 sm:w-28 shrink-0 text-right text-sm font-semibold whitespace-nowrap"
               style={{ color: it.status === 'reversed' ? colors.success : (debit ? colors.error : colors.success) }}
             >
               {it.status === 'reversed' ? '+' : (debit ? '-' : '+')}
@@ -98,7 +102,6 @@ export function RecentTransactionsList({
           </Link>
         )
       })}
-      
     </div>
   )
 }

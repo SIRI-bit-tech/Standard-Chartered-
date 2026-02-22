@@ -23,7 +23,7 @@ async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
 
 @router.get("/products")
 async def get_loan_products(
-    user_tier: str = Query(...),
+    user_tier: str | None = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
     """Get available loan products"""
@@ -33,18 +33,9 @@ async def get_loan_products(
     products = result.scalars().all()
     
     available_products = []
-    def is_true(val):
-        if isinstance(val, bool): return val
-        if isinstance(val, str): return val.lower() == 'true'
-        return bool(val)
-
     for product in products:
-        if user_tier == "standard" and is_true(product.available_to_standard):
-            available_products.append(product)
-        elif user_tier == "priority" and is_true(product.available_to_priority):
-            available_products.append(product)
-        elif user_tier == "premium" and is_true(product.available_to_premium):
-            available_products.append(product)
+        # User requested to make loans global to all users regardless of country or tier
+        available_products.append(product)
     
     return {
         "success": True,

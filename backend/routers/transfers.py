@@ -13,6 +13,7 @@ from schemas.transfer import (
     InternationalTransferRequest,
     ACHTransferRequest,
     WireTransferRequest,
+    CryptoWithdrawRequest,
     TransferResponse,
     TransferStatusUpdateResponse,
 )
@@ -1224,4 +1225,128 @@ async def remove_beneficiary(beneficiary_id: str, db: AsyncSession = Depends(get
         "success": True,
         "data": {},
         "message": "Beneficiary removed successfully"
+    }
+@router.post("/crypto-withdraw")
+async def crypto_withdraw(
+    request: CryptoWithdrawRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Initiate a crypto (BTC) withdrawal or conversion. Requires PIN and active crypto account."""
+    await _ensure_user_active(db, user_id)
+    await _verify_transfer_pin(db, user_id, request.transfer_pin)
+    
+    # 1. Fetch current BTC price for internal accounting and conversion
+    btc_price = 1.0
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd")
+            data = resp.json()
+            btc_price = data.get("bitcoin", {}).get("usd", 0)
+    except Exception:
+        logger.warning("Failed to fetch BTC price for withdrawal accounting, using fallback")
+        btc_price = 65000.0
+
+    async with db.begin():
+        # Fetch source crypto account
+        result = await db.execute(
+            select(Account).where(Account.id == request.from_account_id).with_for_update()
+        )
+        account = result.scalar_one_or_none()
+        
+        if not account or account.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Crypto account not found")
+        
+        if account.account_type.value != "crypto":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Selected account is not a crypto account")
+            
+        if account.status != AccountStatus.ACTIVE:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is not active")
+
+        if account.balance < request.amount_btc:
+             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient BTC balance")
+
+        # Handling destination
+        is_internal = bool(request.destination_account_id)
+        to_account_id = None
+        transfer_currency = "BTC"
+        transfer_amount = request.amount_btc # This is what we record in the transfer 'amount' field
+        # BUT for internal conversion, we want _auto_complete_transfer to credit USD.
+        # _auto_complete_transfer uses transfer.amount.
+        
+        if is_internal:
+            dest_acc_res = await db.execute(
+                select(Account).where(Account.id == request.destination_account_id)
+            )
+            dest_acc = dest_acc_res.scalar_one_or_none()
+            if not dest_acc or dest_acc.user_id != user_id:
+                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Destination account not found")
+            
+            to_account_id = dest_acc.id
+            transfer_currency = dest_acc.currency # Usually USD
+            transfer_amount = request.amount_btc * btc_price # Set amount to USD value for internal credit
+            description = f"Conversion to {dest_acc.account_type.value} account (****{dest_acc.account_number[-4:]})"
+        else:
+            if not request.destination_address:
+                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Destination address required for external withdrawal")
+            description = f"BTC Withdrawal to {request.destination_address[:12]}..."
+            to_account_id = None
+
+        before_btc = account.balance
+        account.balance -= request.amount_btc
+        if account.available_balance is not None:
+             account.available_balance -= request.amount_btc
+        
+        account.updated_at = datetime.utcnow()
+        
+        transfer_id = str(uuid.uuid4())
+        reference = f"CRYPTO-{uuid.uuid4().hex[:10].upper()}"
+        
+        new_transfer = Transfer(
+            id=transfer_id,
+            from_account_id=account.id,
+            from_user_id=user_id,
+            to_account_id=to_account_id,
+            type=TransferType.INTERNAL if is_internal else TransferType.INTERNATIONAL,
+            amount=transfer_amount,
+            currency=transfer_currency,
+            fee_amount=0.0,
+            total_amount=transfer_amount,
+            reference_number=reference,
+            description=description,
+            status=TransferStatus.PROCESSING,
+            created_at=datetime.utcnow()
+        )
+        db.add(new_transfer)
+        
+        tx = Transaction(
+            id=str(uuid.uuid4()),
+            account_id=account.id,
+            user_id=user_id,
+            type=TxType.WITHDRAWAL,
+            status=TxStatus.PROCESSING,
+            amount=request.amount_btc,
+            currency="BTC",
+            balance_before=before_btc,
+            balance_after=account.balance,
+            description=description,
+            reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+            transfer_id=transfer_id,
+            created_at=datetime.utcnow()
+        )
+        db.add(tx)
+
+    _schedule_auto_complete(transfer_id, 120)
+    
+    AblyRealtimeManager.publish_notification(
+        user_id,
+        "crypto_withdrawal",
+        "Transaction Initiated",
+        f"Your {'conversion' if is_internal else 'withdrawal'} of {request.amount_btc} BTC is being processed."
+    )
+    
+    return {
+        "success": True,
+        "data": {"transfer_id": transfer_id, "reference": reference},
+        "message": f"Crypto {'conversion' if is_internal else 'withdrawal'} is processing"
     }

@@ -18,77 +18,132 @@ export function HistoryTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   return (
     <div className="rounded-xl border" style={{ borderColor: colors.border, backgroundColor: colors.white }}>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs font-medium uppercase" style={{ color: colors.textSecondary }}>
-            <th className="px-4 py-3">Date</th>
-            <th className="px-4 py-3">Beneficiary / Sender</th>
-            <th className="px-4 py-3">Reference / Account</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3 text-right">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((it) => {
-            const isReversed = it.status === 'reversed'
-            const isDebit = it.direction === 'debit' && !isReversed
-            const statusBg =
-              it.status === 'completed'
-                ? `${colors.success}20`
-                : it.status === 'pending' || it.status === 'processing'
-                ? '#FDF5E5'
-                : it.status === 'reversed'
-                ? `${colors.success}20`
-                : '#FBEAEA'
-            const statusFg =
-              it.status === 'completed'
-                ? colors.success
-                : it.status === 'pending' || it.status === 'processing'
+      {/* Desktop Table View */}
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs font-medium uppercase" style={{ color: colors.textSecondary }}>
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Beneficiary / Sender</th>
+              <th className="px-4 py-3">Reference / Account</th>
+              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it) => {
+              const isReversed = it.status === 'reversed'
+              const isDebit = it.direction === 'debit' && !isReversed
+              const statusBg =
+                it.status === 'completed'
+                  ? `${colors.success}20`
+                  : it.status === 'pending' || it.status === 'processing'
+                    ? '#FDF5E5'
+                    : it.status === 'reversed'
+                      ? `${colors.success}20`
+                      : '#FBEAEA'
+              const statusFg =
+                it.status === 'completed'
+                  ? colors.success
+                  : it.status === 'pending' || it.status === 'processing'
+                    ? colors.warning
+                    : it.status === 'reversed'
+                      ? colors.success
+                      : colors.error
+              const subtitleText = it.bank_name ? `${it.bank_name} • ${it.subtitle ?? ''}`.trim() : it.subtitle || ''
+              return (
+                <tr key={it.id} className="border-t" style={{ borderColor: colors.border }}>
+                  <td className="px-4 py-3" style={{ color: colors.textPrimary }}>
+                    {formatDateTime(it.date)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium" style={{ color: colors.textPrimary }}>
+                      {isReversed ? 'Transfer Reversed' : it.counterparty}
+                    </div>
+                    <div className="text-xs" style={{ color: colors.textSecondary }}>
+                      {isReversed ? (it.subtitle || '') : subtitleText}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium" style={{ color: colors.textPrimary }}>
+                      {it.transfer_id ? (
+                        <Link href={`/dashboard/transfers/receipt/${it.transfer_id}`}>{it.reference}</Link>
+                      ) : (
+                        it.reference
+                      )}
+                    </div>
+                    <div className="text-xs" style={{ color: colors.textSecondary }}>{it.account_masked}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-medium"
+                      style={{ backgroundColor: statusBg, color: statusFg }}
+                    >
+                      {it.status.charAt(0).toUpperCase() + it.status.slice(1)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{ color: isDebit ? colors.error : colors.success }}>
+                    {isReversed ? '+' : isDebit ? '-' : '+'}
+                    {formatCurrency(Math.abs(it.amount), it.currency)}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Card Layout */}
+      <div className="lg:hidden divide-y" style={{ borderColor: colors.border }}>
+        {items.map((it) => {
+          const isReversed = it.status === 'reversed'
+          const isDebit = it.direction === 'debit' && !isReversed
+          const statusFg =
+            it.status === 'completed'
+              ? colors.success
+              : it.status === 'pending' || it.status === 'processing'
                 ? colors.warning
                 : it.status === 'reversed'
-                ? colors.success
-                : colors.error
-            const subtitleText = it.bank_name ? `${it.bank_name} • ${it.subtitle ?? ''}`.trim() : it.subtitle || ''
-            return (
-              <tr key={it.id} className="border-t" style={{ borderColor: colors.border }}>
-                <td className="px-4 py-3" style={{ color: colors.textPrimary }}>
-                  {formatDateTime(it.date)}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="font-medium" style={{ color: colors.textPrimary }}>
+                  ? colors.success
+                  : colors.error
+
+          return (
+            <div key={it.id} className="p-4 space-y-2">
+              <div className="flex justify-between items-start">
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="text-xs" style={{ color: colors.textSecondary }}>
+                    {formatDateTime(it.date)}
+                  </div>
+                  <div className="font-bold truncate" style={{ color: colors.textPrimary }}>
                     {isReversed ? 'Transfer Reversed' : it.counterparty}
                   </div>
-                  <div className="text-xs" style={{ color: colors.textSecondary }}>
-                    {isReversed ? (it.subtitle || '') : subtitleText}
+                  <div className="text-xs truncate" style={{ color: colors.textSecondary }}>
+                    Ref: {it.reference}
                   </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="font-medium" style={{ color: colors.textPrimary }}>
-                    {it.transfer_id ? (
-                      <Link href={`/dashboard/transfers/receipt/${it.transfer_id}`}>{it.reference}</Link>
-                    ) : (
-                      it.reference
-                    )}
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="font-bold text-sm" style={{ color: isDebit ? colors.error : colors.success }}>
+                    {isReversed ? '+' : isDebit ? '-' : '+'}
+                    {formatCurrency(Math.abs(it.amount), it.currency)}
                   </div>
-                  <div className="text-xs" style={{ color: colors.textSecondary }}>{it.account_masked}</div>
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className="rounded-full px-2 py-0.5 text-xs font-medium"
-                    style={{ backgroundColor: statusBg, color: statusFg }}
-                  >
+                  <div className="text-xs font-medium" style={{ color: statusFg }}>
                     {it.status.charAt(0).toUpperCase() + it.status.slice(1)}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right font-semibold" style={{ color: isDebit ? colors.error : colors.success }}>
-                  {isReversed ? '+' : isDebit ? '-' : '+'}
-                  {formatCurrency(Math.abs(it.amount), it.currency)}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                  </div>
+                </div>
+              </div>
+              {it.transfer_id && (
+                <Link
+                  href={`/dashboard/transfers/receipt/${it.transfer_id}`}
+                  className="block text-xs font-medium text-center py-1 rounded"
+                  style={{ backgroundColor: colors.primaryLight, color: colors.primary }}
+                >
+                  View Receipt
+                </Link>
+              )}
+            </div>
+          )
+        })}
+      </div>
       <div className="flex items-center justify-between px-4 py-3">
         <span className="text-xs" style={{ color: colors.textSecondary }}>
           Showing {Math.min(total, (page - 1) * pageSize + items.length)} of {total} transactions

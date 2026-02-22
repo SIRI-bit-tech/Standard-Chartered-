@@ -64,41 +64,41 @@ export default function DepositsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-balance">Deposits</h1>
-        <p className="text-muted-foreground">Deposit checks using your phone</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-balance">Deposits</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground">Deposit checks using your phone</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Deposits</p>
-              <p className="text-2xl font-bold">{deposits.length}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Total Deposits</p>
+              <p className="text-xl sm:text-2xl font-bold">{deposits.length}</p>
             </div>
-            <ArrowDownLeft className="w-8 h-8 text-green-600" />
+            <ArrowDownLeft className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Pending Deposits</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-xs sm:text-sm text-muted-foreground">Pending Deposits</p>
+              <p className="text-xl sm:text-2xl font-bold text-red-600">
                 {deposits.filter(d => (d.status || '').toLowerCase() === 'pending').length}
               </p>
             </div>
-            <Zap className="w-8 h-8 text-red-600" />
+            <Zap className="w-6 h-6 sm:w-8 sm:h-8 text-red-600" />
           </div>
         </Card>
       </div>
 
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Mobile Check Deposit</h3>
+      <Card className="p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold mb-4">Mobile Check Deposit</h3>
         <CheckDepositForm onSuccess={fetchDeposits} />
       </Card>
 
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Recent Deposits</h3>
+      <Card className="p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold mb-4">Recent Deposits</h3>
         <DepositList deposits={deposits} loading={loading} onRefresh={fetchDeposits} />
       </Card>
     </div>

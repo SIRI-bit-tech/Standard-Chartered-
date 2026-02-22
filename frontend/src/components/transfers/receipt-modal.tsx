@@ -1,5 +1,6 @@
 import { colors, type TransferReceipt } from '@/types'
 import { Button } from '@/components/ui/button'
+import { formatCurrency } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 
@@ -66,7 +67,7 @@ export function ReceiptModal({ open, onClose, data }: Props) {
                   Amount Transferred
                 </p>
                 <p className="mt-1 text-3xl font-extrabold" style={{ color: colors.primary }}>
-                  {data.currency} {Number(data.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(data.amount, data.currency)}
                 </p>
               </div>
             </div>
@@ -119,20 +120,20 @@ export function ReceiptModal({ open, onClose, data }: Props) {
                 <div className="flex items-center justify-between">
                   <span style={{ color: colors.textSecondary }}>Transfer Amount</span>
                   <span style={{ color: colors.textPrimary }}>
-                    {data.currency} {Number(data.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(data.amount, data.currency)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span style={{ color: colors.textSecondary }}>Processing Fee</span>
                   <span style={{ color: colors.textPrimary }}>
-                    {receipt ? `${receipt.currency} ${Number(receipt.fee_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `${data.currency} 0.00`}
+                    {receipt ? formatCurrency(receipt.fee_amount || 0, receipt.currency) : formatCurrency(0, data.currency)}
                   </span>
                 </div>
                 <hr className="my-2" style={{ borderColor: colors.border }} />
                 <div className="flex items-center justify-between font-semibold">
                   <span style={{ color: colors.textPrimary }}>Total Amount</span>
                   <span style={{ color: colors.primary }}>
-                    {receipt ? `${receipt.currency} ${Number(receipt.total_amount || receipt.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `${data.currency} ${Number(data.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    {receipt ? formatCurrency(receipt.total_amount || receipt.amount || 0, receipt.currency) : formatCurrency(data.amount, data.currency)}
                   </span>
                 </div>
               </div>

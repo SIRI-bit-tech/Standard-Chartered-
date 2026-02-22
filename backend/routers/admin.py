@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, status, Query
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, text
 from datetime import datetime, timezone, timedelta
@@ -758,6 +759,7 @@ async def admin_list_accounts(
                 "currency": a.currency,
                 "balance": a.balance,
                 "status": a.status,
+                "wallet_id": getattr(a, "wallet_id", None),
                 "user": {
                     "id": user.id if user else "",
                     "name": f"{user.first_name} {user.last_name}".strip() if user else "",
@@ -2563,6 +2565,56 @@ async def admin_adjust_account_balance(
     except Exception as e:
         logger.error("Balance adjust failed", error=e)
         raise InternalServerError(operation="adjust balance", error_code="BALANCE_ADJUST_FAILED", original_error=e)
+
+class AdminUpdateWalletIdRequest(BaseModel):
+    account_id: str
+    wallet_id: str
+    wallet_qrcode: Optional[str] = None
+
+@router.put("/accounts/wallet-id")
+async def admin_update_wallet_id(
+    admin_id: str,
+    request: AdminUpdateWalletIdRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Admin: set wallet_id on a crypto account"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin:
+            raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+        acc_result = await db.execute(select(Account).where(Account.id == request.account_id))
+        account = acc_result.scalar_one_or_none()
+        if not account:
+            raise NotFoundError(resource="Account", error_code="ACCOUNT_NOT_FOUND")
+        from models.account import AccountType as AT
+        acct_type = account.account_type.value if hasattr(account.account_type, "value") else str(account.account_type)
+        if acct_type != "crypto":
+            raise ValidationError(message="Wallet ID can only be set on crypto accounts", error_code="NOT_CRYPTO_ACCOUNT")
+        account.wallet_id = request.wallet_id
+        if request.wallet_qrcode:
+            account.wallet_qrcode = request.wallet_qrcode
+        account.updated_at = datetime.utcnow()
+        db.add(account)
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="update_wallet_id",
+            resource_type="account",
+            resource_id=account.id,
+            details=json.dumps({"wallet_id": request.wallet_id, "has_qrcode": bool(request.wallet_qrcode)})
+        )
+        db.add(audit_log)
+        await db.commit()
+        AblyRealtimeManager.publish_admin_event("accounts", {"type": "wallet_id_updated", "account_id": account.id})
+        return {"success": True, "message": "Wallet ID updated"}
+    except (UnauthorizedError, NotFoundError, ValidationError):
+        raise
+    except Exception as e:
+        logger.error("Wallet ID update failed", error=e)
+        raise InternalServerError(operation="update wallet id", error_code="WALLET_ID_UPDATE_FAILED", original_error=e)
+
 @router.delete("/users/delete")
 async def admin_delete_user(
     admin_id: str,

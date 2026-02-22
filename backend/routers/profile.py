@@ -3,6 +3,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.user import User
 from models.support import LoginHistory
+from models.account import Account, Statement
+from models.transaction import Transaction
+from models.transfer import Transfer
+from models.document import Document
+from models.notification import Notification
+from models.security import TrustedDevice
+from models.loan import Loan
+from models.virtual_card import VirtualCard
+from models.bill_payment import BillPayment
+from models.deposit import Deposit
 from database import get_db
 from datetime import datetime
 from utils.auth import get_current_user_id
@@ -259,3 +269,51 @@ async def get_login_history(
         ],
         "message": "Login history retrieved"
     }
+
+
+@router.delete("")
+async def delete_account(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete user and all associated data permanently"""
+    from sqlalchemy import delete
+    
+    # 1. Verify user exists
+    result = await db.execute(select(User).where(User.id == current_user_id))
+    user = result.scalar()
+    if not user:
+        raise HTTPException(status_code=404, detail="User found")
+
+    try:
+        # Get all account IDs for this user
+        acc_result = await db.execute(select(Account.id).where(Account.user_id == current_user_id))
+        account_ids = [row[0] for row in acc_result.all()]
+
+        # 2. Delete data linked to accounts (Transactions, Statements, Transfers)
+        if account_ids:
+            await db.execute(delete(Transaction).where(Transaction.account_id.in_(account_ids)))
+            await db.execute(delete(Statement).where(Statement.account_id.in_(account_ids)))
+            await db.execute(delete(Transfer).where((Transfer.from_account_id.in_(account_ids)) | (Transfer.to_account_id.in_(account_ids))))
+            await db.execute(delete(Account).where(Account.id.in_(account_ids)))
+
+        # 3. Delete data linked directly to user_id
+        await db.execute(delete(Loan).where(Loan.user_id == current_user_id))
+        await db.execute(delete(VirtualCard).where(VirtualCard.user_id == current_user_id))
+        await db.execute(delete(BillPayment).where(BillPayment.user_id == current_user_id))
+        await db.execute(delete(Deposit).where(Deposit.user_id == current_user_id))
+        await db.execute(delete(Document).where(Document.user_id == current_user_id))
+        await db.execute(delete(Notification).where(Notification.user_id == current_user_id))
+        await db.execute(delete(TrustedDevice).where(TrustedDevice.user_id == current_user_id))
+        await db.execute(delete(LoginHistory).where(LoginHistory.user_id == current_user_id))
+        
+        # 4. Finally delete the User record
+        await db.execute(delete(User).where(User.id == current_user_id))
+
+        await db.commit()
+        return {"success": True, "message": "Account and all associated data deleted successfully"}
+
+    except Exception as e:
+        await db.rollback()
+        print(f"Error during account deletion: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete account. Internal server error.")

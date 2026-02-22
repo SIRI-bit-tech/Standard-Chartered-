@@ -1,7 +1,8 @@
 import React from 'react'
 import { Check } from 'lucide-react'
 import type { LoanProduct } from '@/types'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getCurrencyFromCountry } from '@/lib/utils'
+import { useAuthStore } from '@/lib/store'
 
 interface LoanProductCardProps {
     product: LoanProduct
@@ -9,6 +10,11 @@ interface LoanProductCardProps {
 }
 
 export const LoanProductCard: React.FC<LoanProductCardProps> = ({ product, onApply }) => {
+    const { user } = useAuthStore()
+    const currency = user?.primary_currency && user?.primary_currency !== 'USD'
+        ? user?.primary_currency
+        : getCurrencyFromCountry(user?.country)
+
     return (
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col h-full group">
             {/* Top Image & Tag */}
@@ -35,7 +41,7 @@ export const LoanProductCard: React.FC<LoanProductCardProps> = ({ product, onApp
 
                 <ul className="space-y-3 mb-8 flex-1">
                     {(product.features || [
-                        `Up to ${formatCurrency(product.max_amount)}`,
+                        `Up to ${formatCurrency(product.max_amount, currency)}`,
                         'Fixed rate options',
                         'No processing fees',
                         'Expert guidance'

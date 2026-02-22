@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CreditCard, Landmark, Wallet, ArrowRightLeft, Eye, EyeOff, Download } from 'lucide-react'
+import { CreditCard, Landmark, Wallet, ArrowRightLeft, Eye, EyeOff, Download, Copy, Check } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
-import { formatCurrency, toTitleCase } from '@/lib/utils'
+import { formatCurrency, cn, toTitleCase, getCurrencyFromCountry } from '@/lib/utils'
+import { useCryptoPrice } from '@/hooks/use-crypto-price'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { colors } from '@/types'
@@ -40,6 +41,11 @@ export default function AccountsPage() {
     }
   }
 
+  const primaryAccount = accounts.find((a) => a.is_primary) ?? accounts[0]
+  const primaryCurrency = user?.primary_currency && user?.primary_currency !== 'USD'
+    ? user?.primary_currency
+    : (primaryAccount?.currency || getCurrencyFromCountry(user?.country))
+
   const totalNetWorth = accounts.reduce((sum, a) => sum + a.balance, 0)
 
   const handleDownloadStatement = async () => {
@@ -57,7 +63,7 @@ export default function AccountsPage() {
           `${a.nickname || toTitleCase(a.type)} (****${a.account_number.slice(-4)}): ${formatCurrency(a.balance, a.currency)}`,
       ),
       '',
-      `Total Net Worth: ${formatCurrency(totalNetWorth, user?.primary_currency ?? 'USD')}`,
+      `Total Net Worth: ${formatCurrency(totalNetWorth, primaryCurrency)}`,
     ]
     const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -73,20 +79,20 @@ export default function AccountsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>
+        <h1 className="text-xl font-bold sm:text-2xl" style={{ color: colors.textPrimary }}>
           My Accounts
         </h1>
-        <p className="mt-1 text-sm" style={{ color: colors.textSecondary }}>
+        <p className="mt-1 text-xs sm:text-sm" style={{ color: colors.textSecondary }}>
           Manage your finances across all account types.
         </p>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="rounded-xl border p-6"
+              className="rounded-xl border p-4 sm:p-6"
               style={{ borderColor: colors.border }}
             >
               <Skeleton className="mb-4 h-10 w-24" />
@@ -96,9 +102,9 @@ export default function AccountsPage() {
           ))}
         </div>
       ) : accounts.length > 0 ? (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           {accounts.map((account) => (
-            <AccountCard key={account.id} account={account} />
+            <AccountCard key={account.id} account={account} primaryCurrency={primaryCurrency} />
           ))}
         </div>
       ) : (
@@ -114,16 +120,16 @@ export default function AccountsPage() {
 
       {!loading && accounts.length > 0 && (
         <div
-          className="rounded-xl border p-6"
+          className="rounded-xl border p-4 sm:p-6"
           style={{ borderColor: colors.border, backgroundColor: colors.gray50 }}
         >
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium" style={{ color: colors.textSecondary }}>
+              <p className="text-xs sm:text-sm font-medium" style={{ color: colors.textSecondary }}>
                 Total Net Worth
               </p>
-              <p className="text-2xl font-bold" style={{ color: colors.primary }}>
-                {formatCurrency(totalNetWorth, user.primary_currency)}
+              <p className="text-xl sm:text-2xl font-bold" style={{ color: colors.primary }}>
+                {formatCurrency(totalNetWorth, primaryCurrency)}
               </p>
             </div>
             <div className="flex gap-2">
@@ -131,7 +137,7 @@ export default function AccountsPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleDownloadStatement}
-                className="gap-2"
+                className="flex-1 sm:flex-none gap-2"
               >
                 <Download className="h-4 w-4" />
                 Statement
@@ -144,8 +150,9 @@ export default function AccountsPage() {
   )
 }
 
-function AccountCard({ account }: { account: Account }) {
+function AccountCard({ account, primaryCurrency }: { account: Account; primaryCurrency: string }) {
   const [numberVisible, setNumberVisible] = useState(false)
+  const [copied, setCopied] = useState(false)
   const style = CARD_STYLES[account.type] || CARD_STYLES.checking
   const Icon =
     account.type === 'checking'
@@ -153,96 +160,148 @@ function AccountCard({ account }: { account: Account }) {
       : account.type === 'savings'
         ? Landmark
         : Wallet
-  const displayNumber = numberVisible
-    ? account.account_number
-    : `**** ${account.account_number.slice(-4)}`
-  const statusLabel =
-    account.type === 'crypto' && account.status === 'active'
-      ? 'TRADING'
-      : account.status.toUpperCase()
+
+  const { price: btcPrice } = useCryptoPrice('bitcoin')
+
+  const isCrypto = account.type === 'crypto'
+  const isFrozen = account.status === 'frozen'
+  const identifier = isCrypto
+    ? account.wallet_id || ''
+    : account.account_number
+  const hasIdentifier = !!identifier
+  const displayNumber = !hasIdentifier
+    ? 'Pending setup'
+    : numberVisible || isCrypto
+      ? identifier
+      : isCrypto
+        ? `${identifier.substring(0, 8)}...${identifier.slice(-6)}`
+        : `**** ${identifier.slice(-4)}`
+
+  const statusLabel = isCrypto && account.status === 'active' ? 'TRADING' : account.status.toUpperCase()
   const balanceLabel =
-    account.type === 'crypto' ? 'MARKET VALUE (USD)' : 'AVAILABLE BALANCE'
-  const primaryAction =
-    account.type === 'checking'
-      ? 'Transfer'
-      : account.type === 'savings'
-        ? 'Deposit'
-        : 'Buy/Sell'
+    isCrypto ? 'MARKET VALUE (BTC)' : 'AVAILABLE BALANCE'
+
+  const primaryAction = isCrypto ? 'Withdraw' : 'Transfer'
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!identifier) return
+    navigator.clipboard.writeText(identifier)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const btcValue = isCrypto ? account.balance : 0
+  const usdValue = isCrypto && btcPrice ? account.balance * btcPrice : account.balance
 
   return (
     <div
-      className="rounded-xl border p-6 transition-shadow hover:shadow-md"
+      className="rounded-xl border p-4 sm:p-6 transition-shadow hover:shadow-md h-full flex flex-col"
       style={{ backgroundColor: style.bg, borderColor: colors.border }}
     >
-      <div className="mb-4 flex items-start justify-between">
-        <div className="flex items-center gap-3">
+      <div className="mb-4 flex items-start justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div
-            className="flex h-10 w-10 items-center justify-center rounded-lg"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
             style={{ backgroundColor: style.iconBg }}
           >
             <Icon className="h-5 w-5 text-white" />
           </div>
-          <div>
-            <h3 className="font-semibold" style={{ color: colors.textPrimary }}>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold truncate text-sm sm:text-base" style={{ color: colors.textPrimary }}>
               {account.nickname || `${toTitleCase(account.type)} Account`}
             </h3>
-            <div className="mt-0.5 flex items-center gap-1">
-              <span className="font-mono text-xs" style={{ color: colors.textSecondary }}>
+            <div className="mt-0.5 flex items-center gap-1 min-w-0">
+              <span className={cn(
+                "font-mono text-[10px] sm:text-xs",
+                isCrypto ? "break-all text-gray-500" : "truncate text-gray-400"
+              )} style={{ color: isCrypto ? undefined : colors.textSecondary }}>
                 {displayNumber}
               </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0"
-                onClick={(e) => {
-                  e.preventDefault()
-                  setNumberVisible((v) => !v)
-                }}
-                aria-label={numberVisible ? 'Hide number' : 'Show number'}
-              >
-                {numberVisible ? (
-                  <EyeOff className="h-3 w-3" style={{ color: colors.textSecondary }} />
-                ) : (
-                  <Eye className="h-3 w-3" style={{ color: colors.textSecondary }} />
+              <div className="flex shrink-0">
+                {!isCrypto && hasIdentifier && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setNumberVisible((v) => !v)
+                    }}
+                    aria-label={numberVisible ? 'Hide number' : 'Show number'}
+                  >
+                    {numberVisible ? (
+                      <EyeOff className="h-3 w-3" style={{ color: colors.textSecondary }} />
+                    ) : (
+                      <Eye className="h-3 w-3" style={{ color: colors.textSecondary }} />
+                    )}
+                  </Button>
                 )}
-              </Button>
+                {hasIdentifier && (isCrypto || numberVisible) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={handleCopy}
+                    aria-label="Copy"
+                  >
+                    {copied ? (
+                      <Check className="h-3 w-3 text-green-600" />
+                    ) : (
+                      <Copy className="h-3 w-3" style={{ color: colors.textSecondary }} />
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
         <span
-          className="rounded px-2 py-0.5 text-xs font-medium"
+          className="rounded px-2 py-0.5 text-[10px] font-bold uppercase transition-all"
           style={{
-            backgroundColor:
-              account.type === 'crypto' ? colors.info + '20' : colors.success + '20',
-            color: account.type === 'crypto' ? colors.info : colors.success,
+            backgroundColor: isCrypto ? `${colors.success}15` : isFrozen ? `${colors.error}15` : `${colors.success}15`,
+            color: isCrypto ? colors.success : isFrozen ? colors.error : colors.success,
           }}
         >
           {statusLabel}
         </span>
       </div>
 
-      <div className="mb-6">
-        <p className="text-xs font-medium" style={{ color: colors.textSecondary }}>
+      <div className="mb-6 flex-1">
+        <p className="text-[10px] sm:text-xs font-medium" style={{ color: colors.textSecondary }}>
           {balanceLabel}
         </p>
-        <p className="text-xl font-bold" style={{ color: colors.textPrimary }}>
-          {formatCurrency(account.balance, account.currency)}
-        </p>
+        <div className="mt-1">
+          <p className="text-lg sm:text-xl font-bold" style={{ color: colors.textPrimary }}>
+            {isCrypto ? (
+              <span className="flex items-baseline gap-1">
+                {btcValue.toFixed(8)} <span className="text-xs font-semibold">BTC</span>
+              </span>
+            ) : (
+              formatCurrency(account.balance, account.currency)
+            )}
+          </p>
+          {isCrypto && (
+            <p className="text-[10px] mt-0.5 font-medium" style={{ color: colors.textSecondary }}>
+              ≈ {formatCurrency(usdValue, primaryCurrency)}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" className="flex-1" asChild>
+      <div className="flex flex-col sm:flex-row gap-2 mt-auto">
+        <Button variant="outline" size="sm" className="flex-1 text-xs" asChild>
           <Link href={`/dashboard/accounts/${account.id}`}>View Details</Link>
         </Button>
-        <Button size="sm" className="flex-1 gap-1" asChild>
+        <Button size="sm" className="flex-1 gap-1 text-xs" asChild>
           <Link
             href={
-              account.type === 'checking'
-                ? '/dashboard/transfers'
-                : account.type === 'savings'
-                  ? '/dashboard/deposits'
-                  : '/dashboard/accounts/' + account.id
+              isCrypto
+                ? `/dashboard/accounts/${account.id}?action=withdraw`
+                : '/dashboard/transfers'
             }
           >
             <ArrowRightLeft className="h-3.5 w-3.5" />
@@ -253,3 +312,4 @@ function AccountCard({ account }: { account: Account }) {
     </div>
   )
 }
+

@@ -3,7 +3,7 @@
 import React from "react"
 
 import { useState } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthStore } from '@/lib/store';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Scan } from 'lucide-react';
 import { FromAccountSelect } from '@/components/transfers/from-account-select';
 import { ImageUpload } from '@/components/ImageUpload';
+import { getCurrencyFromCountry } from '@/lib/utils';
 import type { Account } from '@/types';
 
 interface CheckDepositFormProps {
@@ -19,7 +20,7 @@ interface CheckDepositFormProps {
 }
 
 export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -31,9 +32,9 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
     check_issuer_bank: '',
     name_on_check: '',
     front_image_url: '',
-    currency: 'USD'
+    currency: user?.primary_currency || getCurrencyFromCountry(user?.country)
   });
-  
+
   const [touched, setTouched] = useState({ amount: false, check_number: false });
 
   React.useEffect(() => {
@@ -153,7 +154,7 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
           check_issuer_bank: '',
           name_on_check: '',
           front_image_url: '',
-          currency: 'USD'
+          currency: user?.primary_currency || getCurrencyFromCountry(user?.country)
         });
         onSuccess?.();
       }
@@ -168,7 +169,7 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
     }
   }
 
-  
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -211,7 +212,7 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="amount">Amount</Label>
           <Input
@@ -259,10 +260,10 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
           type="text"
           placeholder="e.g., 1234567"
           value={formData.check_number}
-            onChange={(e) => {
-              setTouched(prev => ({ ...prev, check_number: true }));
-              setFormData({ ...formData, check_number: e.target.value });
-            }}
+          onChange={(e) => {
+            setTouched(prev => ({ ...prev, check_number: true }));
+            setFormData({ ...formData, check_number: e.target.value });
+          }}
           disabled={loading}
         />
       </div>

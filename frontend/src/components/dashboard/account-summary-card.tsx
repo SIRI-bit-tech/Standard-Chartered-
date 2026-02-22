@@ -137,7 +137,7 @@ export function AccountSummaryCard({
 
   return (
     <div
-      className="mt-4 flex flex-wrap items-start gap-6 rounded-lg border p-4"
+      className="mt-4 grid grid-cols-1 sm:flex sm:flex-wrap items-start gap-4 sm:gap-6 rounded-xl border p-4 sm:p-6"
       style={{ borderColor: colors.border }}
     >
       <div>

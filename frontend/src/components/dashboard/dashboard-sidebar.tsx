@@ -61,7 +61,7 @@ export function DashboardSidebar({ mobileOpen = false, onMobileOpenChange }: Das
   return (
     <>
       <aside
-        className="hidden w-64 flex-col border-r lg:flex"
+        className="hidden w-64 flex-col border-r xl:flex"
         style={{ backgroundColor: colors.primary, borderColor: colors.primaryDark }}
       >
         <SidebarContent />

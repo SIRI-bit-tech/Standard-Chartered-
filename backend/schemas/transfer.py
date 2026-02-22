@@ -184,3 +184,16 @@ class RegisterBeneficiaryRequest(BaseModel):
     bank_code: Optional[str] = Field(None, max_length=10)
     country: Optional[str] = Field(None, min_length=2, max_length=2)
     nickname: Optional[str] = Field(None, max_length=50)
+
+
+class CryptoWithdrawRequest(BaseModel):
+    """Crypto withdrawal request"""
+    transfer_pin: str = Field(..., pattern=r"^\d{4}$", description="4-digit transfer PIN")
+    from_account_id: str
+    amount_btc: float = Field(..., gt=0)
+    destination_address: Optional[str] = Field(None, min_length=10)
+    destination_account_id: Optional[str] = Field(None)
+
+    @validator("transfer_pin")
+    def validate_transfer_pin_strength(cls, v: str) -> str:
+        return validate_transfer_pin_strength(v)

@@ -28,6 +28,8 @@ class Account(Base):
     # Account info
     account_number = Column(String, unique=True, index=True, nullable=False)
     routing_number = Column(String, nullable=True)  # For US bank transfers
+    wallet_id = Column(String, nullable=True)  # For crypto accounts (set by admin)
+    wallet_qrcode = Column(String, nullable=True)  # URL to uploaded QR code
     account_type = Column(Enum(AccountType), nullable=False)
     status = Column(Enum(AccountStatus), default=AccountStatus.ACTIVE, nullable=False)
     

@@ -1,5 +1,5 @@
- 'use client'
- 
+'use client'
+
 import { useEffect, useState } from "react"
 import { apiClient } from "@/lib/api-client"
 import type { TrustedDevice, LoginHistoryItem, TwoFactorSetupPayload } from "@/types"
@@ -285,6 +285,36 @@ export function SecurityPanel({ onRefreshDevices }: Props) {
               )}
             </tbody>
           </table>
+        </div>
+        <hr className="border-border" />
+        <div className="pt-4 pb-2">
+          <h3 className="font-semibold text-destructive mb-3 text-lg">Danger Zone</h3>
+          <p className="text-sm text-muted-foreground mb-4 max-w-xl">
+            Once you delete your account, there is no going back. All your data, transaction history, and documents will be permanently removed from our servers.
+          </p>
+          <button
+            onClick={async () => {
+              if (confirm("Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.")) {
+                setBusy(true);
+                try {
+                  const res = await apiClient.delete<{ success: boolean }>('/api/v1/profile');
+                  if (res.success) {
+                    alert("Your account has been successfully deleted.");
+                    window.localStorage.clear();
+                    window.location.href = '/';
+                  }
+                } catch (e: any) {
+                  setError(e?.response?.data?.detail || "Failed to delete account. Please contact support.");
+                } finally {
+                  setBusy(false);
+                }
+              }
+            }}
+            className="px-6 py-2.5 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition text-sm font-semibold shadow-sm"
+            disabled={busy}
+          >
+            {busy ? "Deleting..." : "Delete Account"}
+          </button>
         </div>
       </div>
     </div>

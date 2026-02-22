@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Clock } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
-import { formatDate } from '@/lib/utils'
+import { formatDate, getCurrencyFromCountry } from '@/lib/utils'
 import { AccountCards } from '@/components/dashboard/account-cards'
 import { AccountSummaryCard } from '@/components/dashboard/account-summary-card'
 import { QuickActionsGrid } from '@/components/dashboard/quick-actions-grid'
@@ -43,12 +43,30 @@ export default function DashboardPage() {
   async function loadDashboardData() {
     try {
       if (!user) return
+
+      // Fetch BTC price for total balance calculation
+      let btcPrice = 0
+      try {
+        const priceRes: any = await apiClient.get('/api/v1/accounts/crypto-price?symbol=bitcoin')
+        btcPrice = priceRes?.price || 65000
+      } catch (e) {
+        console.warn('Failed to fetch BTC price for summary, using fallback')
+        btcPrice = 65000 // Fallback
+      }
+
       const accountsResponse: AccountsResponse = await apiClient.get<AccountsResponse>(`/api/v1/accounts/`)
       if (accountsResponse.success) {
         setAccounts(accountsResponse.data)
-        setTotalBalance(
-          accountsResponse.data.reduce((sum: number, acc: Account) => sum + acc.balance, 0),
-        )
+
+        const total = accountsResponse.data.reduce((sum: number, acc: Account) => {
+          if (acc.type === 'crypto' && acc.currency === 'BTC') {
+            return sum + (acc.balance * btcPrice)
+          }
+          return sum + acc.balance
+        }, 0)
+
+        setTotalBalance(total)
+
         // Load unified recent transfer history for consistent display
         const hx: TransferHistoryResponse = await apiClient.get<TransferHistoryResponse>(
           `/api/v1/transfers/history?page=1&page_size=5`,
@@ -74,11 +92,14 @@ export default function DashboardPage() {
     cUpper === 'UNITED STATES' ||
     cUpper === 'UNITED STATES OF AMERICA'
   const primaryAccount = accounts.find((a) => a.is_primary) ?? accounts[0]
+  const primaryCurrency = user.primary_currency && user.primary_currency !== 'USD'
+    ? user.primary_currency
+    : (primaryAccount?.currency || getCurrencyFromCountry(user.country))
 
   return (
     <div className="space-y-8">
       <section>
-        <h1 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>
+        <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: colors.textPrimary }}>
           Welcome back, {user.username}!
         </h1>
         <p className="mt-1 flex items-center gap-1.5 text-sm" style={{ color: colors.textSecondary }}>
@@ -88,7 +109,7 @@ export default function DashboardPage() {
         <AccountSummaryCard
           loading={loading}
           totalBalance={totalBalance}
-          primaryCurrency={user.primary_currency}
+          primaryCurrency={primaryCurrency}
           primaryAccount={primaryAccount}
           isUS={isUS}
         />
@@ -98,7 +119,7 @@ export default function DashboardPage() {
         <h2 className="mb-4 text-lg font-semibold" style={{ color: colors.textPrimary }}>
           My Accounts
         </h2>
-        <AccountCards accounts={accounts} loading={loading} />
+        <AccountCards accounts={accounts} loading={loading} primaryCurrency={primaryCurrency} />
       </section>
 
       <section>

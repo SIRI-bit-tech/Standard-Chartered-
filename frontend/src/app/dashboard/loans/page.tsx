@@ -29,7 +29,7 @@ export default function LoansPage() {
 
     try {
       // Load products (Mocking more products if backend returns few)
-      const productsResponse = await apiClient.get<ApiResponse<LoanProduct[]>>(`/api/v1/loans/products?user_tier=${user.tier}`)
+      const productsResponse = await apiClient.get<ApiResponse<LoanProduct[]>>(`/api/v1/loans/products`)
       if (productsResponse?.success) {
         setProducts(productsResponse.data)
       }
@@ -79,36 +79,38 @@ export default function LoansPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-20 space-y-8 animate-in fade-in duration-700">
+    <div className="max-w-7xl mx-auto pb-20 space-y-6 sm:space-y-8 animate-in fade-in duration-700 px-1 sm:px-4">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-1">
         <div>
-          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Loans & Financing</h1>
-          <p className="text-gray-500 font-medium mt-1">Empowering your financial journey with flexible solutions.</p>
+          <h1 className="text-2xl sm:text-4xl font-black text-gray-900 tracking-tight">Loans & Financing</h1>
+          <p className="text-xs sm:text-sm text-gray-500 font-medium mt-1">Empowering your financial journey with flexible solutions.</p>
         </div>
 
-        <div className="flex bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200 w-fit">
-          <button
-            onClick={() => setActiveTab('browse')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'browse' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <Landmark size={16} /> Browse
-          </button>
-          <button
-            onClick={() => setActiveTab('applications')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'applications' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <FileText size={16} /> Applications {applications.length > 0 && <span className="ml-1 bg-primary/10 px-1.5 rounded-md text-[10px]">{applications.length}</span>}
-          </button>
-          <button
-            onClick={() => setActiveTab('active')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'active' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-          >
-            <Activity size={16} /> My Loans {loans.length > 0 && <span className="ml-1 bg-primary/10 px-1.5 rounded-md text-[10px]">{loans.length}</span>}
-          </button>
+        <div className="flex bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200 w-full md:w-fit overflow-x-auto scrollbar-hide">
+          <div className="flex min-w-max">
+            <button
+              onClick={() => setActiveTab('browse')}
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'browse' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <Landmark size={16} /> Browse
+            </button>
+            <button
+              onClick={() => setActiveTab('applications')}
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'applications' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <FileText size={16} /> Applications {applications.length > 0 && <span className="ml-1 bg-primary/10 px-1.5 rounded-md text-[10px]">{applications.length}</span>}
+            </button>
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'active' ? 'bg-white text-primary shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              <Activity size={16} /> My Loans {loans.length > 0 && <span className="ml-1 bg-primary/10 px-1.5 rounded-md text-[10px]">{loans.length}</span>}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -122,7 +124,7 @@ export default function LoansPage() {
           {activeTab === 'browse' && (
             <>
               {selectedProduct ? (
-                <div className="bg-white rounded-[32px] border border-gray-100 shadow-2xl overflow-hidden">
+                <div className="bg-white rounded-[24px] sm:rounded-[32px] border border-gray-100 shadow-2xl overflow-hidden p-4 sm:p-0">
                   <LoanApplicationForm
                     product={selectedProduct}
                     onSuccess={handleApplicationSuccess}
@@ -130,20 +132,20 @@ export default function LoansPage() {
                   />
                 </div>
               ) : (
-                <div className="space-y-12">
+                <div className="space-y-8 sm:space-y-12">
                   <LoanEligibilityChecker onStart={() => solutionsRef.current?.scrollIntoView({ behavior: 'smooth' })} />
 
-                  <div ref={solutionsRef} className="space-y-8">
+                  <div ref={solutionsRef} className="space-y-6 sm:space-y-8">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-                      <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
-                        <Layers className="text-primary" size={24} /> Recommended Solutions
+                      <h2 className="text-xl sm:text-2xl font-black text-gray-900 flex items-center gap-3">
+                        <Layers className="text-primary w-5 h-5 sm:w-6 sm:h-6" /> Recommended Solutions
                       </h2>
-                      <div className="flex items-center gap-2 text-primary font-bold text-sm cursor-pointer hover:underline">
+                      <div className="hidden sm:flex items-center gap-2 text-primary font-bold text-sm cursor-pointer hover:underline">
                         View Details <ArrowRight size={14} />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
                       {products.length > 0 ? (
                         products.map((product) => (
                           <LoanProductCard
@@ -154,7 +156,7 @@ export default function LoansPage() {
                         ))
                       ) : (
                         <div className="col-span-full py-20 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                          <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">No products currently available for your tier</p>
+                          <p className="text-gray-400 font-bold uppercase tracking-widest text-xs px-4">No products currently available for your tier</p>
                         </div>
                       )}
                     </div>
@@ -166,30 +168,30 @@ export default function LoansPage() {
 
           {activeTab === 'applications' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-4">
+              <div className="lg:col-span-2 space-y-6">
                 {applications.length > 0 ? (
                   applications.map((app) => {
                     const product = products.find(p => p.id === app.product_id)
                     return (
-                      <div key={app.id} className="bg-white rounded-2xl p-6 border border-gray-100 hover:border-primary/20 shadow-sm transition-all group">
-                        <div className="flex items-center justify-between">
+                      <div key={app.id} className="bg-white rounded-2xl p-4 sm:p-6 border border-gray-100 hover:border-primary/20 shadow-sm transition-all group">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 group-hover:bg-blue-50 transition-colors">
-                              <FileText className="text-gray-400 group-hover:text-primary transition-colors" size={20} />
+                            <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100 group-hover:bg-blue-50 transition-colors">
+                              <FileText className="text-gray-400 group-hover:text-primary transition-colors w-[18px] h-[18px] sm:w-5 sm:h-5" />
                             </div>
-                            <div>
-                              <h4 className="font-bold text-gray-900">{product?.name || 'Loan Application'}</h4>
-                              <p className="text-xs text-gray-500 font-medium">Applied on {formatDate(app.created_at)}</p>
+                            <div className="min-w-0">
+                              <h4 className="font-bold text-gray-900 truncate">{product?.name || 'Loan Application'}</h4>
+                              <p className="text-[10px] sm:text-xs text-gray-500 font-medium">Applied on {formatDate(app.created_at)}</p>
                             </div>
                           </div>
 
-                          <div className={`px-4 py-1.5 rounded-full border text-xs font-bold flex items-center gap-2 ${getStatusStyles(app.status)}`}>
+                          <div className={`px-4 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold flex items-center gap-2 w-fit ${getStatusStyles(app.status)}`}>
                             {getStatusIcon(app.status)}
                             {toTitleCase(app.status)}
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-8 mt-6 pt-6 border-t border-gray-50">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mt-6 pt-6 border-t border-gray-50">
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Requested Amount</p>
                             <p className="text-sm font-bold text-gray-900">{formatCurrency(app.requested_amount)}</p>
@@ -216,15 +218,15 @@ export default function LoansPage() {
                     )
                   })
                 ) : (
-                  <div className="bg-gray-50/50 border-2 border-dashed border-gray-200 rounded-3xl p-20 flex flex-col items-center text-center">
-                    <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
-                      <FileText className="text-gray-200" size={32} />
+                  <div className="bg-gray-50/50 border-2 border-dashed border-gray-200 rounded-3xl p-10 sm:p-20 flex flex-col items-center text-center">
+                    <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-full bg-white flex items-center justify-center shadow-sm mb-6">
+                      <FileText className="text-gray-200 w-6 h-6 sm:w-8 sm:h-8" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900">No applications on file</h3>
-                    <p className="text-sm text-gray-500 max-w-xs mt-2">Ready to fund your next project? Browse our loan products to get started.</p>
+                    <p className="text-xs sm:text-sm text-gray-500 max-w-xs mt-2">Ready to fund your next project? Browse our loan products to get started.</p>
                     <button
                       onClick={() => setActiveTab('browse')}
-                      className="mt-8 px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-primary font-bold text-sm shadow-sm hover:shadow-md transition-all"
+                      className="mt-6 sm:mt-8 px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-primary font-bold text-sm shadow-sm hover:shadow-md transition-all"
                     >
                       Start New Application
                     </button>
@@ -243,19 +245,19 @@ export default function LoansPage() {
                         <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <span className="text-[10px] font-bold text-blue-400">1</span>
                         </div>
-                        <p className="text-xs text-gray-400">Application verification by our underwriting team.</p>
+                        <p className="text-[11px] sm:text-xs text-gray-400">Application verification by our underwriting team.</p>
                       </li>
                       <li className="flex gap-3">
                         <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <span className="text-[10px] font-bold text-blue-400">2</span>
                         </div>
-                        <p className="text-xs text-gray-400">Final credit review and limit assignment.</p>
+                        <p className="text-[11px] sm:text-xs text-gray-400">Final credit review and limit assignment.</p>
                       </li>
                       <li className="flex gap-3">
                         <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <CheckCircle2 className="text-green-400" size={14} />
                         </div>
-                        <p className="text-xs text-gray-400">Approval and instant disbursement to your account.</p>
+                        <p className="text-[11px] sm:text-xs text-gray-400">Approval and disbursement to your account.</p>
                       </li>
                     </ul>
                   </div>
@@ -270,62 +272,62 @@ export default function LoansPage() {
               {loans.length > 0 ? (
                 <div className="grid grid-cols-1 gap-8">
                   {loans.map((loan) => (
-                    <div key={loan.id} className="bg-white rounded-[32px] border border-gray-100 shadow-xl overflow-hidden group">
-                      <div className="p-8 md:p-10 flex flex-col md:flex-row md:items-center justify-between gap-8 border-b border-gray-50">
+                    <div key={loan.id} className="bg-white rounded-[24px] sm:rounded-[32px] border border-gray-100 shadow-xl overflow-hidden group">
+                      <div className="p-6 sm:p-10 flex flex-col md:flex-row md:items-center justify-between gap-6 sm:gap-8 border-b border-gray-50">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-3">
-                            <h3 className="text-2xl font-black text-gray-900">{toTitleCase(loan.type)}</h3>
-                            <span className="px-3 py-1 bg-green-50 text-green-700 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-green-100">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <h3 className="text-xl sm:text-2xl font-black text-gray-900">{toTitleCase(loan.type)}</h3>
+                            <span className="px-3 py-1 bg-green-50 text-green-700 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-green-100 w-fit">
                               Active Repayment
                             </span>
                           </div>
-                          <p className="text-sm text-gray-500 font-medium">Facility ID: #{loan.id.slice(0, 12).toUpperCase()}</p>
+                          <p className="text-xs sm:text-sm text-gray-500 font-medium">Facility ID: #{loan.id.slice(0, 12).toUpperCase()}</p>
                         </div>
 
                         <div className="text-left md:text-right">
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Outstanding Balance</p>
-                          <p className="text-4xl font-black text-primary">{formatCurrency(loan.remaining_balance)}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Outstanding Balance</p>
+                          <p className="text-2xl sm:text-4xl font-black text-primary">{formatCurrency(loan.remaining_balance)}</p>
                         </div>
                       </div>
 
-                      <div className="p-8 md:p-10 grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-12 bg-gray-50/30">
+                      <div className="p-6 sm:p-10 grid grid-cols-2 lg:grid-cols-4 gap-y-8 gap-x-6 sm:gap-x-12 bg-gray-50/30">
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Principal</p>
-                          <p className="text-lg font-black text-gray-900">{formatCurrency(loan.principal_amount)}</p>
+                          <p className="text-base sm:text-lg font-black text-gray-900">{formatCurrency(loan.principal_amount)}</p>
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Interest Rate</p>
-                          <p className="text-lg font-black text-gray-900">{loan.interest_rate}% APR</p>
+                          <p className="text-base sm:text-lg font-black text-gray-900">{loan.interest_rate}% APR</p>
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Monthly EMI</p>
-                          <p className="text-lg font-black text-primary">{formatCurrency(loan.monthly_payment)}</p>
+                          <p className="text-base sm:text-lg font-black text-primary">{formatCurrency(loan.monthly_payment)}</p>
                         </div>
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Next Payment</p>
-                          <p className="text-lg font-black text-gray-900">{formatDate(loan.next_payment_date)}</p>
+                          <p className="text-base sm:text-lg font-black text-gray-900">{formatDate(loan.next_payment_date)}</p>
                         </div>
                       </div>
 
-                      <div className="px-8 md:px-10 py-6 bg-white flex flex-col sm:flex-row items-center justify-between gap-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-primary">
+                      <div className="px-6 sm:px-10 py-6 bg-white flex flex-col sm:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                          <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-primary shrink-0">
                             <Clock size={20} />
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-xs font-bold text-gray-900">{loan.payments_made} Payments Made</p>
-                            <div className="w-32 h-1.5 bg-gray-100 rounded-full mt-1">
+                            <div className="w-full sm:w-32 h-1.5 bg-gray-100 rounded-full mt-1">
                               <div className="h-full bg-primary rounded-full" style={{ width: '45%' }} />
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-4 w-full sm:w-auto">
-                          <button className="flex-1 sm:flex-none px-6 py-3 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">
-                            Repayment Schedule
+                        <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
+                          <button className="w-full sm:w-auto px-6 py-2.5 border border-gray-200 rounded-xl text-xs sm:text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">
+                            Schedule
                           </button>
-                          <button className="flex-1 sm:flex-none px-8 py-3 bg-primary text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-200 hover:scale-[1.02] active:scale-[0.98] transition-all">
-                            Make Quick Payment
+                          <button className="w-full sm:w-auto px-6 py-2.5 bg-primary text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-200 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                            Make Payment
                           </button>
                         </div>
                       </div>
@@ -333,19 +335,19 @@ export default function LoansPage() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white border border-gray-100 rounded-[40px] p-20 flex flex-col items-center text-center shadow-xl">
-                  <div className="w-24 h-24 rounded-full bg-blue-50 flex items-center justify-center mb-8">
-                    <Landmark className="text-primary-light" size={48} />
+                <div className="bg-white border border-gray-100 rounded-[32px] sm:rounded-[40px] p-10 sm:p-20 flex flex-col items-center text-center shadow-xl">
+                  <div className="w-16 sm:w-24 h-16 sm:h-24 rounded-full bg-blue-50 flex items-center justify-center mb-8">
+                    <Landmark className="text-primary-light w-8 h-8 sm:w-12 sm:h-12" />
                   </div>
-                  <h3 className="text-2xl font-black text-gray-900">No active facilities</h3>
-                  <p className="text-gray-500 max-w-sm mt-3 leading-relaxed">
-                    You don't have any active loans or credit lines at the moment. Browse our products to find the perfect solution for you.
+                  <h3 className="text-xl sm:text-2xl font-black text-gray-900">No active facilities</h3>
+                  <p className="text-xs sm:text-sm text-gray-500 max-w-sm mt-3 leading-relaxed">
+                    You don't have any active loans at the moment. Browse our products to find the perfect solution for you.
                   </p>
                   <button
                     onClick={() => setActiveTab('browse')}
-                    className="mt-10 px-10 py-4 bg-primary text-white rounded-[20px] font-black shadow-xl shadow-blue-200 hover:translate-y-1 transition-all"
+                    className="mt-8 px-8 py-3 bg-primary text-white rounded-[16px] sm:rounded-[20px] font-black shadow-xl shadow-blue-200 hover:translate-y-1 transition-all text-sm sm:text-base"
                   >
-                    View Loan Products
+                    View Products
                   </button>
                 </div>
               )}

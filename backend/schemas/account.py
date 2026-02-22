@@ -41,6 +41,8 @@ class AccountResponse(BaseModel):
     nickname: Optional[str] = None
     status: AccountStatus = AccountStatus.ACTIVE
     is_primary: bool = False
+    wallet_id: Optional[str] = None  # For crypto accounts
+    wallet_qrcode: Optional[str] = None  # For crypto accounts
     daily_limit: float = 5000.0
     monthly_limit: float = 50000.0
     created_at: datetime

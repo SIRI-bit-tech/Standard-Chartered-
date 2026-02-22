@@ -9,9 +9,17 @@ import {
   ToastTitle,
   ToastViewport,
 } from '@/components/ui/toast'
+import { usePathname } from 'next/navigation'
+import { useEffect } from 'react'
 
 export function Toaster() {
-  const { toasts } = useToast()
+  const { toasts, dismiss } = useToast()
+  const pathname = usePathname()
+
+  // Clear toasts on navigation
+  useEffect(() => {
+    dismiss()
+  }, [pathname, dismiss])
 
   return (
     <ToastProvider>

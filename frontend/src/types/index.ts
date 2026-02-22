@@ -24,6 +24,8 @@ export interface Account {
   id: string
   account_number: string
   routing_number?: string // US accounts only
+  wallet_id?: string | null // Crypto accounts only
+  wallet_qrcode?: string | null // Crypto accounts only
   type: 'checking' | 'savings' | 'crypto'
   currency: string
   balance: number

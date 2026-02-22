@@ -3,8 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Briefcase, DollarSign, Target, CreditCard, ShieldCheck, AlertCircle } from 'lucide-react'
 import { StepIndicator } from './StepIndicator'
 import type { LoanProduct } from '@/types'
-import { useAccountStore } from '@/lib/store'
-import { formatCurrency } from '@/lib/utils'
+import { useAuthStore, useAccountStore } from '@/lib/store'
+import { formatCurrency, getCurrencyFromCountry } from '@/lib/utils'
 import { apiClient } from '@/lib/api-client'
 
 interface LoanApplicationFormProps {
@@ -21,7 +21,12 @@ const STEPS = [
 
 export const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ product, onSuccess, onCancel }) => {
     const [currentStep, setCurrentStep] = useState(1)
+    const { user } = useAuthStore()
     const { accounts } = useAccountStore()
+    const primaryAccount = accounts.find((a) => a.is_primary) ?? accounts[0]
+    const currency = user?.primary_currency && user?.primary_currency !== 'USD'
+        ? user?.primary_currency
+        : (primaryAccount?.currency || getCurrencyFromCountry(user?.country))
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
@@ -112,7 +117,7 @@ export const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ produc
 
                                             <div className="space-y-2">
                                                 <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                                    <DollarSign size={14} /> Annual Income (USD)
+                                                    <DollarSign size={14} /> Annual Income ({currency})
                                                 </label>
                                                 <input
                                                     type="number"
@@ -143,7 +148,7 @@ export const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ produc
                                         <div className="space-y-4">
                                             <div className="flex justify-between items-center">
                                                 <label className="text-sm font-bold text-gray-700">How much do you need?</label>
-                                                <span className="text-2xl font-black text-primary">{formatCurrency(formData.amount)}</span>
+                                                <span className="text-2xl font-black text-primary">{formatCurrency(formData.amount, currency)}</span>
                                             </div>
                                             <input
                                                 type="range"
@@ -249,11 +254,11 @@ export const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ produc
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Loan Amount</p>
-                                                    <p className="text-xl font-black text-gray-900">{formatCurrency(formData.amount)}</p>
+                                                    <p className="text-xl font-black text-gray-900">{formatCurrency(formData.amount, currency)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monthly Payment (Est.)</p>
-                                                    <p className="text-xl font-black text-primary">{formatCurrency(monthlyPayment)}/mo</p>
+                                                    <p className="text-xl font-black text-primary">{formatCurrency(monthlyPayment, currency)}/mo</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Duration</p>
