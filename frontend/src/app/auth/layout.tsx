@@ -22,9 +22,9 @@ export default function AuthLayout({
         <div className="relative z-10 text-white flex-col justify-between p-8 flex">
           <div>
             <Link href="/" className="inline-block bg-white p-2 rounded-lg shadow-lg">
-              <img 
-                src="/logo.png" 
-                alt="Standard Chartered" 
+              <img
+                src="/logo.png"
+                alt="Standard Chartered"
                 className="h-10 w-auto"
               />
             </Link>
@@ -63,7 +63,21 @@ export default function AuthLayout({
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-8">
+      <div className="flex-1 flex flex-col items-center justify-start lg:justify-center p-4 sm:p-6 overflow-y-auto">
+        {/* Mobile logo header - only visible on small screens */}
+        <div className="lg:hidden w-full max-w-md mb-6 flex items-center gap-3">
+          <Link href="/" className="inline-block bg-white p-2 rounded-lg shadow border border-gray-100">
+            <img
+              src="/logo.png"
+              alt="Standard Chartered"
+              className="h-8 w-auto"
+            />
+          </Link>
+          <div>
+            <p className="text-sm font-bold text-foreground">Standard Chartered</p>
+            <p className="text-xs text-muted-foreground">Digital Banking Platform</p>
+          </div>
+        </div>
         <div className="w-full max-w-md">
           {children}
         </div>

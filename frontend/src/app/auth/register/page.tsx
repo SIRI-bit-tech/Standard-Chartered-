@@ -90,7 +90,7 @@ export default function RegisterPage() {
     } catch (err: any) {
       console.error('Registration error:', err)
       let errorMessage = 'Registration failed. Please try again.'
-      
+
       if (err.response?.data) {
         const data = err.response.data
         if (typeof data === 'string') {
@@ -103,7 +103,7 @@ export default function RegisterPage() {
       } else if (err.message) {
         errorMessage = err.message
       }
-      
+
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -140,7 +140,7 @@ export default function RegisterPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Personal Information */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="relative">
             <input
               type="text"
@@ -148,7 +148,7 @@ export default function RegisterPage() {
               value={formData.first_name}
               onChange={handleChange}
               placeholder="First name"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -159,13 +159,13 @@ export default function RegisterPage() {
               value={formData.last_name}
               onChange={handleChange}
               placeholder="Last name"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
               required
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="relative">
             <input
               type="email"
@@ -173,7 +173,7 @@ export default function RegisterPage() {
               value={formData.email}
               onChange={handleChange}
               placeholder="Email address"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -184,14 +184,14 @@ export default function RegisterPage() {
               value={formData.username}
               onChange={handleChange}
               placeholder="Username"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
               required
             />
           </div>
         </div>
 
         {/* Location Information */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <CountrySelector
               value={formData.country}
@@ -208,14 +208,14 @@ export default function RegisterPage() {
               value={formData.phone}
               onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
               placeholder="+1 (555) 123-4567"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
               required
             />
           </div>
         </div>
 
         {/* Address Information */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="col-span-2">
             <input
               type="text"
@@ -223,7 +223,7 @@ export default function RegisterPage() {
               value={formData.street_address}
               onChange={handleChange}
               placeholder="Street Address"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -233,7 +233,7 @@ export default function RegisterPage() {
             value={formData.city}
             onChange={handleChange}
             placeholder="City"
-            className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
             required
           />
           <input
@@ -242,7 +242,7 @@ export default function RegisterPage() {
             value={formData.state}
             onChange={handleChange}
             placeholder="State/Province"
-            className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
             required
           />
           <input
@@ -251,13 +251,13 @@ export default function RegisterPage() {
             value={formData.postal_code}
             onChange={handleChange}
             placeholder="Postal Code"
-            className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+            className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
             required
           />
         </div>
 
         {/* Security */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="relative">
             <input
               type="password"
@@ -265,7 +265,7 @@ export default function RegisterPage() {
               value={formData.password}
               onChange={handleChange}
               placeholder="Password"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
               required
             />
           </div>
@@ -276,17 +276,17 @@ export default function RegisterPage() {
               value={formData.confirm_password}
               onChange={handleChange}
               placeholder="Confirm password"
-              className="w-full px-3 py-2.5 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
+              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-foreground bg-white placeholder:text-gray-400"
               required
             />
           </div>
         </div>
 
         <div className="flex items-center gap-2 py-2">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             id="terms"
-            required 
+            required
             className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary focus:ring-2"
           />
           <label htmlFor="terms" className="text-sm text-muted-foreground">

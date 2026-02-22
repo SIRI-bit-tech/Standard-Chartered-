@@ -38,7 +38,7 @@ export default function LoginPage() {
       e.preventDefault()
       e.stopPropagation()
     }
-    
+
     setLoading(true)
     setError('')
     show()
@@ -74,10 +74,10 @@ export default function LoginPage() {
           // Store tokens in localStorage AND cookie for middleware
           localStorage.setItem('access_token', response.token.access_token)
           localStorage.setItem('refresh_token', response.token.refresh_token)
-          
+
           // Also set cookie for middleware
           document.cookie = `accessToken=${response.token.access_token}; path=/; max-age=3600; secure; samesite=strict`
-          
+
           // Map user data from server response with fallbacks
           const userData = {
             id: response.data.user_id || '',
@@ -96,9 +96,9 @@ export default function LoginPage() {
             created_at: response.data.created_at || new Date().toISOString(),
             last_login: response.data.last_login || new Date().toISOString()
           }
-          
+
           localStorage.setItem('user', JSON.stringify(userData))
-          
+
           // Update auth store
           setUser(userData)
           setToken(response.token.access_token)
@@ -106,10 +106,10 @@ export default function LoginPage() {
           // Handle missing token case
           setError('Login successful but no token received. Please try again.')
         }
-        
+
         setLoading(false)
         hide()
-        
+
         // Navigate to dashboard after successful login
         setTimeout(() => {
           window.location.href = '/dashboard'
@@ -147,7 +147,7 @@ export default function LoginPage() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Enter your username"
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-foreground bg-white placeholder:text-gray-400"
             required
           />
         </div>
@@ -161,7 +161,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter your password"
-            className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-foreground bg-white placeholder:text-gray-400"
             required
           />
         </div>
@@ -180,7 +180,7 @@ export default function LoginPage() {
           type="button"
           onClick={handleLogin}
           disabled={loading}
-          className="w-full py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-medium disabled:opacity-50"
+          className="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-semibold disabled:opacity-50 shadow-md"
         >
           {loading ? 'Signing in...' : 'Sign In'}
         </button>
