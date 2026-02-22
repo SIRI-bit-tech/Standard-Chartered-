@@ -14,29 +14,26 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <img 
-                src="/logo.png" 
-                alt="Standard Chartered" 
-                className="h-12 w-auto"
+            <Link href="/" className="flex-shrink-0">
+              <img
+                src="/logo.png"
+                alt="Standard Chartered"
+                className="h-12 w-auto cursor-pointer"
               />
-            </div>
+            </Link>
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <a href="#" className="text-gray-700 hover:text-gray-900 transition-colors">
+            <Link href="/banking/personal" className="text-gray-700 hover:text-gray-900 transition-colors">
               Personal
-            </a>
-            <a href="#" className="text-gray-700 hover:text-gray-900 transition-colors">
+            </Link>
+            <Link href="/banking/business" className="text-gray-700 hover:text-gray-900 transition-colors">
               Business
-            </a>
-            <a href="#" className="text-gray-700 hover:text-gray-900 transition-colors">
+            </Link>
+            <Link href="/corporate/about" className="text-gray-700 hover:text-gray-900 transition-colors">
               About Us
-            </a>
-            <a href="#" className="text-gray-700 hover:text-gray-900 transition-colors">
-              Contact
-            </a>
+            </Link>
           </nav>
 
           {/* Search and Actions */}
@@ -47,7 +44,7 @@ export function Header() {
               </button>
             </Link>
             <Link href="/auth/register">
-              <button 
+              <button
                 className="px-4 py-2 text-white rounded-lg transition-colors"
                 style={{ backgroundColor: colors.primary }}
                 onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.primaryDark}
@@ -73,18 +70,15 @@ export function Header() {
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-gray-200">
             <div className="px-2 pt-2 pb-3 space-y-1">
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
+              <Link href="/banking/personal" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
                 Personal
-              </a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
+              </Link>
+              <Link href="/banking/business" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
                 Business
-              </a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
+              </Link>
+              <Link href="/corporate/about" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
                 About Us
-              </a>
-              <a href="#" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
-                Contact
-              </a>
+              </Link>
               <div className="pt-2 space-y-2">
                 <Link href="/auth/login">
                   <button className="w-full px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md text-left">
@@ -92,7 +86,7 @@ export function Header() {
                   </button>
                 </Link>
                 <Link href="/auth/register">
-                  <button 
+                  <button
                     className="w-full px-3 py-2 text-white rounded-md"
                     style={{ backgroundColor: colors.primary }}
                   >

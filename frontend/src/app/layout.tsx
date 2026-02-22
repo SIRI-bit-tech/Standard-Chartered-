@@ -5,10 +5,10 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
-  title: 'Standard Chartered Banking Platform',
-  description: 'Secure, professional online banking with multi-currency support',
+  title: 'Standard Chartered Bank - Personal, Business & Corporate Banking',
+  description: 'Standard Chartered is a leading international banking group connecting corporate, institutional and affluent clients, as well as individuals and SMEs, to a network offering sustainable growth opportunities across Asia, Africa and the Middle East.',
   keywords:
-    'banking, online banking, transfers, loans, accounts, digital banking',
+    'Standard Chartered, Standard Chartered Bank, global banking, international banking, corporate banking, institutional banking, retail banking, personal banking, private banking, priority banking, wealth management, sustainable finance, Asia banking, Africa banking, Middle East banking, cross-border banking',
   openGraph: {
     title: 'Standard Chartered Banking Platform',
     description: 'Secure, professional online banking with multi-currency support',
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-16x16.pnkg', sizes: '16x16', type: 'image/png' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' }
     ],
     apple: [

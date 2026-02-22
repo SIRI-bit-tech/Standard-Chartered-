@@ -2,37 +2,44 @@
 
 import { CreditCard, Send, FileText, Bitcoin, Headphones, TrendingUp } from 'lucide-react'
 import { colors } from '@/types'
+import Link from 'next/link'
 
 const services = [
   {
     icon: CreditCard,
     title: 'Multi-Currency Accounts',
-    description: 'Hold and manage multiple currencies in one account'
+    description: 'Hold and manage multiple currencies in one account',
+    href: '/banking/personal'
   },
   {
     icon: Send,
     title: 'Global Transfers',
-    description: 'Send money worldwide with competitive exchange rates'
+    description: 'Send money worldwide with competitive exchange rates',
+    href: '/banking/personal'
   },
   {
     icon: FileText,
     title: 'Personal Loans',
-    description: 'Flexible loan options with competitive interest rates'
+    description: 'Flexible loan options with competitive interest rates',
+    href: '/banking/loans'
   },
   {
     icon: Bitcoin,
     title: 'Crypto Assets',
-    description: 'Buy, sell, and store cryptocurrencies securely'
+    description: 'Buy, sell, and store cryptocurrencies securely',
+    href: '/auth/register'
   },
   {
     icon: Headphones,
     title: '24/7 Priority Support',
-    description: 'Round-the-clock assistance for all your banking needs'
+    description: 'Round-the-clock assistance for all your banking needs',
+    href: '/auth/register'
   },
   {
     icon: TrendingUp,
     title: 'Wealth Management',
-    description: 'Expert guidance to grow and protect your wealth'
+    description: 'Expert guidance to grow and protect your wealth',
+    href: '/banking/personal'
   }
 ]
 
@@ -53,15 +60,16 @@ export function Services() {
         {/* Services Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {services.map((service, index) => (
-            <div 
+            <Link
               key={index}
-              className="bg-white rounded-xl p-8 shadow-sm hover:shadow-lg transition-all duration-300 group cursor-pointer border border-gray-100"
+              href={service.href}
+              className="bg-white rounded-xl p-8 shadow-sm hover:shadow-lg transition-all duration-300 group cursor-pointer border border-gray-100 block"
             >
-              <div 
+              <div
                 className="w-14 h-14 rounded-lg flex items-center justify-center mb-6 transition-all group-hover:scale-110"
                 style={{ backgroundColor: colors.primaryLight }}
               >
-                <service.icon 
+                <service.icon
                   className="w-7 h-7"
                   style={{ color: colors.primary }}
                 />
@@ -72,7 +80,7 @@ export function Services() {
               <p className="text-gray-600 leading-relaxed">
                 {service.description}
               </p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

@@ -1,189 +1,133 @@
-'use client'
-
+import { Header } from '@/components/landing/header'
+import { Footer } from '@/components/landing/footer'
 import { Card } from '@/components/ui/card'
+import { FileText, ShieldAlert, Scale, CreditCard, Laptop, AlertCircle } from 'lucide-react'
 
 export default function TermsOfServicePage() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <Card className="p-8">
-        <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
-        <p className="text-xl text-muted-foreground mb-1">Standard Chartered Bank Online Banking Platform</p>
-        <p className="text-sm text-muted-foreground mb-1">
-          Last Updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
-        <p className="text-sm text-muted-foreground mb-8">Version: 1.0</p>
-
-        {/* Introduction & Acceptance */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">1. Introduction & Acceptance</h2>
-          <p className="mb-4">
-            These Terms of Service ("Terms") govern your use of Standard Chartered Bank's online banking platform ("Platform"). By accessing or using our Platform, you agree to be bound by these Terms, our Privacy Policy, and all applicable laws and regulations. If you do not agree to these Terms, you may not access or use our Platform.
-          </p>
-          <p>
-            Standard Chartered Bank may update these Terms from time to time. We will notify you of any changes by posting the updated Terms on our Platform or sending you an email notification at least 30 days before the effective date of changes. Your continued use of the Platform after such notification constitutes your acceptance of the updated Terms.
-          </p>
-        </section>
-
-        {/* Definitions */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">2. Definitions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="mb-2"><strong>"Account"</strong> means your banking account with Standard Chartered Bank, including all associated services and features.</p>
-              <p className="mb-2"><strong>"User"</strong> means any individual or entity that accesses or uses the Platform.</p>
-              <p className="mb-2"><strong>"Services"</strong> includes all banking products and services offered through the Platform.</p>
-              <p><strong>"Platform"</strong> refers to Standard Chartered Bank's online banking website and mobile applications.</p>
+    <div className="bg-white min-h-screen">
+      <Header />
+      <div className="pt-24 pb-16 px-4">
+        <div className="container mx-auto max-w-4xl">
+          <Card className="p-8 md:p-12 border-none shadow-sm bg-gray-50/50 rounded-[2rem]">
+            <div className="mb-12">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-[#0066CC] text-xs font-bold mb-4">
+                <Scale className="w-3.5 h-3.5" /> LEGALLY BINDING AGREEMENT
+              </div>
+              <h1 className="text-4xl md:text-5xl font-black mb-4 text-gray-900 leading-tight">Terms of Service</h1>
+              <p className="text-lg text-gray-500 font-medium">Standard Chartered Bank Global Banking Conditions</p>
+              <div className="flex flex-wrap gap-4 mt-6 text-sm text-gray-400 font-bold uppercase tracking-wider">
+                <span>Revised: February 2026</span>
+                <span className="text-gray-200">|</span>
+                <span>Document Ref: GBC-V.04</span>
+              </div>
             </div>
-            <div>
-              <p className="mb-2"><strong>"Transaction"</strong> means any transfer of funds or financial activity conducted through the Platform.</p>
-              <p className="mb-2"><strong>"Personal Data"</strong> means any information relating to an identified or identifiable individual.</p>
-              <p className="mb-2"><strong>"Business Day"</strong> means Monday through Friday, excluding banking holidays.</p>
-              <p><strong>"We/Us/Our"</strong> refers to Standard Chartered Bank.</p>
+
+            <div className="prose prose-blue max-w-none space-y-12">
+              {/* General Terms */}
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <FileText className="text-[#0066CC] w-5 h-5" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 m-0">1. General Banking Terms</h2>
+                </div>
+                <p className="text-gray-600 leading-relaxed font-medium">
+                  These General Banking Terms and Conditions apply when you use any Standard Chartered Bank account, product, or service. They form a binding agreement between you and the Bank. We reserve the right to amend these terms at any time with prior notice.
+                </p>
+                <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-100 mt-6">
+                  <p className="text-sm text-gray-500 m-0 leading-relaxed font-medium">
+                    "General Conditions" means these terms as supplemented by the specific terms of each account and service. In case of conflict, the specific product terms shall prevail.
+                  </p>
+                </div>
+              </section>
+
+              {/* Electronic Banking */}
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <Laptop className="text-[#0066CC] w-5 h-5" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 m-0">2. Electronic Banking Services</h2>
+                </div>
+                <p className="text-gray-600 leading-relaxed font-medium mb-6">
+                  Our digital platform allows you to manage accounts, execute transfers, and access financial markets globally. Access is governed by strict security protocols:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex gap-3">
+                    <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0" />
+                    <p className="text-xs font-bold text-gray-600 m-0">You are responsible for keeping all security codes, PINs, and biometric data confidential.</p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+                    <p className="text-xs font-bold text-gray-600 m-0">Online transactions carry inherent risks; the Bank is not liable for losses due to user negligence.</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Regulatory Compliance */}
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <Scale className="text-[#0066CC] w-5 h-5" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 m-0">3. Regulatory Compliance</h2>
+                </div>
+                <p className="text-gray-600 leading-relaxed font-medium">
+                  We operate in compliance with international standards, including the UK Banking Act and global AML (Anti-Money Laundering) requirements. We are obligated to report suspicious activity to relevant authorities and may freeze accounts pending investigation.
+                </p>
+                <ul className="mt-4 space-y-2 text-sm text-gray-500 font-bold list-none p-0">
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-400 rounded-full" /> No service will be provided in violation of international sanctions.</li>
+                  <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-blue-400 rounded-full" /> Tax reporting is conducted in adherence with CRS and FATCA standards.</li>
+                </ul>
+              </section>
+
+              {/* Payments & Fees */}
+              <section>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                    <CreditCard className="text-[#0066CC] w-5 h-5" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 m-0">4. Payments and Tariffs</h2>
+                </div>
+                <div className="space-y-4 text-gray-600 font-medium">
+                  <p>
+                    All payments must be made in the currency specified for the product. Fees and charges are outlined in our <strong>Client Tariff Booklet</strong>, available on our website and at any branch.
+                  </p>
+                  <p>
+                    Currency conversion for international transfers is executed at the prevailing Bank rate at the time of processing, which includes a standard service margin.
+                  </p>
+                </div>
+              </section>
+
+              {/* Limitation of Liability */}
+              <section>
+                <div className="bg-gray-900 p-8 rounded-[2rem] text-white">
+                  <h3 className="text-xl font-bold mb-4">Limitation of Liability</h3>
+                  <p className="opacity-70 text-sm mb-6 leading-relaxed">
+                    To the maximum extent permitted by law, the Bank is not liable for indirect, consequential, or punitive damages arising from the use or inability to use our services, unless caused by our gross negligence or willful misconduct.
+                  </p>
+                  <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                    <p className="text-xs font-bold leading-relaxed m-0 italic">
+                      "I have read, understood, and agree to the General Banking Terms and Conditions."
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Contact Information */}
+              <section className="text-center pt-8 border-t border-gray-100">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Need Legal Clarification?</p>
+                <p className="font-bold text-gray-900">legal@sc.com</p>
+                <p className="text-xs text-gray-400 mt-4 leading-relaxed">
+                  Standard Chartered Bank is authorized by the Prudential Regulation Authority and regulated by the Financial Conduct Authority and the Prudential Regulation Authority.
+                </p>
+              </section>
             </div>
-          </div>
-        </section>
-
-          {/* Eligibility & Account Creation */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">3. Eligibility & Account Creation</h2>
-          <p className="mb-4">To be eligible to use our Platform, you must:</p>
-          <ul className="list-disc pl-6 mb-4">
-            <li>Be at least 18 years of age or the legal age of majority in your jurisdiction</li>
-            <li>Be a resident of a country where our services are legally available</li>
-            <li>Provide valid, government-issued identification documents</li>
-            <li>Complete our identity verification (KYC/AML) process</li>
-            <li>Have a valid email address and bank account where applicable</li>
-          </ul>
-          <p>You may not create more than one personal account. We reserve the right to refuse service to anyone at our sole discretion.</p>
-        </section>
-
-        {/* Account Types & Services */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">4. Account Types & Services</h2>
-          <p className="mb-4">Our Platform offers the following banking services:</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-lg font-semibold mb-2">Core Banking</h4>
-              <ul className="list-disc pl-6 mb-4">
-                <li>Checking Accounts</li>
-                <li>Savings Accounts</li>
-                <li>Cryptocurrency Accounts</li>
-                <li>Money Transfers (ACH, SWIFT)</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-lg font-semibold mb-2">Additional Services</h4>
-              <ul className="list-disc pl-6 mb-4">
-                <li>Bill Payment Services</li>
-                <li>Loan Products</li>
-                <li>Document Management</li>
-                <li>Customer Support</li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* User Responsibilities */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">5. User Responsibilities</h2>
-          <p className="mb-4">As a User, you are responsible for:</p>
-          <ul className="list-disc pl-6 mb-4">
-            <li>Maintaining accurate and complete account information</li>
-            <li>Keeping your login credentials confidential and secure</li>
-            <li>Notifying us immediately of any unauthorized access or suspicious activity</li>
-            <li>Ensuring sufficient funds are available before initiating transactions</li>
-            <li>Complying with all applicable laws and regulations</li>
-            <li>Not using our services for illegal purposes</li>
-            <li>Being responsible for all activity conducted under your account</li>
-          </ul>
-        </section>
-
-        {/* Account Security */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">6. Account Security</h2>
-          <p className="mb-4">You are solely responsible for maintaining the security of your account. We recommend:</p>
-          <ul className="list-disc pl-6 mb-4">
-            <li>Using strong, unique passwords</li>
-            <li>Enabling two-factor authentication</li>
-            <li>Regularly monitoring your account activity</li>
-            <li>Logging out after each session</li>
-            <li>Not sharing your credentials with anyone</li>
-          </ul>
-          <p>We will never ask for your password via email or phone. If you suspect unauthorized access, contact us immediately.</p>
-        </section>
-
-        {/* Fees & Charges */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">7. Fees & Charges</h2>
-          <p className="mb-4">Our services are subject to the following fees:</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-lg font-semibold mb-2">Transaction Fees</h4>
-              <ul className="list-disc pl-6 mb-4">
-                <li>Wire transfers: $25 domestic, $45 international</li>
-                <li>ACH transfers: Free for standard, $3 for expedited</li>
-                <li>Cryptocurrency trades: 1.5% of transaction value</li>
-                <li>Foreign exchange: 0.5% above market rate</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-lg font-semibold mb-2">Account Fees</h4>
-              <ul className="list-disc pl-6 mb-4">
-                <li>Monthly maintenance: $10 (waived with $5,000 balance)</li>
-                <li>Overdraft: $35 per item</li>
-                <li>Returned items: $30 per item</li>
-                <li>Inactivity: $5 per month after 12 months</li>
-              </ul>
-            </div>
-          </div>
-          <p>All fees are subject to change with 30 days notice. Please refer to our Fee Schedule for complete details.</p>
-        </section>
-
-        {/* Cryptocurrency Services */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">8. Cryptocurrency Services</h2>
-          <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
-            <p className="font-semibold mb-2">⚠️ Cryptocurrency Risk Warning</p>
-            <p>Cryptocurrencies are highly volatile and speculative investments. You may lose your entire investment. We are not responsible for market fluctuations or losses.</p>
-          </div>
-          <p className="mb-4">Our cryptocurrency services include:</p>
-          <ul className="list-disc pl-6 mb-4">
-            <li>Bitcoin, Ethereum, and major altcoin trading</li>
-            <li>Crypto-to-fiat conversions</li>
-            <li>Digital wallet services</li>
-            <li>Blockchain transaction monitoring</li>
-          </ul>
-          <p>Cryptocurrency services are not FDIC insured and are not covered by traditional banking protections.</p>
-        </section>
-
-        {/* Liability & Disclaimers */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">9. Liability & Disclaimers</h2>
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
-            <p className="font-semibold mb-2">🚨 Limitation of Liability</p>
-            <p>Our liability is limited to the maximum extent permitted by law. We are not liable for indirect, incidental, or consequential damages.</p>
-          </div>
-          <p className="mb-4">We are not liable for:</p>
-          <ul className="list-disc pl-6 mb-4">
-            <li>Losses due to unauthorized access if you failed to secure your account</li>
-            <li>Market fluctuations in cryptocurrency values</li>
-            <li>Delays caused by third-party payment processors</li>
-            <li>System maintenance or downtime</li>
-            <li>Losses from your investment decisions</li>
-          </ul>
-        </section>
-
-        {/* Contact Information */}
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">10. Contact Information</h2>
-          <p className="mb-4">For questions about these Terms, please contact us:</p>
-          <ul className="list-disc pl-6 mb-4">
-            <li><strong>Email:</strong> legal@standardchartered.com</li>
-            <li><strong>Phone:</strong> 1-800-LEGAL (1-800-53425)</li>
-            <li><strong>Mail:</strong> Standard Chartered Bank, Legal Department, 425 Market Street, 38th Floor, New York, NY 10004</li>
-          </ul>
-        </section>
-      </Card>
+          </Card>
+        </div>
+      </div>
+      <Footer />
     </div>
   )
 }

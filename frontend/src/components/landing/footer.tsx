@@ -14,24 +14,24 @@ const socialLinks = [
 
 const footerLinks = {
   banking: [
-    { name: 'Personal Banking', href: '#' },
-    { name: 'Business Banking', href: '#' },
-    { name: 'Credit Cards', href: '#' },
-    { name: 'Loans', href: '#' },
-    { name: 'Mortgages', href: '#' }
+    { name: 'Personal Banking', href: '/banking/personal' },
+    { name: 'Business Banking', href: '/banking/business' },
+    { name: 'Credit Cards', href: '/banking/credit-cards' },
+    { name: 'Loans', href: '/banking/loans' },
+    { name: 'Mortgages', href: '/banking/mortgages' }
   ],
   corporate: [
-    { name: 'About Us', href: '#' },
-    { name: 'Investor Relations', href: '#' },
-    { name: 'Careers', href: '#' },
-    { name: 'Press Releases', href: '#' },
-    { name: 'Sustainability', href: '#' }
+    { name: 'About Us', href: '/corporate/about' },
+    { name: 'Investor Relations', href: '/corporate/investor-relations' },
+    { name: 'Careers', href: '/corporate/careers' },
+    { name: 'Press Releases', href: '/corporate/press-releases' },
+    { name: 'Sustainability', href: '/corporate/sustainability' }
   ],
   legal: [
     { name: 'Privacy Policy', href: '/legal/privacy-policy' },
     { name: 'Terms of Service', href: '/legal/terms-of-service' },
     { name: 'Cookie Policy', href: '/legal/cookie-policy' },
-    { name: 'Security', href: '/legal/compliance' }
+    { name: 'Security', href: '/legal/security' }
   ]
 }
 
@@ -43,9 +43,9 @@ export function Footer() {
           {/* Company Info */}
           <div className="lg:col-span-2">
             <div className="mb-4">
-              <img 
-                src="/logo.png" 
-                alt="Standard Chartered" 
+              <img
+                src="/logo.png"
+                alt="Standard Chartered"
                 className="h-14 w-auto"
               />
             </div>
@@ -71,7 +71,7 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.banking.map((link, index) => (
                 <li key={index}>
-                  <Link 
+                  <Link
                     href={link.href}
                     className="text-gray-400 hover:text-white transition-colors text-sm"
                   >
@@ -88,7 +88,7 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.corporate.map((link, index) => (
                 <li key={index}>
-                  <Link 
+                  <Link
                     href={link.href}
                     className="text-gray-400 hover:text-white transition-colors text-sm"
                   >
@@ -105,7 +105,7 @@ export function Footer() {
             <ul className="space-y-2">
               {footerLinks.legal.map((link, index) => (
                 <li key={index}>
-                  <Link 
+                  <Link
                     href={link.href}
                     className="text-gray-400 hover:text-white transition-colors text-sm"
                   >
@@ -120,7 +120,7 @@ export function Footer() {
         {/* Copyright */}
         <div className="border-t border-gray-800 mt-12 pt-8">
           <p className="text-center text-gray-400 text-sm">
-            © 2024 Standard Chartered. All rights reserved.
+            © 2026 Standard Chartered. All rights reserved.
           </p>
         </div>
       </div>
