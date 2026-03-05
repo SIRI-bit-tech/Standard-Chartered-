@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react"
 import axios from "axios"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuthContext } from "@/context/auth-context"
+import { ConfirmModal } from "@/components/ui/confirm-modal"
+import { toast } from "sonner"
+import { Button } from "../ui/button"
 
 interface Document {
   id: string
@@ -22,6 +24,7 @@ export function DocumentList() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -52,7 +55,10 @@ export function DocumentList() {
   }
 
   const handleDelete = async (documentId: string) => {
-    if (!confirm("Are you sure you want to delete this document?")) return
+    setShowDeleteConfirm(documentId)
+  }
+
+  const executeDelete = async (documentId: string) => {
 
     try {
       await axios.delete(
@@ -67,7 +73,7 @@ export function DocumentList() {
 
       setDocuments((prev) => prev.filter((doc) => doc.id !== documentId))
     } catch (err: any) {
-      alert("Failed to delete document")
+      toast.error("Failed to delete document")
     }
   }
 
@@ -161,6 +167,21 @@ export function DocumentList() {
           </CardContent>
         </Card>
       ))}
+
+      <ConfirmModal
+        isOpen={!!showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(null)}
+        onConfirm={() => {
+          if (showDeleteConfirm) {
+            executeDelete(showDeleteConfirm)
+            setShowDeleteConfirm(null)
+          }
+        }}
+        title="Delete Document?"
+        description="Are you sure you want to delete this document? This cannot be undone."
+        confirmText="Yes, Delete"
+        variant="destructive"
+      />
     </div>
   )
 }

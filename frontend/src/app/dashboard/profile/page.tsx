@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react"
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
+import { toast } from 'sonner'
 import { ProfileHeader } from '@/components/profile/profile-header'
 import { PersonalInfoForm, type PersonalInfo } from '@/components/profile/personal-info-form'
 import { SecurityPanel } from '@/components/profile/security-panel'
@@ -101,14 +102,14 @@ export default function ProfilePage() {
       const response = await apiClient.put<{ success: boolean; data: any }>(`/api/v1/profile`, payload)
 
       if (response.success) {
-        alert('Profile updated successfully!')
+        toast.success('Profile updated successfully!')
         setUser({ ...user, ...payload })
         await loadProfileData()
         setIsEditing(false)
       }
     } catch (error) {
       console.error('Failed to update profile:', error)
-      alert('Failed to update profile')
+      toast.error('Failed to update profile')
     } finally {
       setLoading(false)
     }

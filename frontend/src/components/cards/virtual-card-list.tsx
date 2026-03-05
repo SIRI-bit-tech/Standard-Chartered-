@@ -9,7 +9,8 @@ import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { Lock, Trash2, Copy, Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { formatCurrency} from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface VirtualCard {
   id: string;
@@ -43,6 +44,7 @@ export function VirtualCardList({ cards, loading, onRefresh }: VirtualCardListPr
   const { user } = useAuth();
   const { toast } = useToast();
   const [visibleCards, setVisibleCards] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   const toggleCardVisibility = (cardId: string) => {
     const newSet = new Set(visibleCards);
@@ -76,7 +78,10 @@ export function VirtualCardList({ cards, loading, onRefresh }: VirtualCardListPr
   }
 
   async function handleDelete(cardId: string) {
-    if (!confirm('Are you sure you want to cancel this card?')) return;
+    setShowDeleteConfirm(cardId);
+  }
+
+  async function executeDelete(cardId: string) {
 
     try {
       const response = await apiClient.delete<{ success: boolean }>(`/api/v1/cards/${cardId}`, {
@@ -226,6 +231,21 @@ export function VirtualCardList({ cards, loading, onRefresh }: VirtualCardListPr
           Refresh
         </Button>
       )}
+
+      <ConfirmModal
+        isOpen={!!showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(null)}
+        onConfirm={() => {
+          if (showDeleteConfirm) {
+            executeDelete(showDeleteConfirm);
+            setShowDeleteConfirm(null);
+          }
+        }}
+        title="Cancel Card?"
+        description="Are you sure you want to cancel this virtual card? This action cannot be undone."
+        confirmText="Yes, Cancel Card"
+        variant="destructive"
+      />
     </div>
   );
 }

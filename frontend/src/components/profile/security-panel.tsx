@@ -6,12 +6,16 @@ import type { TwoFactorSetupPayload } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { QRCodeSVG } from "qrcode.react"
 import { ShieldCheck, ShieldAlert, Key, Trash2, ShieldX, AlertTriangle } from 'lucide-react'
+import { ConfirmModal } from "@/components/ui/confirm-modal"
+import { useToast } from "@/hooks/use-toast"
 
 export function SecurityPanel() {
   const [busy, setBusy] = useState(false)
   const [enabled, setEnabled] = useState<boolean>(false)
   const [showSetup, setShowSetup] = useState(false)
   const [showDisableModal, setShowDisableModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const { toast } = useToast()
   const [setupData, setSetupData] = useState<TwoFactorSetupPayload | null>(null)
   const [otp, setOtp] = useState('')
   const [disableOtp, setDisableOtp] = useState('')
@@ -197,23 +201,7 @@ export function SecurityPanel() {
             Deleting your account is permanent and cannot be undone. All your banking history, documents, and personal data will be erased immediately from our systems.
           </p>
           <button
-            onClick={async () => {
-              if (confirm("Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.")) {
-                setBusy(true);
-                try {
-                  const res = await apiClient.delete<{ success: boolean }>('/api/v1/profile');
-                  if (res.success) {
-                    alert("Your account has been successfully deleted.");
-                    window.localStorage.clear();
-                    window.location.href = '/';
-                  }
-                } catch (e: any) {
-                  setError(e?.response?.data?.detail || "Failed to delete account. Please contact support.");
-                } finally {
-                  setBusy(false);
-                }
-              }
-            }}
+            onClick={() => setShowDeleteConfirm(true)}
             className="w-full sm:w-auto mt-6 px-8 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all font-bold text-sm shadow-sm"
             disabled={busy}
           >
@@ -221,6 +209,34 @@ export function SecurityPanel() {
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={async () => {
+          setShowDeleteConfirm(false);
+          setBusy(true);
+          try {
+            const res = await apiClient.delete<{ success: boolean }>('/api/v1/profile');
+            if (res.success) {
+              toast({
+                title: "Account Deleted",
+                description: "Your account has been successfully deleted.",
+              });
+              window.localStorage.clear();
+              window.location.href = '/';
+            }
+          } catch (e: any) {
+            setError(e?.response?.data?.detail || "Failed to delete account. Please contact support.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+        title="Delete Account?"
+        description="Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently removed."
+        confirmText="Yes, Delete Everything"
+        variant="destructive"
+      />
 
       {/* Password Dialog */}
       <Dialog open={pwdOpen} onOpenChange={setPwdOpen}>
