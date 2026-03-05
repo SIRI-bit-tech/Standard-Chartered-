@@ -104,9 +104,19 @@ class ApiClient {
     // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => {
+        if ((response.config as any)._showLoader && typeof window !== 'undefined') {
+          try {
+            useLoadingStore.getState().hide()
+          } catch { }
+        }
         return response
       },
       async (error: AxiosError) => {
+        if ((error.config as any)?._showLoader && typeof window !== 'undefined') {
+          try {
+            useLoadingStore.getState().hide()
+          } catch { }
+        }
         const status = error.response?.status
         const failingUrl: string = (error.config?.url as string) || ''
         const isAdminRequest = typeof failingUrl === 'string' && failingUrl.startsWith('/admin')

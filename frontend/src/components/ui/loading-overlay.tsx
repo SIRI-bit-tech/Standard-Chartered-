@@ -14,18 +14,20 @@ export function BrandLoader({ size = 160 }: { size?: number }) {
 }
 
 export function LoadingOverlay() {
-  const { isLoading } = useLoadingStore()
+  const { isLoading, reset } = useLoadingStore()
   const [visible, setVisible] = useState(false)
   const startedAtRef = useRef<number | null>(null)
   const hideTimerRef = useRef<number | null>(null)
-  const MIN_VISIBLE_MS = 8000
+  const MIN_VISIBLE_MS = 1000
 
   useEffect(() => {
     try {
+      // Force clean up any stale loading counts on layout shift
+      reset()
       const el = document.getElementById('app-boot-preloader')
       if (el) el.remove()
       document.documentElement.classList.remove('app-preloading')
-    } catch {}
+    } catch { }
   }, [])
 
   useEffect(() => {
