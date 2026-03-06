@@ -11,7 +11,7 @@ import { apiClient } from '@/lib/api-client'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import { useLoadingStore } from '@/lib/store'
-import posthog from 'posthog-js'
+import { trackEvent, hashString } from '@/lib/analytics'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -82,7 +82,18 @@ export default function RegisterPage() {
       )
 
       if (response.success) {
-        posthog.capture('registration_started', { email: formData.email, country: formData.country });
+        // Hash the email for analytics — never send raw PII to PostHog
+        try {
+          const userEmailHash = await hashString(formData.email);
+          trackEvent('registration_success', {
+            userEmailHash,
+            country: formData.country,
+          });
+        } catch {
+          // If hashing fails, capture without any email identifier
+          trackEvent('registration_success', { country: formData.country });
+        }
+
         setSuccess(true)
         // Redirect to email verification page with email parameter
         setTimeout(() => {

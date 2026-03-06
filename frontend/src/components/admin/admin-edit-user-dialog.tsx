@@ -226,12 +226,23 @@ export function AdminEditUserDialog({
                     <Input
                       type="datetime-local"
                       className="bg-white border-red-200"
-                      value={form.restricted_until ? new Date(form.restricted_until).toISOString().slice(0, 16) : ''}
+                      value={form.restricted_until ? (() => {
+                        const d = new Date(form.restricted_until);
+                        const Y = d.getFullYear();
+                        const M = String(d.getMonth() + 1).padStart(2, '0');
+                        const D = String(d.getDate()).padStart(2, '0');
+                        const h = String(d.getHours()).padStart(2, '0');
+                        const m = String(d.getMinutes()).padStart(2, '0');
+                        return `${Y}-${M}-${D}T${h}:${m}`;
+                      })() : ''}
                       onChange={(e) => {
                         const v = e.target.value;
                         if (!v) {
                           setForm({ ...form, restricted_until: null });
                         } else {
+                          // The browser provides local 'YYYY-MM-DDTHH:MM'. 
+                          // new Date(v) parses this using local time, 
+                          // and toISOString() converts it back to UTC for storage.
                           const iso = new Date(v).toISOString();
                           setForm({ ...form, restricted_until: iso });
                         }

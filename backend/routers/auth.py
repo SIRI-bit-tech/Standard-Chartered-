@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from models.user import User, UserTier
 from models.admin import AdminAuditLog
 from models.security import TrustedDevice
@@ -34,6 +34,7 @@ router = APIRouter()
 @router.post("/register", response_model=AuthResponse)
 async def register(
     request: RegisterRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     """Register new user with email verification"""
@@ -139,7 +140,6 @@ async def register(
             pass
 
         # Generate tokens
-
         access_token = create_access_token({"sub": new_user.id, "email": new_user.email})
         refresh_token = create_refresh_token(new_user.id)
         
@@ -158,6 +158,26 @@ async def register(
         
         logger.info(f"User registered successfully: {new_user.email}")
         
+        def set_auth_cookies(resp: Response, access: str, refresh: str):
+            resp.set_cookie(
+                key="access_token",
+                value=access,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            )
+            resp.set_cookie(
+                key="refresh_token",
+                value=refresh,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+            )
+
+        set_auth_cookies(response, access_token, refresh_token)
+
         return AuthResponse(
             success=True,
             message="Registration successful! Please check your email for verification code.",
@@ -191,11 +211,13 @@ async def register(
 async def login(
     request: LoginRequest,
     http_request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     # Authentication & Fraud Protection via Stytch if configured
     stytch_session_token = None
     force_2fa = False
+    user = None
     
     if settings.AUTH_PROVIDER == "stytch":
         from utils.stytch_client import get_stytch_client
@@ -232,12 +254,13 @@ async def login(
                     result = await db.execute(select(User).where(User.id == resp.user_id))
                     user = result.scalar()
                 else:
-                    raise HTTPException(status_code=401, detail="Invalid credentials")
-            except HTTPException:
-                raise
+                    # Non-200 from Stytch: log and fall through to local auth
+                    logger.warning(f"Stytch authenticate returned {resp.status_code} for {request.username}, trying local auth")
+                    user = None
             except Exception as e:
+                # Stytch unavailable or error: log and fall through to local auth
                 logger.error(f"Stytch authentication error: {e}")
-                raise HTTPException(status_code=401, detail="Invalid credentials")
+                user = None
     
     # Fallback to local auth if not using Stytch or Stytch user not found
     if not user:
@@ -383,6 +406,26 @@ async def login(
     except Exception:
         pass
     
+    def set_auth_cookies(resp: Response, access: str, refresh: str):
+        resp.set_cookie(
+            key="access_token",
+            value=access,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        )
+        resp.set_cookie(
+            key="refresh_token",
+            value=refresh,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+        )
+    
+    set_auth_cookies(response, stytch_session_token or access_token, refresh_token)
+
     return AuthResponse(
         success=True,
         message="Login successful",
@@ -395,7 +438,7 @@ async def login(
             "country": user.country,
             "primary_currency": user.primary_currency,
             "tier": user.tier,
-            "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or user.restricted_until > datetime.utcnow()),
+            "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or user.restricted_until > datetime.now(timezone.utc)),
             "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
             "token": stytch_session_token or access_token,
             "is_new_device": is_new_device,
@@ -413,6 +456,7 @@ async def login(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_access_token(
     request: RefreshTokenRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     """Refresh access token using refresh token"""
@@ -437,6 +481,16 @@ async def refresh_access_token(
     # Generate new access token
     access_token = create_access_token({"sub": user.id, "email": user.email})
     
+    # Set cookies
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    
     return TokenResponse(
         access_token=access_token,
         refresh_token=request.refresh_token,
@@ -447,6 +501,7 @@ async def refresh_access_token(
 async def complete_two_factor(
     payload: dict,
     http_request: Request,
+    response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     session_token = payload.get("session_token")
@@ -537,6 +592,24 @@ async def complete_two_factor(
         await db.commit()
     except Exception:
         pass
+    # Set cookies
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+    )
+
     return AuthResponse(
         success=True,
         message="Login successful",

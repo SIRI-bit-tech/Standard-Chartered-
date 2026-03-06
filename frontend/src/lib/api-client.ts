@@ -9,14 +9,16 @@ interface ApiClientConfig {
 
 class ApiClient {
   private client: AxiosInstance
+  private inMemoryToken: string | null = null
 
   constructor(config: ApiClientConfig) {
     this.client = axios.create({
       baseURL: config.baseURL,
-      timeout: config.timeout || 60000, // Increased to 60 seconds
+      timeout: config.timeout || 60000,
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true,
     })
 
     let isRefreshing = false
@@ -24,24 +26,15 @@ class ApiClient {
 
     const performRefresh = async (): Promise<string> => {
       if (refreshPromise) return refreshPromise
-      const refresh_token = typeof window !== 'undefined' ? window.localStorage.getItem('refresh_token') : null
-      if (!refresh_token) throw new Error('No refresh token')
       isRefreshing = true
+      // No need to pass refresh_token in body anymore, backend reads it from httpOnly cookie
       refreshPromise = axios
-        .post(`${API_BASE_URL}/api/v1/auth/refresh`, { refresh_token })
+        .post(`${API_BASE_URL}/api/v1/auth/refresh`, {}, { withCredentials: true })
         .then((res) => {
           const data: any = res.data
           const newAccess: string = data?.access_token
-          const newRefresh: string | undefined = data?.refresh_token
           if (!newAccess) throw new Error('No access token in refresh response')
-          try {
-            if (typeof window !== 'undefined') {
-              window.localStorage.setItem('access_token', newAccess)
-              if (newRefresh) window.localStorage.setItem('refresh_token', newRefresh)
-              document.cookie = `accessToken=${newAccess}; path=/; max-age=3600; secure; samesite=strict`
-              window.localStorage.setItem('access_token_updated_at', String(Date.now()))
-            }
-          } catch { }
+
           this.setAuthToken(newAccess)
           return newAccess
         })
@@ -52,7 +45,7 @@ class ApiClient {
       return refreshPromise
     }
 
-    // Request interceptor to attach token from storage/cookie on the client
+    // Request interceptor to attach token from in-memory variable
     this.client.interceptors.request.use((cfg) => {
       try {
         const showLoaderHeader =
@@ -64,36 +57,10 @@ class ApiClient {
               ; (cfg as any)._showLoader = true
           } catch { }
         }
-        if (typeof window !== 'undefined') {
-          const urlPath = typeof cfg.url === 'string' ? cfg.url : ''
-          const isAdminRequest = urlPath.startsWith('/admin')
-          const hasAuth = cfg.headers && ('Authorization' in (cfg.headers as any))
-          if (!hasAuth) {
-            let token: string | null = null
-            const lsToken = window.localStorage.getItem(isAdminRequest ? 'admin_token' : 'access_token')
-            if (lsToken) token = lsToken
-            if (!token) {
-              const persisted = window.localStorage.getItem('auth-storage')
-              if (persisted) {
-                try {
-                  const obj = JSON.parse(persisted)
-                  token = obj?.state?.token ?? null
-                } catch { }
-              }
-            }
-            if (!token) {
-              const cookie = document.cookie || ''
-              const cookieName = isAdminRequest ? 'admin_token=' : 'accessToken='
-              const match = cookie.split('; ').find((c) => c.startsWith(cookieName))
-              if (match) {
-                token = decodeURIComponent(match.split('=')[1])
-              }
-            }
-            if (token) {
-              cfg.headers = cfg.headers || {}
-                ; (cfg.headers as any)['Authorization'] = `Bearer ${token}`
-            }
-          }
+
+        if (this.inMemoryToken) {
+          cfg.headers = cfg.headers || {}
+            ; (cfg.headers as any)['Authorization'] = `Bearer ${this.inMemoryToken}`
         }
       } catch {
         // no-op
@@ -229,10 +196,12 @@ class ApiClient {
   }
 
   setAuthToken(token: string) {
+    this.inMemoryToken = token;
     this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`
   }
 
   clearAuthToken() {
+    this.inMemoryToken = null;
     delete this.client.defaults.headers.common['Authorization']
   }
 

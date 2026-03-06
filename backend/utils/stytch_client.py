@@ -14,10 +14,12 @@ def get_stytch_client():
         return None
         
     try:
+        stytch_env = settings.STYTCH_ENVIRONMENT
+        logger.info(f"Initializing Stytch client in '{stytch_env}' environment")
         _stytch_client = stytch.Client(
             project_id=settings.STYTCH_PROJECT_ID,
             secret=settings.STYTCH_SECRET,
-            environment="live"
+            environment=stytch_env
         )
         return _stytch_client
     except Exception as e:

@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import posthog from 'posthog-js'
+import { trackEvent } from '@/lib/analytics'
 import {
   Select,
   SelectContent,
@@ -394,12 +394,11 @@ export default function TransfersPage() {
           })
           setReceiptOpen(true)
           setInternalForm({ from_account_id: '', to_account_id: '', amount: 0, reference_memo: '' })
-          posthog.capture('transfer_initiated', {
+          trackEvent('transfer_initiated', {
             type: 'internal',
-            amount: receiptAmt,
-            currency,
-            reference: receiptRef
+            status: 'success'
           });
+
         }
       } else if (transferType === 'domestic') {
         const payload = {
@@ -436,12 +435,11 @@ export default function TransfersPage() {
             memo: '',
           })
           setSelectedRecipient(null)
-          posthog.capture('transfer_initiated', {
+          trackEvent('transfer_initiated', {
             type: 'domestic',
-            amount: receiptAmt,
-            currency,
-            reference: receiptRef
+            status: 'success'
           });
+
         }
       } else if (transferType === 'international') {
         const payload = {
@@ -483,12 +481,11 @@ export default function TransfersPage() {
             amount: 0,
             purpose: '',
           })
-          posthog.capture('transfer_initiated', {
+          trackEvent('transfer_initiated', {
             type: 'international',
-            amount: receiptAmt,
-            currency,
-            reference: receiptRef
+            status: 'success'
           });
+
         }
       } else {
         const payload = {
@@ -525,11 +522,11 @@ export default function TransfersPage() {
             amount: 0,
             description: '',
           })
-          posthog.capture('transfer_initiated', {
+          trackEvent('transfer_initiated', {
             type: 'ach',
-            amount: receiptAmt,
-            currency,
+            status: 'success'
           });
+
         }
       }
     } catch (err) {
@@ -544,12 +541,11 @@ export default function TransfersPage() {
         error: typeof detail === 'string' ? detail : 'Transfer failed',
       })
       setReceiptOpen(true)
-      posthog.capture('transfer_failed', {
+      trackEvent('transfer_failed', {
         type: transferType,
-        amount,
-        currency,
-        error: typeof detail === 'string' ? detail : 'Transfer failed'
+        error_code: 'TRANSFER_ERROR'
       });
+
       throw err
     } finally {
       setSubmitting(false)

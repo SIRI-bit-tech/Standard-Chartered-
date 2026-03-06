@@ -1,7 +1,8 @@
 from sqlalchemy import Column, String, DateTime, Boolean, Text, Enum as SQLEnum
 from database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
+import uuid
 
 
 class AdminRole(str, enum.Enum):
@@ -26,12 +27,12 @@ class AdminUser(Base):
     department = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     is_verified = Column(Boolean, default=False, nullable=False)
-    email_verified_at = Column(DateTime, nullable=True)
-    last_login = Column(DateTime, nullable=True)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    last_login = Column(DateTime(timezone=True), nullable=True)
     login_history = Column(Text, nullable=True)  # JSON string
     permissions = Column(Text, nullable=True)  # JSON string
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     created_by = Column(String(36), nullable=True)  # Admin who created this admin
     
     def __repr__(self):
@@ -51,7 +52,7 @@ class AdminAuditLog(Base):
     details = Column(Text, nullable=True)  # JSON with action details
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     
     def __repr__(self):
         return f"<AdminAuditLog {self.action}>"

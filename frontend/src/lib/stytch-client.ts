@@ -1,9 +1,17 @@
 import { createStytchUIClient } from "@stytch/nextjs";
 
-if (!process.env.NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN) {
-    throw new Error("Missing NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN");
-}
+const publicToken = process.env.NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN || "";
 
-export const stytchClient = (typeof window !== 'undefined'
-    ? createStytchUIClient(process.env.NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN)
-    : null) as any;
+/**
+ * Initializer for the Stytch UI client.
+ * Calls createStytchUIClient directly.
+ */
+export const createStytchClient = () => createStytchUIClient(publicToken);
+
+/**
+ * Singleton instance for browser-side usage.
+ * Null on server to avoid SSR initialization issues.
+ */
+export const stytchClient = typeof window !== 'undefined' && publicToken
+    ? createStytchClient()
+    : null;

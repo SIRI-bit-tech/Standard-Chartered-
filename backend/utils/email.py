@@ -1,6 +1,7 @@
 import logging
 import asyncio
 import html
+import socket
 from urllib.parse import quote
 from typing import Optional
 from email.mime.text import MIMEText
@@ -12,13 +13,32 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 
+def mask_email(email: str) -> str:
+    """Return a masked version of an email address for safe logging.
+
+    Example: 'john.doe@example.com' -> 'j***@example.com'
+    """
+    try:
+        local, domain = email.rsplit("@", 1)
+        return f"{local[0]}***@{domain}"
+    except Exception:
+        return "***"
+
+
 def _send_blocking_email(msg: MIMEMultipart) -> None:
-    """Blocking SMTP operations moved to separate function for thread execution"""
-    # Send email
-    with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
-        server.starttls()
-        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        server.send_message(msg)
+    """Blocking SMTP operations moved to separate function for thread execution."""
+    timeout = getattr(settings, "SMTP_TIMEOUT_SECONDS", 10)
+    try:
+        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout) as server:
+            server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.send_message(msg)
+    except (socket.timeout, TimeoutError) as e:
+        logger.error(
+            f"SMTP timeout after {timeout}s connecting to "
+            f"{settings.SMTP_SERVER}:{settings.SMTP_PORT}: {e}"
+        )
+        raise
 
 
 async def send_verification_email(email: str, verification_token: str, first_name: str) -> None:
@@ -77,10 +97,10 @@ async def send_verification_email(email: str, verification_token: str, first_nam
         
         # Send using the blocking function in a separate thread/task
         await asyncio.to_thread(_send_blocking_email, msg)
-        logger.info(f"Verification email sent to {email}")
+        logger.info(f"Verification email sent to {mask_email(email)}")
         
     except Exception as e:
-        logger.error(f"Failed to send verification email to {email}: {e}")
+        logger.error(f"Failed to send verification email to {mask_email(email)}: {e}")
         raise e
 
 async def send_login_alert(email: str, first_name: str, device_name: str, ip_address: str, location: str) -> None:
@@ -139,6 +159,6 @@ async def send_login_alert(email: str, first_name: str, device_name: str, ip_add
         msg.attach(MIMEText(html_content, 'html'))
         
         await asyncio.to_thread(_send_blocking_email, msg)
-        logger.info(f"Login alert sent to {email}")
+        logger.info(f"Login alert sent to {mask_email(email)}")
     except Exception as e:
-        logger.error(f"Failed to send login alert to {email}: {e}")
+        logger.error(f"Failed to send login alert to {mask_email(email)}: {e}")

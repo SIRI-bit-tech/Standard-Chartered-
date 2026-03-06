@@ -1,6 +1,6 @@
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from passlib.context import CryptContext
 from fastapi import Request, HTTPException, status
@@ -60,9 +60,9 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     """Create JWT access token"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -72,7 +72,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
 def create_refresh_token(user_id: str) -> str:
     """Create refresh token"""
     data = {"sub": user_id, "type": "refresh"}
-    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = data.copy()
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
@@ -91,14 +91,20 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
 
 
 async def get_current_user_id(request: Request) -> str:
-    """Extract and verify token from Authorization header. Supports Stytch and local JWT."""
+    """Extract and verify token from Authorization header or cookie. Supports Stytch and local JWT."""
     auth = request.headers.get("Authorization")
-    if not auth or not auth.startswith("Bearer "):
+    token = None
+    if auth and auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1]
+    else:
+        # Fallback to cookie
+        token = request.cookies.get("access_token")
+    
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid authorization header",
+            detail="Missing or invalid authorization",
         )
-    token = auth.split(" ", 1)[1]
     
     # Try Stytch first if configured
     if settings.AUTH_PROVIDER == "stytch":
@@ -142,7 +148,7 @@ def generate_account_number(country: str, account_type: str) -> str:
     """Generate unique account number"""
     prefix = country[:2].upper()
     acc_type_code = account_type[:2].upper()
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     random_suffix = secrets.token_hex(4).upper()
     return f"{prefix}{acc_type_code}{timestamp}{random_suffix}"
 

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     AUTH_PROVIDER: str = "stytch"
     STYTCH_PROJECT_ID: Optional[str] = None
     STYTCH_SECRET: Optional[str] = None
+    STYTCH_ENVIRONMENT: str = "test"  # "test" for dev/staging, "live" for production
     
     # Ably
     ABLY_API_KEY: str
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
     SMTP_USER: str
     SMTP_PASSWORD: str
     SMTP_FROM: str
+    SMTP_TIMEOUT_SECONDS: int = 10  # Connection/operation timeout for SMTP
     
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"

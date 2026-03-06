@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { RestrictionModal } from './RestrictionModal';
-import posthog from 'posthog-js';
+import { trackEvent } from '@/lib/analytics';
 
 interface RestrictionContextType {
     isRestricted: boolean;
@@ -30,16 +30,39 @@ export const RestrictionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             const target = e.target as HTMLElement;
 
             // Check if clicked element or its parent is a Link (a tag) or an action Button
-            const isInteractiveElement = target.closest('a') || target.closest('button');
+            const anchor = target.closest('a');
+            const button = target.closest('button');
+            const isInteractiveElement = anchor || button;
 
             if (isInteractiveElement) {
-                // Special case: Allow closing the banner or modal itself
-                if (target.closest('[role="dialog"]') || target.closest('.restriction-allow')) {
-                    return;
-                }
+                // 1. Explicitly allowed selectors/roles
+                const isAllowedSelector = !!target.closest([
+                    '[role="dialog"]',
+                    '.restriction-allow',
+                    '.restriction-recovery',
+                    '.help-link',
+                    '.support-link',
+                    '.bottom-navbar',
+                    '[data-restriction-allow]'
+                ].join(','));
 
-                // Allow logout button? Usually yes.
-                const isLogout = target.textContent?.toLowerCase().includes('log out') || target.textContent?.toLowerCase().includes('sign out');
+                if (isAllowedSelector) return;
+
+                // 2. Recovery-specific hrefs (support, mailto, etc)
+                const href = anchor?.getAttribute('href')?.toLowerCase() || '';
+                const isRecoveryRoute = [
+                    '/support',
+                    '/help',
+                    '/contact',
+                    'mailto:',
+                    'tel:'
+                ].some(path => href.includes(path));
+
+                if (isRecoveryRoute) return;
+
+                // 3. Robust Logout detection
+                const text = target.textContent?.toLowerCase().trim() || '';
+                const isLogout = text === 'log out' || text === 'sign out' || text.includes('logout') || text.includes('signout');
                 if (isLogout) return;
 
                 // Otherwise, prevent default and show modal
@@ -48,9 +71,10 @@ export const RestrictionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
                 // Track blocked action in PostHog
                 const elementLabel = target.textContent?.trim().slice(0, 50) || target.tagName;
-                posthog.capture('restricted_action_blocked', {
+                trackEvent('restricted_action_blocked', {
                     target_element: elementLabel,
-                    url: window.location.pathname
+                    url: window.location.pathname,
+                    target_href: href || undefined
                 });
 
                 showRestrictionModal();

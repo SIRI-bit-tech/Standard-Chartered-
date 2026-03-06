@@ -12,7 +12,7 @@ import { Loader2, Lock, ArrowLeft, CheckCircle, Shield } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
 import { useLoadingStore } from '@/lib/store'
-import posthog from 'posthog-js'
+import { identifyUser, trackEvent } from '@/lib/analytics'
 
 export default function SetTransferPinPage() {
   const router = useRouter()
@@ -70,17 +70,15 @@ export default function SetTransferPinPage() {
         if (response.data?.user) {
           localStorage.setItem('user', JSON.stringify(response.data.user))
 
-          // PostHog identify
+          // Identify user – only non-PII attributes, only with consent
           const userData = response.data.user;
-          posthog.identify(userData.id, {
-            email: userData.email,
-            name: `${userData.first_name} ${userData.last_name}`,
-            username: userData.username,
+          identifyUser(userData.id, {
             country: userData.country,
-            tier: userData.tier
+            tier: userData.tier,
           });
-          posthog.capture('transfer_pin_set');
-          posthog.capture('registration_complete');
+          trackEvent('transfer_pin_set');
+          trackEvent('registration_complete');
+
 
           setUser(response.data.user) // Update auth store
         }

@@ -23,7 +23,7 @@ export default function VirtualCardsPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('accessToken')
+      const token = localStorage.getItem('access_token')
       if (token) apiClient.setAuthToken(token)
     }
     fetchCards()
