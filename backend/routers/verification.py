@@ -16,6 +16,7 @@ from schemas.verification import (
     StartPinResetRequest,
     ConfirmPinResetRequest,
     CompletePinResetRequest,
+    MagicLinkRequest,
     AuthResponse,
 )
 from services.email import email_service
@@ -28,7 +29,7 @@ from utils.auth import (
     verify_token,
     get_current_user_id,
 )
-from utils.errors import NotFoundError, ValidationError, ConflictError
+from utils.errors import NotFoundError, ValidationError, ConflictError, AuthenticationError
 
 logger = logging.getLogger(__name__)
 
@@ -104,10 +105,72 @@ async def verify_email(
         raise
     except Exception as e:
         logger.error(f"Email verification error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Verification failed. Please try again."
-        )
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="email verification", original_error=e)
+
+
+@router.post("/verify-magic-link", response_model=AuthResponse)
+async def verify_magic_link(
+    request: MagicLinkRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Verify Stytch magic link token and activate user email."""
+    try:
+        from utils.stytch_client import get_stytch_client
+        stytch_client = get_stytch_client()
+        if not stytch_client:
+            from utils.errors import InternalServerError
+            raise InternalServerError(operation="Stytch verification initialization")
+        
+        try:
+            # Authenticate the magic link token with Stytch
+            resp = stytch_client.magic_links.authenticate(token=request.token)
+            if resp.status_code != 200:
+                raise ValidationError("Invalid or expired magic link token")
+            
+            stytch_user_id = resp.user_id
+            email = resp.user.emails[0].email
+            
+            # Find local user by Stytch ID or Email
+            user = await db.execute(
+                select(User).where((User.id == stytch_user_id) | (User.email == email))
+            )
+            user = user.scalar_one_or_none()
+            
+            if not user:
+                # If stytch verified but we don't have them, they might have registered elsewhere or DB desync
+                logger.error(f"User {email} verified by Stytch but not found in local DB")
+                raise NotFoundError("Account record not found")
+            
+            # Update user verification status
+            user.email_verified = True
+            user.is_active = True
+            user.updated_at = datetime.now(timezone.utc)
+            
+            # Generate short-lived token for PIN setup
+            verification_token = secrets.token_urlsafe(32)
+            user.email_verification_token = verification_token
+            user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 300
+            
+            await db.commit()
+            
+            return AuthResponse(
+                success=True,
+                message="Email verified successfully!",
+                data={"email": user.email, "verification_token": verification_token}
+            )
+            
+        except Exception as e:
+            from utils.stytch_client import parse_stytch_error
+            msg, _ = parse_stytch_error(e)
+            raise ValidationError(msg)
+            
+    except (NotFoundError, ValidationError, ConflictError):
+        raise
+    except Exception as e:
+        logger.error(f"Magic link verification error: {e}")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="magic link verification", original_error=e)
 
 
 @router.post("/start-pin-reset", response_model=AuthResponse)
@@ -130,13 +193,15 @@ async def start_pin_reset(
         await db.commit()
         email_sent = email_service.send_pin_reset_email(user.email, code)
         if not email_sent:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to send reset code")
+            from utils.errors import InternalServerError
+            raise InternalServerError(operation="sending pin reset email")
         return AuthResponse(success=True, message="Reset code sent to your email", data={"expires_in": 900})
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"start_pin_reset error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to start PIN reset")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="start PIN reset", original_error=e)
 
 
 @router.post("/confirm-pin-reset", response_model=AuthResponse)
@@ -149,13 +214,17 @@ async def confirm_pin_reset(
         result = await db.execute(select(User).where(User.email == request.email))
         user = result.scalar_one_or_none()
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            from utils.errors import NotFoundError
+            raise NotFoundError(resource="User")
         if not user.email_verification_token or not user.email_verification_expires:
-            raise HTTPException(status_code=400, detail="No reset code found")
+            from utils.errors import ValidationError
+            raise ValidationError(message="No reset code found")
         if user.email_verification_expires < datetime.now(timezone.utc).timestamp():
-            raise HTTPException(status_code=400, detail="Reset code expired")
+            from utils.errors import ValidationError
+            raise ValidationError(message="Reset code expired")
         if user.email_verification_token != request.code:
-            raise HTTPException(status_code=400, detail="Invalid code")
+            from utils.errors import ValidationError
+            raise ValidationError(message="Invalid code")
         # Issue short-lived token using password_reset_token fields
         reset_token = secrets.token_urlsafe(32)
         user.password_reset_token = reset_token
@@ -166,7 +235,8 @@ async def confirm_pin_reset(
         raise
     except Exception as e:
         logger.error(f"confirm_pin_reset error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to confirm reset code")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="confirm reset code", original_error=e)
 
 
 @router.post("/complete-pin-reset", response_model=AuthResponse)
@@ -179,13 +249,17 @@ async def complete_pin_reset(
         result = await db.execute(select(User).where(User.email == request.email))
         user = result.scalar_one_or_none()
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            from utils.errors import NotFoundError
+            raise NotFoundError(resource="User")
         if not user.password_reset_token or not user.password_reset_expires:
-            raise HTTPException(status_code=400, detail="Invalid or expired token")
+            from utils.errors import ValidationError
+            raise ValidationError(message="Invalid or expired token")
         if user.password_reset_token != request.token:
-            raise HTTPException(status_code=400, detail="Invalid or expired token")
+            from utils.errors import ValidationError
+            raise ValidationError(message="Invalid or expired token")
         if user.password_reset_expires < datetime.now(timezone.utc).timestamp():
-            raise HTTPException(status_code=400, detail="Invalid or expired token")
+            from utils.errors import ValidationError
+            raise ValidationError(message="Invalid or expired token")
         # Set new PIN
         user.transfer_pin = hash_password(request.new_pin)
         # Clear reset artifacts and unlock
@@ -202,7 +276,8 @@ async def complete_pin_reset(
         raise
     except Exception as e:
         logger.error(f"complete_pin_reset error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to reset transfer PIN")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="reset transfer PIN", original_error=e)
 
 @router.post("/resend-verification", response_model=AuthResponse)
 async def resend_verification_code(
@@ -228,43 +303,45 @@ async def resend_verification_code(
             logger.info(f"Resend verification - email already verified: {request.email}")
             raise ConflictError("Email already verified")
         
-        # Generate new verification code (6-digit)
-        verification_code = f"{secrets.randbelow(1000000):06d}"
-        expiry_time = datetime.now(timezone.utc).timestamp() + 900  # 15 minutes
-        
-        # Update user with new code
-        user.email_verification_token = verification_code
-        user.email_verification_expires = expiry_time
-        user.updated_at = datetime.now(timezone.utc)
-        
-        await db.commit()
-        
-        # Send new verification email
-        email_sent = email_service.send_verification_email(user.email, verification_code)
+        # Send new verification magic link using Stytch
+        from utils.stytch_client import get_stytch_client
+        stytch_client = get_stytch_client()
+        if stytch_client:
+            try:
+                stytch_client.magic_links.email.send(
+                    email=user.email,
+                    login_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email",
+                    signup_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email"
+                )
+                logger.info(f"Stytch magic link resent to {user.email}")
+                email_sent = True
+            except Exception as e:
+                logger.error(f"Failed to resend Stytch magic link: {e}")
+                email_sent = False
+        else:
+            # Fallback to local email if Stytch not available (though less ideal for "magic link")
+            from services.email import email_service
+            email_sent = email_service.send_verification_email(user.email, user.email_verification_token)
         
         if not email_sent:
             logger.error(f"Failed to send verification email to: {request.email}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send verification email. Please try again."
-            )
+            from utils.errors import InternalServerError
+            raise InternalServerError(operation="sending verification email")
         
         logger.info(f"Verification code resent to: {request.email}")
         
         return AuthResponse(
             success=True,
-            message="New verification code sent to your email. Please check your inbox.",
-            data={"expires_in": 900}  # 15 minutes in seconds
+            message="A new magic link has been sent to your email.",
+            data={"expires_in": 3600}
         )
         
     except (NotFoundError, ConflictError):
         raise
     except Exception as e:
         logger.error(f"Resend verification error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to resend verification code. Please try again."
-        )
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="resend verification code", original_error=e)
 
 
 @router.post("/set-transfer-pin", response_model=AuthResponse)
@@ -354,10 +431,8 @@ async def set_transfer_pin(
         raise
     except Exception as e:
         logger.error(f"Set transfer PIN error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to set transfer PIN. Please try again."
-        )
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="set transfer PIN", original_error=e)
 
 
 @router.post("/verify-transfer-pin", response_model=AuthResponse)
@@ -370,12 +445,15 @@ async def verify_transfer_pin(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(resource="User")
     if not user.transfer_pin:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Transfer PIN not set. Please set your PIN first.",
+        from utils.errors import ValidationError
+        raise ValidationError(
+            message="Transfer PIN not set. Please set your PIN first.",
+            details={"field": "transfer_pin"}
         )
     if not verify_password(request.transfer_pin, user.transfer_pin):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid transfer PIN")
+        from utils.errors import ValidationError
+        raise ValidationError(message="Invalid transfer PIN", details={"field": "transfer_pin"})
     return AuthResponse(success=True, message="PIN verified", data=None)

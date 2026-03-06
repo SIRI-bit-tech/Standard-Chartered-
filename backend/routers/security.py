@@ -26,7 +26,8 @@ async def start_2fa_setup(
     res = await db.execute(select(User).where(User.id == current_user_id))
     user = res.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(message="User not found")
     if user.two_factor_enabled and user.two_factor_secret:
         # Already enabled, return masked info
         return {"success": True, "enabled": True}
@@ -52,9 +53,11 @@ async def verify_2fa_code(
     res = await db.execute(select(User).where(User.id == current_user_id))
     user = res.scalar_one_or_none()
     if not user or not user.two_factor_secret:
-        raise HTTPException(status_code=400, detail="2FA setup not started")
+        from utils.errors import ValidationError
+        raise ValidationError(message="2FA setup not started", details={"field": "code"})
     if not verify_totp(code, user.two_factor_secret):
-        raise HTTPException(status_code=400, detail="Invalid authentication code")
+        from utils.errors import ValidationError
+        raise ValidationError(message="Invalid authentication code", details={"field": "code"})
     user.two_factor_enabled = True
     db.add(user)
     # Optionally trust this device
@@ -99,11 +102,13 @@ async def disable_2fa(
     res = await db.execute(select(User).where(User.id == current_user_id))
     user = res.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(message="User not found")
     if not user.two_factor_enabled or not user.two_factor_secret:
         return {"success": True, "enabled": False}
     if not verify_totp(code, user.two_factor_secret):
-        raise HTTPException(status_code=400, detail="Invalid authentication code")
+        from utils.errors import ValidationError
+        raise ValidationError(message="Invalid authentication code", details={"field": "code"})
     user.two_factor_enabled = False
     user.two_factor_secret = None
     db.add(user)
@@ -155,7 +160,8 @@ async def trust_device(
     device_id = (payload.get("device_id") or "").strip()
     device_name = payload.get("device_name") or request.headers.get("X-Device-Name") or ""
     if not device_id:
-        raise HTTPException(status_code=400, detail="device_id is required")
+        from utils.errors import ValidationError
+        raise ValidationError(message="device_id is required")
     td = TrustedDevice(
         id=str(uuid.uuid4()),
         user_id=current_user_id,
@@ -266,9 +272,15 @@ async def change_password(
     res = await db.execute(select(User).where(User.id == current_user_id))
     user = res.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(message="User not found")
     if not verify_password(payload.current_password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Current password is incorrect")
+        from utils.errors import ValidationError
+        raise ValidationError(
+            message="Current password is incorrect", 
+            error_code="INVALID_PASSWORD",
+            details={"field": "current_password"}
+        )
     user.password_hash = hash_password(payload.new_password)
     user.updated_at = datetime.utcnow()
     db.add(user)

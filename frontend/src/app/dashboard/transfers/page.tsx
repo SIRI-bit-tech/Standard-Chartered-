@@ -31,6 +31,7 @@ import { HistoryFilters, type HistoryFilterState } from '@/components/transfers/
 import { HistoryKpis } from '@/components/transfers/history-kpis'
 import { HistoryTable } from '@/components/transfers/history-table'
 import { CountrySelector } from '@/components/ui/country-selector'
+import { parseApiError } from '@/utils/error-handler'
 import type {
   Account,
   TransferTypeTab,
@@ -361,11 +362,10 @@ export default function TransfersPage() {
     try {
       await apiClient.post('/api/v1/auth/verify-transfer-pin', { transfer_pin: pin })
     } catch (e: unknown) {
-      const msg =
-        (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Invalid PIN'
-      setPinError(typeof msg === 'string' ? msg : 'Invalid transfer PIN')
+      const { message } = parseApiError(e)
+      setPinError(message)
       setSubmitting(false)
-      throw new Error('PIN verification failed')
+      throw new Error(message)
     }
 
     try {
@@ -531,14 +531,14 @@ export default function TransfersPage() {
       }
     } catch (err) {
       console.error('Transfer failed:', err)
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setTransferError(detail ?? 'Transfer failed. Please try again.')
+      const { message } = parseApiError(err)
+      setTransferError(message)
       setReceiptData({
         status: 'failed',
         type: transferType,
         amount,
         currency,
-        error: typeof detail === 'string' ? detail : 'Transfer failed',
+        error: message,
       })
       setReceiptOpen(true)
       trackEvent('transfer_failed', {

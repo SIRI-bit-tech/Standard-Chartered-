@@ -4,15 +4,18 @@ import React, { useState } from "react"
 import Link from 'next/link'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useLoadingStore } from '@/lib/store'
-import { ShieldCheck, Monitor, Smartphone } from 'lucide-react'
+import { ShieldCheck, Monitor, Smartphone, Eye, EyeOff } from 'lucide-react'
 import { stytchClient } from '@/lib/stytch-client'
 import { identifyUser, trackEvent } from '@/lib/analytics'
+import { parseApiError } from '@/utils/error-handler'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [errorFields, setErrorFields] = useState<string[]>([])
+  const [showPassword, setShowPassword] = useState(false)
   const { setUser, setToken } = useAuthStore()
   const { show, hide } = useLoadingStore()
 
@@ -143,7 +146,9 @@ export default function LoginPage() {
     } catch (err: any) {
       setLoading(false)
       hide()
-      setError('Login failed. Please try again.')
+      const { message, errorFields: fields } = parseApiError(err)
+      setError(message)
+      setErrorFields(fields)
     }
   }
 
@@ -313,9 +318,13 @@ export default function LoginPage() {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (errorFields.includes('username')) setErrorFields(prev => prev.filter(f => f !== 'username'));
+                setError('');
+              }}
               placeholder="Enter your username"
-              className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 bg-white placeholder:text-gray-400"
+              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('username') ? 'border-error ring-error/20' : 'border-border'}`}
               required
             />
           </div>
@@ -324,14 +333,31 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full px-4 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 bg-white placeholder:text-gray-400"
-              required
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (errorFields.includes('password')) setErrorFields(prev => prev.filter(f => f !== 'password'));
+                  setError('');
+                }}
+                placeholder="Enter your password"
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('password') ? 'border-error ring-error/20' : 'border-border'}`}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-sm pt-1">

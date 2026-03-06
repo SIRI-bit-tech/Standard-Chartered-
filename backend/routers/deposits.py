@@ -32,9 +32,11 @@ async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(message="User not found")
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
+        from utils.errors import UnauthorizedError
+        raise UnauthorizedError(message="Account suspended")
 
 
 def _is_host_allowed(host: str) -> bool:
@@ -200,15 +202,11 @@ async def initiate_check_deposit(
         account = account_result.scalar()
         
         if not account or account.user_id != current_user_id:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Account not found"
-            )
+            from utils.errors import ValidationError
+            raise ValidationError(message="Account not found", details={"field": "account_id"})
         if getattr(account, "status", None) and account.status != AccountStatus.ACTIVE:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Account inactive"
-            )
+            from utils.errors import ValidationError
+            raise ValidationError(message="Account inactive", details={"field": "account_id"})
         
         verification_code = str(random.randint(100000, 999999))
         

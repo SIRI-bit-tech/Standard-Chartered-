@@ -20,6 +20,7 @@ export default function SetTransferPinPage() {
   const email = searchParams.get('email') || ''
   const { setUser } = useAuthStore()
   const { show, hide } = useLoadingStore()
+  const verification_token = searchParams.get('token') || ''
 
   const [transferPin, setTransferPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
@@ -54,7 +55,8 @@ export default function SetTransferPinPage() {
         '/api/v1/auth/set-transfer-pin',
         {
           email,
-          transfer_pin: transferPin
+          transfer_pin: transferPin,
+          verification_token: verification_token
         },
         { headers: { 'X-Show-Loader': '1' } }
       )

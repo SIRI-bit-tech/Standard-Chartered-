@@ -51,6 +51,15 @@ async def register(
             raise ConflictError(
                 message="This email or username is already registered"
             )
+
+        # Strict password validation
+        password = request.password
+        if len(password) < 10:
+            raise ValidationError(message="Password must be at least 10 characters long", details={"field": "password"})
+        if not any(char.isdigit() for char in password):
+            raise ValidationError(message="Password must contain at least one number", details={"field": "password"})
+        if not any(not char.isalnum() for char in password):
+            raise ValidationError(message="Password must contain at least one symbol", details={"field": "password"})
         
         primary_currency = AccountService.CURRENCY_MAP.get(request.country, "USD")
 
@@ -71,10 +80,22 @@ async def register(
                         stytch_user_id = stytch_resp.user_id
                         logger.info(f"Stytch user created: {stytch_user_id}")
                 except Exception as e:
-                    logger.error(f"Failed to create Stytch user: {e}")
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Authentication provider failure. Please try again later."
+                    from utils.stytch_client import parse_stytch_error
+                    msg, code = parse_stytch_error(e)
+                    logger.error(f"Failed to create Stytch user: {msg} ({code})")
+                    
+                    # Determine which field the error likely refers to
+                    details = {}
+                    if "password" in str(code).lower() or "password" in msg.lower():
+                        details = {"field": "password"}
+                    elif "email" in str(code).lower() or "email" in msg.lower():
+                        details = {"field": "email"}
+                        
+                    raise ValidationError(
+                        message=msg,
+                        error_code=code,
+                        details=details,
+                        original_error=e
                     )
 
         # Create new user
@@ -120,23 +141,37 @@ async def register(
         except Exception as e:
             await db.rollback()
             logger.error(f"Failed to register user {new_user.email}: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Registration failed. Please try again."
+            from utils.errors import InternalServerError
+            raise InternalServerError(
+                operation="user registration",
+                original_error=e
             ) from e
 
-        # Send verification email
+        # Send verification magic link using Stytch
         try:
-            from utils.email import send_verification_email
-            await send_verification_email(
-                email=new_user.email,
-                verification_token=new_user.email_verification_token,
-                first_name=new_user.first_name
-            )
-            logger.info(f"Verification email sent to {new_user.email}")
+            from utils.stytch_client import get_stytch_client
+            stytch_client = get_stytch_client()
+            if stytch_client:
+                # Initiate Magic Link flow
+                # This will send a Stytch-branded (or configured) magic link to the user
+                stytch_client.magic_links.email.login_or_create(
+                    email=new_user.email,
+                    login_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email",
+                    signup_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email"
+                )
+                logger.info(f"Stytch Magic Link sent to {new_user.email}")
+            else:
+                # Fallback to local email if Stytch initialization failed
+                from utils.email import send_verification_email
+                await send_verification_email(
+                    email=new_user.email,
+                    verification_token=new_user.email_verification_token,
+                    first_name=new_user.first_name
+                )
+                logger.info(f"Local verification email sent to {new_user.email}")
         except Exception as e:
-            logger.error(f"Failed to send verification email: {e}")
-            # Don't fail registration if email fails
+            logger.error(f"Failed to send verification magic link: {e}")
+            # Don't fail registration if magic link fails
             pass
 
         # Generate tokens
@@ -232,7 +267,8 @@ async def login(
                     
                     if action == "BLOCK":
                         logger.warning(f"Blocking login attempt due to fraud verdict: {request.username}")
-                        raise HTTPException(status_code=403, detail="Access denied due to security policy")
+                        from utils.errors import UnauthorizedError
+                        raise UnauthorizedError(message="Access denied due to security policy")
                     elif action == "CHALLENGE":
                         logger.info(f"Forcing 2FA challenge for {request.username} due to fraud verdict")
                         force_2fa = True
@@ -270,16 +306,12 @@ async def login(
         user = result.scalar()
         
         if not user or not verify_password(request.password, user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials"
-            )
+            from utils.errors import AuthenticationError
+            raise AuthenticationError(message="Invalid credentials")
     
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive. Please verify your email."
-        )
+        from utils.errors import UnauthorizedError
+        raise UnauthorizedError(message="Account is inactive. Please verify your email.")
     
     device_id = request.device_id
     device_name = request.device_name
@@ -463,20 +495,16 @@ async def refresh_access_token(
     payload = verify_token(request.refresh_token)
     
     if not payload or payload.get("type") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
-        )
+        from utils.errors import AuthenticationError
+        raise AuthenticationError(message="Invalid refresh token")
     
     user_id = payload.get("sub")
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar()
     
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
+        from utils.errors import NotFoundError
+        raise NotFoundError(resource="User")
     
     # Generate new access token
     access_token = create_access_token({"sub": user.id, "email": user.email})
@@ -514,14 +542,17 @@ async def complete_two_factor(
     ip_address = get_client_ip(http_request)
     payload_decoded = verify_token(session_token)
     if not payload_decoded or payload_decoded.get("purpose") != "2fa":
-        raise HTTPException(status_code=401, detail="Invalid or expired session")
+        from utils.errors import AuthenticationError
+        raise AuthenticationError(message="Invalid or expired session")
     user_id = payload_decoded.get("sub")
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar()
     if not user or not getattr(user, "two_factor_enabled", False) or not getattr(user, "two_factor_secret", None):
-        raise HTTPException(status_code=400, detail="Two-factor authentication not enabled")
+        from utils.errors import ValidationError
+        raise ValidationError(message="Two-factor authentication not enabled")
     if not verify_totp(code, user.two_factor_secret):
-        raise HTTPException(status_code=400, detail="Invalid authentication code")
+        from utils.errors import ValidationError
+        raise ValidationError(message="Invalid authentication code", details={"field": "code"})
     # Success -> issue tokens
     access_token = create_access_token({"sub": user.id, "email": user.username})
     refresh_token = create_refresh_token(user.id)

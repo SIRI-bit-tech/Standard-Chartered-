@@ -27,7 +27,8 @@ async def get_realtime_token(
     from utils.ably import get_ably_token_request
     token_request = await get_ably_token_request(current_user_id)
     if token_request is None:
-        raise HTTPException(status_code=500, detail="Real-time service unavailable")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="Real-time token generation")
     return token_request
 
 
@@ -43,7 +44,8 @@ async def get_profile(
     user = result.scalar()
     
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(resource="User")
     
     return {
         "success": True,
@@ -88,7 +90,8 @@ async def update_profile(
     user = result.scalar()
     
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(resource="User")
     
     first_name = payload.get("first_name")
     last_name = payload.get("last_name")
@@ -145,7 +148,8 @@ async def get_avatar_upload_url(
     # Ensure user exists
     res = await db.execute(select(User).where(User.id == current_user_id))
     if not res.scalar():
-        raise HTTPException(status_code=404, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(resource="User")
     cfg = CloudinaryManager.generate_signed_upload_url(folder="avatars", resource_type="image", expire_seconds=900)
     return {"success": True, "data": cfg}
 
@@ -159,11 +163,13 @@ async def set_avatar(
     """Store avatar URL on the user profile"""
     image_url = payload.get("image_url")
     if not image_url:
-        raise HTTPException(status_code=400, detail="image_url is required")
+        from utils.errors import ValidationError
+        raise ValidationError(message="image_url is required", details={"field": "image_url"})
     res = await db.execute(select(User).where(User.id == current_user_id))
     user = res.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(resource="User")
     user.profile_picture_url = image_url
     user.updated_at = datetime.utcnow()
     db.add(user)
@@ -285,7 +291,8 @@ async def delete_account(
     result = await db.execute(select(User).where(User.id == current_user_id))
     user = result.scalar()
     if not user:
-        raise HTTPException(status_code=404, detail="User found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(resource="User")
 
     try:
         # Get all account IDs for this user
@@ -317,5 +324,6 @@ async def delete_account(
 
     except Exception as e:
         await db.rollback()
-        print(f"Error during account deletion: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete account. Internal server error.")
+        logger.error(f"Error during account deletion: {e}")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="account deletion", original_error=e)

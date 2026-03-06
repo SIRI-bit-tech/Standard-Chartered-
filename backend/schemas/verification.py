@@ -9,6 +9,10 @@ class EmailVerificationRequest(BaseModel):
     email: str = Field(..., description="User's email address")
     verification_code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
 
+class MagicLinkRequest(BaseModel):
+    """Request model for magic link verification"""
+    token: str = Field(..., description="Stytch magic link token")
+
 class StartPinResetRequest(BaseModel):
     """Start transfer PIN reset by email"""
     email: str = Field(..., description="User's email address")

@@ -8,6 +8,7 @@ import { QRCodeSVG } from "qrcode.react"
 import { ShieldCheck, ShieldAlert, Key, Trash2, ShieldX, AlertTriangle } from 'lucide-react'
 import { ConfirmModal } from "@/components/ui/confirm-modal"
 import { useToast } from "@/hooks/use-toast"
+import { parseApiError } from "@/utils/error-handler"
 
 export function SecurityPanel() {
   const [busy, setBusy] = useState(false)
@@ -26,6 +27,7 @@ export function SecurityPanel() {
   const [confirmPwd, setConfirmPwd] = useState('')
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState<string | null>(null)
+  const [pwdErrorFields, setPwdErrorFields] = useState<string[]>([])
 
   const loadStatus = async () => {
     try {
@@ -70,7 +72,8 @@ export function SecurityPanel() {
         setError('Verification failed. Check the code and try again.')
       }
     } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Invalid code. Please try again.')
+      const { message } = parseApiError(e)
+      setError(message)
     } finally {
       setBusy(false)
     }
@@ -89,7 +92,8 @@ export function SecurityPanel() {
         loadStatus()
       }
     } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Failed to disable 2FA. Check the code.')
+      const { message } = parseApiError(e)
+      setError(message)
     } finally {
       setBusy(false)
     }
@@ -121,7 +125,9 @@ export function SecurityPanel() {
         setTimeout(() => setPwdOpen(false), 2000)
       }
     } catch (e: any) {
-      setPwdError(e?.response?.data?.detail || 'Failed to change password.')
+      const { message, errorFields } = parseApiError(e)
+      setPwdError(message)
+      setPwdErrorFields(errorFields)
     } finally {
       setBusy(false)
     }
@@ -252,9 +258,13 @@ export function SecurityPanel() {
               <label className="text-sm font-semibold text-gray-700">Current Password</label>
               <input
                 type="password"
-                className="w-full px-4 py-3 bg-gray-50 border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all ${pwdErrorFields.includes('current_password') ? 'border-red-500 ring-red-500/20' : 'border-border'}`}
                 value={currentPwd}
-                onChange={(e) => setCurrentPwd(e.target.value)}
+                onChange={(e) => {
+                  setCurrentPwd(e.target.value);
+                  if (pwdErrorFields.includes('current_password')) setPwdErrorFields(prev => prev.filter(f => f !== 'current_password'));
+                  setPwdError(null);
+                }}
                 placeholder="••••••••"
               />
             </div>
@@ -263,9 +273,13 @@ export function SecurityPanel() {
               <label className="text-sm font-semibold text-gray-700">New Password</label>
               <input
                 type="password"
-                className="w-full px-4 py-3 bg-gray-50 border border-border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all ${pwdErrorFields.includes('new_password') ? 'border-red-500 ring-red-500/20' : 'border-border'}`}
                 value={newPwd}
-                onChange={(e) => setNewPwd(e.target.value)}
+                onChange={(e) => {
+                  setNewPwd(e.target.value);
+                  if (pwdErrorFields.includes('new_password')) setPwdErrorFields(prev => prev.filter(f => f !== 'new_password'));
+                  setPwdError(null);
+                }}
                 placeholder="••••••••"
               />
             </div>

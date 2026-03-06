@@ -5,13 +5,14 @@ import React from "react"
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Eye, EyeOff, Check } from 'lucide-react'
 import { CountrySelector } from '@/components/ui/country-selector'
 import { apiClient } from '@/lib/api-client'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import { useLoadingStore } from '@/lib/store'
 import { trackEvent, hashString } from '@/lib/analytics'
+import { parseApiError } from '@/utils/error-handler'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -32,7 +33,18 @@ export default function RegisterPage() {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [errorFields, setErrorFields] = useState<string[]>([])
   const [success, setSuccess] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [passwordStrength, setPasswordStrength] = useState({
+    score: 0,
+    hasNumber: false,
+    hasSymbol: false,
+    hasUpper: false,
+    hasLower: false,
+    isLongEnough: false
+  })
   const { show, hide } = useLoadingStore()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -41,6 +53,37 @@ export default function RegisterPage() {
       ...prev,
       [name]: value,
     }))
+
+    if (name === 'password') {
+      const hasNumber = /\d/.test(value)
+      const hasSymbol = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(value)
+      const hasUpper = /[A-Z]/.test(value)
+      const hasLower = /[a-z]/.test(value)
+      const isLongEnough = value.length >= 10
+
+      let score = 0
+      if (hasNumber) score += 1
+      if (hasSymbol) score += 1
+      if (hasUpper) score += 1
+      if (hasLower) score += 1
+      if (isLongEnough) score += 1
+
+      setPasswordStrength({
+        score,
+        hasNumber,
+        hasSymbol,
+        hasUpper,
+        hasLower,
+        isLongEnough
+      })
+    }
+
+    // Clear specific field error when user starts typing
+    if (errorFields.includes(name)) {
+      setErrorFields(prev => prev.filter(f => f !== name))
+    }
+    // Also clear general error when they fix things
+    setError('')
   }
 
   interface AuthResponse {
@@ -57,6 +100,14 @@ export default function RegisterPage() {
 
     if (formData.password !== formData.confirm_password) {
       setError('Passwords do not match')
+      setLoading(false)
+      hide()
+      return
+    }
+
+    if (passwordStrength.score < 4) {
+      setError('Password is too weak. Please include at least 10 characters, numbers, and symbols.')
+      setErrorFields(['password'])
       setLoading(false)
       hide()
       return
@@ -102,22 +153,9 @@ export default function RegisterPage() {
       }
     } catch (err: any) {
       console.error('Registration error:', err)
-      let errorMessage = 'Registration failed. Please try again.'
-
-      if (err.response?.data) {
-        const data = err.response.data
-        if (typeof data === 'string') {
-          errorMessage = data
-        } else if (data.detail) {
-          errorMessage = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)
-        } else if (data.message) {
-          errorMessage = typeof data.message === 'string' ? data.message : JSON.stringify(data.message)
-        }
-      } else if (err.message) {
-        errorMessage = err.message
-      }
-
-      setError(errorMessage)
+      const { message, errorFields: fields } = parseApiError(err)
+      setError(message)
+      setErrorFields(fields)
     } finally {
       setLoading(false)
       hide()
@@ -161,7 +199,7 @@ export default function RegisterPage() {
               value={formData.first_name}
               onChange={handleChange}
               placeholder="First name"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
+              className={`w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('first_name') ? 'border-error ring-error/20' : 'border-border'}`}
               required
             />
           </div>
@@ -172,7 +210,7 @@ export default function RegisterPage() {
               value={formData.last_name}
               onChange={handleChange}
               placeholder="Last name"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
+              className={`w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('last_name') ? 'border-error ring-error/20' : 'border-border'}`}
               required
             />
           </div>
@@ -186,7 +224,7 @@ export default function RegisterPage() {
               value={formData.email}
               onChange={handleChange}
               placeholder="Email address"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
+              className={`w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('email') ? 'border-error ring-error/20' : 'border-border'}`}
               required
             />
           </div>
@@ -197,7 +235,7 @@ export default function RegisterPage() {
               value={formData.username}
               onChange={handleChange}
               placeholder="Username"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
+              className={`w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('username') ? 'border-error ring-error/20' : 'border-border'}`}
               required
             />
           </div>
@@ -219,9 +257,12 @@ export default function RegisterPage() {
               countryCallingCodeEditable={false}
               defaultCountry="US"
               value={formData.phone}
-              onChange={(value) => setFormData(prev => ({ ...prev, phone: value || '' }))}
+              onChange={(value) => {
+                setFormData(prev => ({ ...prev, phone: value || '' }));
+                if (errorFields.includes('phone')) setErrorFields(prev => prev.filter(f => f !== 'phone'));
+              }}
               placeholder="+1 (555) 123-4567"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
+              className={`w-full px-3 py-3 border rounded-lg focus-within:ring-2 focus-within:ring-primary transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('phone') ? 'border-error ring-error/20' : 'border-border'}`}
               required
             />
           </div>
@@ -236,7 +277,7 @@ export default function RegisterPage() {
               value={formData.street_address}
               onChange={handleChange}
               placeholder="Street Address"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
+              className={`w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('street_address') ? 'border-error ring-error/20' : 'border-border'}`}
               required
             />
           </div>
@@ -273,18 +314,25 @@ export default function RegisterPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="relative">
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               name="password"
               value={formData.password}
               onChange={handleChange}
               placeholder="Password"
-              className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
+              className={`w-full px-3 py-3 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400 ${errorFields.includes('password') ? 'border-error ring-error/20' : 'border-border'}`}
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-3 text-gray-400 focus:outline-none"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
           <div className="relative">
             <input
-              type="password"
+              type={showConfirmPassword ? "text" : "password"}
               name="confirm_password"
               value={formData.confirm_password}
               onChange={handleChange}
@@ -292,8 +340,61 @@ export default function RegisterPage() {
               className="w-full px-3 py-3 border border-border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm text-gray-900 bg-white placeholder:text-gray-400"
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="absolute right-3 top-3 text-gray-400 focus:outline-none"
+            >
+              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
         </div>
+
+        {formData.password && (
+          <div className="bg-gray-50 p-3 rounded-lg border border-border space-y-2">
+            <div className="flex items-center justify-between text-xs font-medium text-gray-500 mb-1">
+              <span>Password Strength</span>
+              <span className={
+                passwordStrength.score <= 2 ? 'text-error' :
+                  passwordStrength.score <= 4 ? 'text-yellow-500' :
+                    'text-green-500'
+              }>
+                {passwordStrength.score <= 2 ? 'Weak' :
+                  passwordStrength.score <= 4 ? 'Moderate' :
+                    'Strong'}
+              </span>
+            </div>
+            <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden flex gap-0.5">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <div
+                  key={s}
+                  className={`h-full flex-1 transition-all duration-300 ${s <= passwordStrength.score
+                    ? (passwordStrength.score <= 2 ? 'bg-error' : passwordStrength.score <= 4 ? 'bg-yellow-500' : 'bg-green-500')
+                    : 'bg-gray-100'
+                    }`}
+                />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 pt-1">
+              <div className={`flex items-center gap-1.5 text-xs ${passwordStrength.isLongEnough ? 'text-green-600' : 'text-gray-400'}`}>
+                {passwordStrength.isLongEnough ? <Check size={12} /> : <div className="w-3 h-3 border border-gray-300 rounded-full" />}
+                8+ characters
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${passwordStrength.hasNumber ? 'text-green-600' : 'text-gray-400'}`}>
+                {passwordStrength.hasNumber ? <Check size={12} /> : <div className="w-3 h-3 border border-gray-300 rounded-full" />}
+                1+ number
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${passwordStrength.hasSymbol ? 'text-green-600' : 'text-gray-400'}`}>
+                {passwordStrength.hasSymbol ? <Check size={12} /> : <div className="w-3 h-3 border border-gray-300 rounded-full" />}
+                1+ symbol
+              </div>
+              <div className={`flex items-center gap-1.5 text-xs ${passwordStrength.hasUpper ? 'text-green-600' : 'text-gray-400'}`}>
+                {passwordStrength.hasUpper ? <Check size={12} /> : <div className="w-3 h-3 border border-gray-300 rounded-full" />}
+                Upper case
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 py-2">
           <input

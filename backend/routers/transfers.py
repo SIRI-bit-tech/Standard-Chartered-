@@ -111,9 +111,11 @@ async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(message="User not found")
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
+        from utils.errors import UnauthorizedError
+        raise UnauthorizedError(message="Account suspended")
 
 
 @router.get("/recipients/search")
@@ -212,20 +214,24 @@ async def _verify_transfer_pin(db: AsyncSession, user_id: str, transfer_pin: str
     )
     user = result.scalar_one_or_none()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        from utils.errors import NotFoundError
+        raise NotFoundError(message="User not found")
     if not user.transfer_pin:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Transfer PIN not set. Please set your PIN first.",
+        from utils.errors import ValidationError
+        raise ValidationError(
+            message="Transfer PIN not set. Please set your PIN first.",
+            details={"field": "transfer_pin"}
         )
 
     now = datetime.utcnow()
     if user.transfer_pin_locked_until and user.transfer_pin_locked_until > now:
         retry_after = int((user.transfer_pin_locked_until - now).total_seconds())
-        raise HTTPException(
+        from utils.errors import APIError
+        raise APIError(
             status_code=423,
-            detail=f"Transfer PIN locked. Try again in {retry_after} seconds.",
-            headers={"Retry-After": str(retry_after)},
+            message=f"Transfer PIN locked. Try again in {retry_after} seconds.",
+            error_code="PIN_LOCKED",
+            details={"field": "transfer_pin", "retry_after": retry_after}
         )
 
     if not verify_password(transfer_pin, user.transfer_pin):
@@ -234,14 +240,20 @@ async def _verify_transfer_pin(db: AsyncSession, user_id: str, transfer_pin: str
             user.transfer_pin_locked_until = now + LOCKOUT_DURATION
             await db.commit()
             retry_after = int(LOCKOUT_DURATION.total_seconds())
-            raise HTTPException(
+            from utils.errors import APIError
+            raise APIError(
                 status_code=423,
-                detail=f"Transfer PIN locked. Try again in {retry_after} seconds.",
-                headers={"Retry-After": str(retry_after)},
+                message=f"Transfer PIN locked. Try again in {retry_after} seconds.",
+                error_code="PIN_LOCKED",
+                details={"field": "transfer_pin", "retry_after": retry_after}
             )
 
         await db.commit()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid transfer PIN")
+        from utils.errors import ValidationError
+        raise ValidationError(
+            message="Invalid transfer PIN",
+            details={"field": "transfer_pin"}
+        )
 
     if user.transfer_pin_failed_attempts or user.transfer_pin_locked_until:
         user.transfer_pin_failed_attempts = 0
@@ -305,15 +317,17 @@ async def internal_transfer(
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Destination account not found")
 
             if from_account.currency != to_account.currency:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Currency mismatch between accounts",
+                from utils.errors import ValidationError
+                raise ValidationError(
+                    message="Currency mismatch between accounts",
+                    details={"field": "to_account_id"}
                 )
 
             if from_account.available_balance < total_amount:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Insufficient funds",
+                from utils.errors import ValidationError
+                raise ValidationError(
+                    message="Insufficient funds",
+                    details={"field": "amount"}
                 )
 
             from_balance_before = from_account.balance
@@ -467,9 +481,10 @@ async def domestic_transfer(
     # Verify sufficient funds
     total_amount = request.amount + 2.50  # Include domestic transfer fee
     if from_account.balance < total_amount:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Insufficient funds"
+        from utils.errors import ValidationError
+        raise ValidationError(
+            message="Insufficient funds",
+            details={"field": "amount"}
         )
 
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
@@ -572,7 +587,11 @@ async def ach_transfer(
         if getattr(account, "status", None) and account.status != AccountStatus.ACTIVE:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
         if account.available_balance < request.amount:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient funds")
+            from utils.errors import ValidationError
+            raise ValidationError(
+                message="Insufficient funds",
+                details={"field": "amount"}
+            )
         
         balance_before = account.balance
         account.balance = account.balance - request.amount

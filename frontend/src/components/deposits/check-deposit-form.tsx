@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { parseApiError } from '@/utils/error-handler';
 import { Scan } from 'lucide-react';
 import { FromAccountSelect } from '@/components/transfers/from-account-select';
 import { ImageUpload } from '@/components/ImageUpload';
@@ -34,6 +35,7 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
     front_image_url: '',
     currency: user?.primary_currency || getCurrencyFromCountry(user?.country)
   });
+  const [errorFields, setErrorFields] = useState<string[]>([]);
 
   const [touched, setTouched] = useState({ amount: false, check_number: false });
 
@@ -159,9 +161,11 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
         onSuccess?.();
       }
     } catch (error: any) {
+      const { message, errorFields } = parseApiError(error);
+      setErrorFields(errorFields);
       toast({
         title: 'Error',
-        description: error.response?.data?.detail || 'Failed to submit deposit',
+        description: message,
         variant: 'destructive'
       });
     } finally {
@@ -225,8 +229,10 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
             onChange={(e) => {
               setTouched(prev => ({ ...prev, amount: true }));
               setFormData({ ...formData, amount: e.target.value });
+              if (errorFields.includes('amount')) setErrorFields(prev => prev.filter(f => f !== 'amount'));
             }}
             disabled={loading}
+            className={errorFields.includes('amount') ? 'border-red-500 ring-red-500/20' : ''}
           />
         </div>
         <div>
@@ -248,8 +254,12 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
           type="text"
           placeholder="Name written on the check"
           value={formData.name_on_check}
-          onChange={(e) => setFormData({ ...formData, name_on_check: e.target.value })}
+          onChange={(e) => {
+            setFormData({ ...formData, name_on_check: e.target.value });
+            if (errorFields.includes('name_on_check')) setErrorFields(prev => prev.filter(f => f !== 'name_on_check'));
+          }}
           disabled={loading}
+          className={errorFields.includes('name_on_check') ? 'border-red-500 ring-red-500/20' : ''}
         />
       </div>
 
@@ -263,8 +273,10 @@ export function CheckDepositForm({ onSuccess }: CheckDepositFormProps) {
           onChange={(e) => {
             setTouched(prev => ({ ...prev, check_number: true }));
             setFormData({ ...formData, check_number: e.target.value });
+            if (errorFields.includes('check_number')) setErrorFields(prev => prev.filter(f => f !== 'check_number'));
           }}
           disabled={loading}
+          className={errorFields.includes('check_number') ? 'border-red-500 ring-red-500/20' : ''}
         />
       </div>
 

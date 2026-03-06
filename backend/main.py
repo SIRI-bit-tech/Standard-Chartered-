@@ -11,6 +11,7 @@ import logging
 import asyncio
 import httpx
 import os
+from utils.errors import APIError
 
 # Import all models to ensure they're registered
 from models.user import User
@@ -418,20 +419,23 @@ app.include_router(admin.router, tags=["Admin"])
 app.include_router(security_router.router)
 
 
+@app.exception_handler(APIError)
+async def api_error_handler(request: Request, exc: APIError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.to_dict()
+    )
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logger.error(f"Validation error: {exc.errors()}")
-    logger.error(f"Request body: {exc.body}")
+    # Log the full error internally
+    logger.error(f"Validation error: {exc.errors()} | Body: {exc.body}")
     
-    # Construct error response with proper format
-    error_response = {
-        "detail": exc.errors(),
-        "body": exc.body
-    }
-    
+    # Return structured error for parseApiError to handle
     return JSONResponse(
         status_code=422,
-        content=error_response
+        content={"detail": exc.errors()}
     )
 
 

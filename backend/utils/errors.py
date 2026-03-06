@@ -9,7 +9,7 @@ from utils.logger import logger
 
 
 class APIError(HTTPException):
-    """Base API error with generic response"""
+    """Base API error with descriptive response"""
     
     def __init__(
         self,
@@ -30,33 +30,47 @@ class APIError(HTTPException):
             logger.error(
                 f"API Error [{error_code}]: {message}",
                 error=original_error,
-                error_code=error_code
+                error_code=error_code,
+                details=self.details
             )
         
-        # Return generic message to client
+        # Return descriptive message and details to client
         super().__init__(
             status_code=status_code,
             detail={
                 "success": False,
                 "message": message,
                 "error_code": error_code,
+                "details": self.details
             }
         )
 
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert error to dictionary for JSON response"""
+        return {
+            "success": False,
+            "message": self.message,
+            "error_code": self.error_code,
+            "details": self.details
+        }
+
+
 class ValidationError(APIError):
-    """Validation error with generic response"""
+    """Validation error with descriptive response"""
     
     def __init__(
         self,
         message: str = "Invalid request data",
         error_code: str = "VALIDATION_ERROR",
+        details: Optional[Dict[str, Any]] = None,
         original_error: Optional[Exception] = None,
     ):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
             message=message,
             error_code=error_code,
+            details=details,
             original_error=original_error,
         )
 

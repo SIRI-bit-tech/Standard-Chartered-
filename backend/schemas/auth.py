@@ -28,6 +28,16 @@ class RegisterRequest(BaseModel):
         if v and not v.replace('+', '').replace('-', '').replace(' ', '').replace('(', '').replace(')', '').isdigit():
             raise ValueError('Phone number must contain only digits and valid symbols')
         return v
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 10:
+            raise ValueError('Password must be at least 10 characters long')
+        if not any(char.isdigit() for char in v):
+            raise ValueError('Password must contain at least one number')
+        if not any(not char.isalnum() for char in v):
+            raise ValueError('Password must contain at least one special character')
+        return v
 
 
 class LoginRequest(BaseModel):
