@@ -2657,6 +2657,16 @@ async def admin_delete_user(
         if not user:
             raise NotFoundError(resource="User", error_code="USER_NOT_FOUND")
         
+        # Delete from Stytch if applicable
+        if settings.AUTH_PROVIDER == "stytch":
+            try:
+                from utils.stytch_client import delete_stytch_user
+                # In our system, User.id IS the Stytch User ID if provider is stytch
+                delete_stytch_user(user.id)
+                logger.info(f"User {user.id} deleted from Stytch by admin {admin.email}")
+            except Exception as stytch_err:
+                logger.error(f"Failed to delete user {user.id} from Stytch: {stytch_err}")
+
         await db.delete(user)
         
         audit_log = AdminAuditLog(

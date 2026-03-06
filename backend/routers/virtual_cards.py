@@ -37,7 +37,7 @@ def generate_cvv() -> str:
 
 def get_expiry_dates():
     """Get expiry month and year"""
-    today = datetime.now(timezone.utc)
+    today = datetime.utcnow()
     expiry_date = today + timedelta(days=365)
     return expiry_date.month, expiry_date.year
 
@@ -89,7 +89,7 @@ async def create_virtual_card(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum of two cards allowed")
         
         # Block applying while any blocked card has not expired yet
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()
         def not_expired(c):
             try:
                 # Consider card expired after the end of expiry month
@@ -106,8 +106,8 @@ async def create_virtual_card(
             user_id=current_user_id,
             account_id=request.account_id,
             card_number=generate_virtual_card_number(),
-            card_type=model_card_type.value,
-            status=VirtualCardStatus.PENDING.value,
+            card_type=model_card_type,
+            status=VirtualCardStatus.PENDING,
             expiry_month=expiry_month,
             expiry_year=expiry_year,
             cvv=generate_cvv(),
@@ -115,13 +115,13 @@ async def create_virtual_card(
             spending_limit=request.spending_limit,
             daily_limit=request.daily_limit,
             monthly_limit=request.monthly_limit,
-            valid_from=request.valid_from or datetime.now(timezone.utc),
+            valid_from=request.valid_from or datetime.utcnow(),
             valid_until=request.valid_until,
             allowed_merchants=json.dumps(request.allowed_merchants or []),
             blocked_merchants=json.dumps(request.blocked_merchants or []),
             allowed_countries=json.dumps(request.allowed_countries or []),
             requires_3d_secure=request.requires_3d_secure,
-            created_at=datetime.now(timezone.utc)
+            created_at=datetime.utcnow()
         )
         
         db.add(virtual_card)
@@ -154,10 +154,10 @@ async def create_virtual_card(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Unexpected error during card creation", error=e)
+        logger.error(f"Unexpected error during card creation: {str(e)}", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal server error occurred while creating the card."
+            detail=f"An internal error occurred: {str(e)}" if settings.ENVIRONMENT == 'development' else "An internal server error occurred while creating the card."
         )
 
 
@@ -261,7 +261,7 @@ async def update_virtual_card(
         if request.allowed_countries is not None:
             card.allowed_countries = json.dumps(request.allowed_countries)
         
-        card.updated_at = datetime.now(timezone.utc)
+        card.updated_at = datetime.utcnow()
         db.add(card)
         await db.commit()
         await db.refresh(card)
@@ -307,7 +307,7 @@ async def block_virtual_card(
             )
         
         card.status = VirtualCardStatus.BLOCKED
-        card.updated_at = datetime.now(timezone.utc)
+        card.updated_at = datetime.utcnow()
         db.add(card)
         await db.commit()
         await db.refresh(card)
@@ -352,7 +352,7 @@ async def unblock_virtual_card(
             )
         
         card.status = VirtualCardStatus.ACTIVE
-        card.updated_at = datetime.now(timezone.utc)
+        card.updated_at = datetime.utcnow()
         db.add(card)
         await db.commit()
         await db.refresh(card)
@@ -397,7 +397,7 @@ async def delete_virtual_card(
             )
         
         card.status = VirtualCardStatus.CANCELLED
-        card.cancelled_at = datetime.now(timezone.utc)
+        card.cancelled_at = datetime.utcnow()
         db.add(card)
         await db.commit()
         

@@ -51,3 +51,20 @@ def parse_stytch_error(e):
         return message, error_type
     except Exception:
         return "An authentication error occurred. Please try again later.", "AUTH_PROVIDER_ERROR"
+
+def delete_stytch_user(stytch_user_id: str) -> bool:
+    """
+    Deletes a user from Stytch by their Stytch User ID.
+    Returns True if successful, False otherwise.
+    """
+    client = get_stytch_client()
+    if not client:
+        return False
+        
+    try:
+        logger.info(f"Deleting user from Stytch: {stytch_user_id}")
+        client.users.delete(user_id=stytch_user_id)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete Stytch user {stytch_user_id}: {e}")
+        return False

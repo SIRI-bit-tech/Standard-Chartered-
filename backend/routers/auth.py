@@ -164,6 +164,17 @@ async def register(
             await db.rollback()
             logger.error(f"Failed to register user {new_user.email}: {e}")
             
+            # --- STYTCH CLEANUP ---
+            # If Stytch user was created but registration failed, delete it from Stytch
+            # so the user can retry with the same email.
+            if stytch_user_id:
+                try:
+                    from utils.stytch_client import delete_stytch_user
+                    delete_stytch_user(stytch_user_id)
+                    logger.info(f"Cleaned up Stytch user {stytch_user_id} after registration failure")
+                except Exception as cleanup_err:
+                    logger.error(f"Failed to cleanup Stytch user {stytch_user_id}: {cleanup_err}")
+            
             # If it's a Stytch error, parse and return it to user
             from utils.stytch_client import parse_stytch_error
             # If the error is from Stytch client call itself
