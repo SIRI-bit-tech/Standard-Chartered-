@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useMemo } from 'react'
 import { StytchProvider } from '@stytch/nextjs'
 import { createStytchClient } from '@/lib/stytch-client'
