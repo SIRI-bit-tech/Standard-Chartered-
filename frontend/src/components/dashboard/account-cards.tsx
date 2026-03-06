@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { CreditCard, Landmark, Wallet, Eye, EyeOff, Copy, Check } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useCryptoPrice } from '@/hooks/use-crypto-price'
@@ -89,6 +89,7 @@ export function AccountCards({
 }
 
 function AccountCard({ account, primaryCurrency }: { account: Account; primaryCurrency: string }) {
+  const router = useRouter()
   const [numberVisible, setNumberVisible] = useState(false)
   const [copied, setCopied] = useState(false)
   const style = cardStyles[account.type] || cardStyles.checking
@@ -121,9 +122,9 @@ function AccountCard({ account, primaryCurrency }: { account: Account; primaryCu
   const usdValue = isCrypto && btcPrice ? account.balance * btcPrice : account.balance
 
   return (
-    <Link
-      href={`/dashboard/accounts/${account.id}`}
-      className="block w-full rounded-xl border p-6 transition-shadow hover:shadow-md"
+    <div
+      onClick={() => router.push(`/dashboard/accounts/${account.id}`)}
+      className="block w-full rounded-xl border p-6 transition-shadow hover:shadow-md cursor-pointer"
       style={{ backgroundColor: style.bg, borderColor: colors.border }}
     >
       <div className="mb-4 flex items-center justify-between">
@@ -197,7 +198,7 @@ function AccountCard({ account, primaryCurrency }: { account: Account; primaryCu
           </p>
         )}
       </div>
-    </Link>
+    </div>
   )
 }
 
