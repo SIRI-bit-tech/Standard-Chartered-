@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS transfer_pin_failed_attempts INTEGER DEFAULT 0 NOT NULL"
             ))
             await conn.execute(text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS transfer_pin_locked_until TIMESTAMP"
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS transfer_pin_locked_until TIMESTAMPTZ"
             ))
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR"
@@ -92,7 +92,7 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE NOT NULL"
             ))
             await conn.execute(text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_until TIMESTAMP"
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_until TIMESTAMPTZ"
             ))
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE NOT NULL"
@@ -101,10 +101,10 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio VARCHAR"
             ))
             await conn.execute(text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP"
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ"
             ))
             await conn.execute(text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth TIMESTAMP"
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS date_of_birth TIMESTAMPTZ"
             ))
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS identity_verified BOOLEAN DEFAULT FALSE NOT NULL"

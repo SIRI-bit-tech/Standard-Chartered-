@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useLoadingStore } from '@/lib/store'
 import { ShieldCheck, Monitor, Smartphone } from 'lucide-react'
 import { stytchClient } from '@/lib/stytch-client'
-import posthog from 'posthog-js'
+import { identifyUser, trackEvent } from '@/lib/analytics'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -112,15 +112,13 @@ export default function LoginPage() {
             setUser(userData)
             setToken(tokens.access_token)
 
-            // PostHog identify
-            posthog.identify(userData.id, {
-              email: userData.email,
-              name: `${userData.first_name} ${userData.last_name}`,
-              username: userData.username,
+            // Identify user – only non-PII attributes, only with consent
+            identifyUser(userData.id, {
               country: userData.country,
-              tier: userData.tier
+              tier: userData.tier,
             });
-            posthog.capture('login_success');
+            trackEvent('login_success');
+
           }
 
           setLoading(false)
@@ -230,15 +228,13 @@ export default function LoginPage() {
                         setUser(userData)
                         setToken(tokens.access_token)
 
-                        // PostHog identify
-                        posthog.identify(userData.id, {
-                          email: userData.email,
-                          name: `${userData.first_name} ${userData.last_name}`,
-                          username: userData.username,
+                        // Identify user – only non-PII attributes, only with consent
+                        identifyUser(userData.id, {
                           country: userData.country,
-                          tier: userData.tier
+                          tier: userData.tier,
                         });
-                        posthog.capture('login_success', { device_trusted: true });
+                        trackEvent('login_success', { device_trusted: true });
+
                       }
                       window.location.href = '/dashboard';
                     }
@@ -279,15 +275,13 @@ export default function LoginPage() {
                       setUser(userData)
                       setToken(tokens.access_token)
 
-                      // PostHog identify
-                      posthog.identify(userData.id, {
-                        email: userData.email,
-                        name: `${userData.first_name} ${userData.last_name}`,
-                        username: userData.username,
+                      // Identify user – only non-PII attributes, only with consent
+                      identifyUser(userData.id, {
                         country: userData.country,
-                        tier: userData.tier
+                        tier: userData.tier,
                       });
-                      posthog.capture('login_success', { device_trusted: false });
+                      trackEvent('login_success', { device_trusted: false });
+
                     }
                     window.location.href = '/dashboard'
                   }}

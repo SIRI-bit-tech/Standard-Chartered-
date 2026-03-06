@@ -9,7 +9,7 @@ export function useUserRealtime(channelName: string, onUpdate: (payload: any) =>
     const channelRef = useRef<Ably.Types.RealtimeChannelCallbacks | null>(null)
 
     useEffect(() => {
-        const token = typeof window !== 'undefined' ? (localStorage.getItem('access_token') || localStorage.getItem('accessToken')) : null
+        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
         if (!token || !channelName) return
         if (typeof window !== 'undefined' && sessionStorage.getItem('realtimeDisabled') === '1') return
 

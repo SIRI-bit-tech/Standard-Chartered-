@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import secrets
 import json
@@ -37,7 +37,7 @@ def generate_cvv() -> str:
 
 def get_expiry_dates():
     """Get expiry month and year"""
-    today = datetime.utcnow()
+    today = datetime.now(timezone.utc)
     expiry_date = today + timedelta(days=365)
     return expiry_date.month, expiry_date.year
 
@@ -89,7 +89,7 @@ async def create_virtual_card(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum of two cards allowed")
         
         # Block applying while any blocked card has not expired yet
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         def not_expired(c):
             try:
                 # Consider card expired after the end of expiry month
@@ -115,13 +115,13 @@ async def create_virtual_card(
             spending_limit=request.spending_limit,
             daily_limit=request.daily_limit,
             monthly_limit=request.monthly_limit,
-            valid_from=request.valid_from or datetime.utcnow(),
+            valid_from=request.valid_from or datetime.now(timezone.utc),
             valid_until=request.valid_until,
             allowed_merchants=json.dumps(request.allowed_merchants or []),
             blocked_merchants=json.dumps(request.blocked_merchants or []),
             allowed_countries=json.dumps(request.allowed_countries or []),
             requires_3d_secure=request.requires_3d_secure,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         
         db.add(virtual_card)
@@ -261,7 +261,7 @@ async def update_virtual_card(
         if request.allowed_countries is not None:
             card.allowed_countries = json.dumps(request.allowed_countries)
         
-        card.updated_at = datetime.utcnow()
+        card.updated_at = datetime.now(timezone.utc)
         db.add(card)
         await db.commit()
         await db.refresh(card)
@@ -307,7 +307,7 @@ async def block_virtual_card(
             )
         
         card.status = VirtualCardStatus.BLOCKED
-        card.updated_at = datetime.utcnow()
+        card.updated_at = datetime.now(timezone.utc)
         db.add(card)
         await db.commit()
         await db.refresh(card)
@@ -352,7 +352,7 @@ async def unblock_virtual_card(
             )
         
         card.status = VirtualCardStatus.ACTIVE
-        card.updated_at = datetime.utcnow()
+        card.updated_at = datetime.now(timezone.utc)
         db.add(card)
         await db.commit()
         await db.refresh(card)
@@ -397,7 +397,7 @@ async def delete_virtual_card(
             )
         
         card.status = VirtualCardStatus.CANCELLED
-        card.cancelled_at = datetime.utcnow()
+        card.cancelled_at = datetime.now(timezone.utc)
         db.add(card)
         await db.commit()
         

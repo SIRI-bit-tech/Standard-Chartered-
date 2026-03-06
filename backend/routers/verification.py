@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 import logging
 
@@ -66,7 +66,7 @@ async def verify_email(
             logger.warning(f"Email verification failed - no token found: {request.email}")
             raise ValidationError("No verification code found. Please request a new one.")
         
-        if user.email_verification_expires < datetime.utcnow().timestamp():
+        if user.email_verification_expires < datetime.now(timezone.utc).timestamp():
             logger.warning(f"Email verification failed - code expired: {request.email}")
             raise ValidationError("Verification code has expired. Please request a new one.")
         
@@ -80,12 +80,12 @@ async def verify_email(
         user.email_verification_token = None
         user.email_verification_expires = None
         user.is_active = True
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         
         # Generate short-lived verification token for PIN setup (5 minutes)
         verification_token = secrets.token_urlsafe(32)
         user.email_verification_token = verification_token
-        user.email_verification_expires = datetime.utcnow().timestamp() + 300  # 5 minutes
+        user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 300  # 5 minutes
         
         await db.commit()
         
@@ -126,7 +126,7 @@ async def start_pin_reset(
             return AuthResponse(success=False, message="Email not verified", data=None)
         code = f"{secrets.randbelow(1_000_000):06d}"
         user.email_verification_token = code
-        user.email_verification_expires = datetime.utcnow().timestamp() + 900  # 15m
+        user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 900  # 15m
         await db.commit()
         email_sent = email_service.send_pin_reset_email(user.email, code)
         if not email_sent:
@@ -152,14 +152,14 @@ async def confirm_pin_reset(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         if not user.email_verification_token or not user.email_verification_expires:
             raise HTTPException(status_code=400, detail="No reset code found")
-        if user.email_verification_expires < datetime.utcnow().timestamp():
+        if user.email_verification_expires < datetime.now(timezone.utc).timestamp():
             raise HTTPException(status_code=400, detail="Reset code expired")
         if user.email_verification_token != request.code:
             raise HTTPException(status_code=400, detail="Invalid code")
         # Issue short-lived token using password_reset_token fields
         reset_token = secrets.token_urlsafe(32)
         user.password_reset_token = reset_token
-        user.password_reset_expires = datetime.utcnow().timestamp() + 300  # 5m
+        user.password_reset_expires = datetime.now(timezone.utc).timestamp() + 300  # 5m
         await db.commit()
         return AuthResponse(success=True, message="Code verified", data={"token": reset_token, "expires_in": 300})
     except HTTPException:
@@ -184,7 +184,7 @@ async def complete_pin_reset(
             raise HTTPException(status_code=400, detail="Invalid or expired token")
         if user.password_reset_token != request.token:
             raise HTTPException(status_code=400, detail="Invalid or expired token")
-        if user.password_reset_expires < datetime.utcnow().timestamp():
+        if user.password_reset_expires < datetime.now(timezone.utc).timestamp():
             raise HTTPException(status_code=400, detail="Invalid or expired token")
         # Set new PIN
         user.transfer_pin = hash_password(request.new_pin)
@@ -195,7 +195,7 @@ async def complete_pin_reset(
         user.email_verification_expires = None
         user.transfer_pin_failed_attempts = 0
         user.transfer_pin_locked_until = None
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         await db.commit()
         return AuthResponse(success=True, message="Transfer PIN reset successfully", data=None)
     except HTTPException:
@@ -230,12 +230,12 @@ async def resend_verification_code(
         
         # Generate new verification code (6-digit)
         verification_code = f"{secrets.randbelow(1000000):06d}"
-        expiry_time = datetime.utcnow().timestamp() + 900  # 15 minutes
+        expiry_time = datetime.now(timezone.utc).timestamp() + 900  # 15 minutes
         
         # Update user with new code
         user.email_verification_token = verification_code
         user.email_verification_expires = expiry_time
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         
         await db.commit()
         
@@ -302,7 +302,7 @@ async def set_transfer_pin(
                 logger.warning(f"Set transfer PIN failed - invalid verification token: {request.email}")
                 raise ValidationError("Invalid or expired verification token")
             
-            if user.email_verification_expires < datetime.utcnow().timestamp():
+            if user.email_verification_expires < datetime.now(timezone.utc).timestamp():
                 logger.warning(f"Set transfer PIN failed - expired verification token: {request.email}")
                 raise ValidationError("Verification token has expired")
         
@@ -318,7 +318,7 @@ async def set_transfer_pin(
         
         # Hash and store the PIN
         user.transfer_pin = hash_password(request.transfer_pin)
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         
         # Clear the verification token after use
         user.email_verification_token = None

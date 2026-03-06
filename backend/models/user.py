@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, Integer, DateTime, Boolean, Enum, Float
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
 from database import Base
 
@@ -25,7 +25,7 @@ class User(Base):
     city = Column(String, nullable=True)
     state = Column(String, nullable=True)
     postal_code = Column(String, nullable=True)
-    date_of_birth = Column(DateTime, nullable=True)
+    date_of_birth = Column(DateTime(timezone=True), nullable=True)
     country = Column(String, nullable=False)  # For currency assignment
     primary_currency = Column(String, nullable=False)  # USD, GBP, EUR, etc.
     
@@ -33,7 +33,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     transfer_pin = Column(String, nullable=True)  # 4-digit PIN for transfers
     transfer_pin_failed_attempts = Column(Integer, default=0, nullable=False)
-    transfer_pin_locked_until = Column(DateTime, nullable=True)
+    transfer_pin_locked_until = Column(DateTime(timezone=True), nullable=True)
     email_verification_token = Column(String, nullable=True)
     email_verification_expires = Column(Float, nullable=True)
     password_reset_token = Column(String, nullable=True)
@@ -55,16 +55,16 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     is_locked = Column(Boolean, default=False, nullable=False)
     is_restricted = Column(Boolean, default=False, nullable=False)
-    restricted_until = Column(DateTime, nullable=True)
+    restricted_until = Column(DateTime(timezone=True), nullable=True)
     
     # Two-Factor Authentication (TOTP)
     two_factor_enabled = Column(Boolean, default=False, nullable=False)
     two_factor_secret = Column(String, nullable=True)
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    last_login = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    last_login = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     accounts = relationship("Account", back_populates="user", cascade="all, delete-orphan")

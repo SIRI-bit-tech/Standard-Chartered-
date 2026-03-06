@@ -81,7 +81,7 @@ async def admin_dashboard_overview(
     accounts = accounts_result.scalars().all()
 
     # Monthly transactions: last 30 days
-    cutoff = datetime.utcnow().timestamp() - (30 * 24 * 60 * 60)
+    cutoff = datetime.now(timezone.utc).timestamp() - (30 * 24 * 60 * 60)
     tx_result = await db.execute(select(Transaction))
     transactions = tx_result.scalars().all()
     monthly_transactions = len([t for t in transactions if t.created_at.timestamp() >= cutoff])
@@ -96,7 +96,7 @@ async def admin_dashboard_overview(
     }
 
     # Simple chart data (last 6 months) - computed from existing rows.
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     months = []
     for i in range(5, -1, -1):
         m = (now.month - i - 1) % 12 + 1
@@ -282,7 +282,7 @@ async def admin_assign_ticket(
     if not t:
         raise NotFoundError(resource="SupportTicket", error_code="TICKET_NOT_FOUND")
     t.assigned_to = request.agent_id if request.agent_id else None
-    t.assigned_at = datetime.utcnow()
+    t.assigned_at = datetime.now(timezone.utc)
     db.add(t)
     log = AdminAuditLog(
         id=str(uuid.uuid4()),
@@ -313,8 +313,8 @@ async def admin_update_ticket_status(
     # Assign new status by raw string; SQLAlchemy Enum accepts string name
     t.status = request.status
     if request.status in ("resolved", "closed"):
-        t.resolved_at = datetime.utcnow() if request.status == "resolved" else getattr(t, "resolved_at", None)
-        t.closed_at = datetime.utcnow() if request.status == "closed" else getattr(t, "closed_at", None)
+        t.resolved_at = datetime.now(timezone.utc) if request.status == "resolved" else getattr(t, "resolved_at", None)
+        t.closed_at = datetime.now(timezone.utc) if request.status == "closed" else getattr(t, "closed_at", None)
     db.add(t)
     log = AdminAuditLog(
         id=str(uuid.uuid4()),
@@ -385,7 +385,7 @@ async def admin_post_ticket_reply(
         sender_id=admin.id,
         is_from_staff=True,
         message=request.message,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(msg)
     # audit
@@ -489,7 +489,7 @@ async def admin_update_card_status(
                     "system",
                     "Virtual Card Generated",
                     f"Your card \"{card.card_name}\" is now active.",
-                    {"id": notif.id, "created_at": datetime.utcnow().isoformat()}
+                    {"id": notif.id, "created_at": datetime.now(timezone.utc).isoformat()}
                 )
                 try:
                     if getattr(settings, "SMTP_SERVER", None):
@@ -855,7 +855,7 @@ async def admin_edit_transfer(
                             description="Transfer destination change (previous recipient debit)",
                             reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
                             transfer_id=transfer.id,
-                            created_at=datetime.utcnow(),
+                            created_at=datetime.now(timezone.utc),
                         )
                         db.add(rev_tx)
                 if new_to_acc:
@@ -879,7 +879,7 @@ async def admin_edit_transfer(
                         description="Transfer destination change (new recipient credit)",
                         reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
                         transfer_id=transfer.id,
-                        created_at=datetime.utcnow(),
+                        created_at=datetime.now(timezone.utc),
                     )
                     db.add(dep_tx)
             # Update transfer destination
@@ -1434,7 +1434,7 @@ async def admin_reverse_transfer(
             description="Transfer reversal credit",
             reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
             transfer_id=transfer.id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         db.add(credit_tx)
         # If recipient was internal, debit them
@@ -1459,7 +1459,7 @@ async def admin_reverse_transfer(
                     description="Transfer reversal debit",
                     reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
                     transfer_id=transfer.id,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                 )
                 db.add(debit_tx)
         transfer.status = TransferStatus.CANCELLED
@@ -2347,9 +2347,9 @@ async def admin_edit_user(
         if request.date_joined:
             # Normalize to naive UTC for storage and comparison
             new_dt = request.date_joined
-            if isinstance(new_dt, datetime) and new_dt.tzinfo is not None:
-                new_dt = new_dt.astimezone(timezone.utc).replace(tzinfo=None)
-            now_utc = datetime.utcnow()
+            if isinstance(new_dt, datetime) and new_dt.tzinfo is None:
+                new_dt = new_dt.replace(tzinfo=timezone.utc)
+            now_utc = datetime.now(timezone.utc)
             if new_dt > now_utc:
                 raise ValidationError(
                     message="date_joined cannot be in the future",
@@ -2364,9 +2364,23 @@ async def admin_edit_user(
         if request.is_restricted is not None:
             user.is_restricted = request.is_restricted
             mark_changed("is_restricted")
-        if request.restricted_until is not None:
+            # If manually disabling restriction, also clear the expiry date
+            if not request.is_restricted:
+                user.restricted_until = None
+                mark_changed("restricted_until")
+                
+        # Use pydantic's fields set to detect explicit null vs missing field
+        if "restricted_until" in request.__fields_set__:
             user.restricted_until = request.restricted_until
             mark_changed("restricted_until")
+            if request.restricted_until is not None:
+                # Setting an expiry date implies restrictions are active
+                user.is_restricted = True
+                mark_changed("is_restricted")
+            else:
+                # Explicitly clearing expiration implies restrictions are removed
+                user.is_restricted = False
+                mark_changed("is_restricted")
         
         db.add(user)
         
@@ -2871,8 +2885,8 @@ async def create_loan_product(
             available_to_standard=request.available_to_standard,
             available_to_priority=request.available_to_priority,
             available_to_premium=request.available_to_premium,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
         
         db.add(new_product)
