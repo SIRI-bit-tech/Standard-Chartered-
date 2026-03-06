@@ -134,26 +134,13 @@ async def register(
             
             for account in default_accounts:
                 db.add(account)
-            
-            await db.commit()
-            logger.info(f"User registered successfully with {len(default_accounts)} accounts: {new_user.email}")
-            
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"Failed to register user {new_user.email}: {e}")
-            from utils.errors import InternalServerError
-            raise InternalServerError(
-                operation="user registration",
-                original_error=e
-            ) from e
 
-        # Send verification magic link using Stytch
-        try:
+            # Send verification magic link using Stytch BEFORE committing
+            # This ensures if email fails, we rollback the DB record
             from utils.stytch_client import get_stytch_client
             stytch_client = get_stytch_client()
             if stytch_client:
-                # Initiate Magic Link flow
-                # This will send a Stytch-branded (or configured) magic link to the user
+                logger.info(f"Sending Stytch Magic Link to {new_user.email}")
                 stytch_client.magic_links.email.login_or_create(
                     email=new_user.email,
                     login_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email",
@@ -163,16 +150,37 @@ async def register(
             else:
                 # Fallback to local email if Stytch initialization failed
                 from utils.email import send_verification_email
+                logger.info(f"Sending local verification email to {new_user.email}")
                 await send_verification_email(
                     email=new_user.email,
                     verification_token=new_user.email_verification_token,
                     first_name=new_user.first_name
                 )
-                logger.info(f"Local verification email sent to {new_user.email}")
+
+            await db.commit()
+            logger.info(f"User registered successfully: {new_user.email}")
+            
         except Exception as e:
-            logger.error(f"Failed to send verification magic link: {e}")
-            # Don't fail registration if magic link fails
-            pass
+            await db.rollback()
+            logger.error(f"Failed to register user {new_user.email}: {e}")
+            
+            # If it's a Stytch error, parse and return it to user
+            from utils.stytch_client import parse_stytch_error
+            # If the error is from Stytch client call itself
+            try:
+                msg, code = parse_stytch_error(e)
+                if msg:
+                   raise ValidationError(message=msg, error_code=str(code))
+            except (ValidationError, Exception) as inner:
+                if isinstance(inner, ValidationError):
+                    raise inner
+            
+            from utils.errors import InternalServerError
+            raise InternalServerError(
+                operation="user registration",
+                original_error=e
+            ) from e
+
 
         # Generate tokens
         access_token = create_access_token({"sub": new_user.id, "email": new_user.email})
