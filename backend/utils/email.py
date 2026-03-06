@@ -12,10 +12,10 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 
-def _send_blocking_email(email: str, msg: MIMEMultipart, verification_url: str) -> None:
+def _send_blocking_email(msg: MIMEMultipart) -> None:
     """Blocking SMTP operations moved to separate function for thread execution"""
     # Send email
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+    with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
         server.starttls()
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.send_message(msg)
@@ -75,7 +75,70 @@ async def send_verification_email(email: str, verification_token: str, first_nam
         
         msg.attach(MIMEText(html_content, 'html'))
         
+        # Send using the blocking function in a separate thread/task
+        await asyncio.to_thread(_send_blocking_email, msg)
+        logger.info(f"Verification email sent to {email}")
         
     except Exception as e:
         logger.error(f"Failed to send verification email to {email}: {e}")
         raise e
+
+async def send_login_alert(email: str, first_name: str, device_name: str, ip_address: str, location: str) -> None:
+    """Send alert about login from new device"""
+    try:
+        escaped_first_name = html.escape(first_name or "Valued Customer")
+        safe_display_name = (first_name or "Valued Customer").replace('\r', '').replace('\n', '').strip()
+        brand_primary = "#0073CF"
+        text_primary = "#2C2C2C"
+        text_secondary = "#6B6B6B"
+        
+        html_content = f"""
+        <html>
+          <body style="margin:0;padding:0;background:#F8F9FA;font-family:Arial,sans-serif;">
+            <div style="max-width:640px;margin:20px auto;background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+              <div style="background:{brand_primary};padding:24px;text-align:center;color:#FFFFFF;">
+                <h1 style="margin:0;font-size:24px;">Security Alert</h1>
+              </div>
+              <div style="padding:32px;color:{text_primary};">
+                <p style="font-size:16px;">Hello {escaped_first_name},</p>
+                <p style="line-height:1.6;">We detected a login to your Standard Chartered account from a new device.</p>
+                
+                <div style="background:#F3F4F6;padding:20px;border-radius:8px;margin:24px 0;">
+                  <table style="width:100%;font-size:14px;border-collapse:collapse;">
+                    <tr>
+                      <td style="padding:4px 0;color:{text_secondary};width:100px;"><strong>Device:</strong></td>
+                      <td style="padding:4px 0;">{html.escape(device_name)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:4px 0;color:{text_secondary};"><strong>IP Address:</strong></td>
+                      <td style="padding:4px 0;">{html.escape(ip_address)}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding:4px 0;color:{text_secondary};"><strong>Location:</strong></td>
+                      <td style="padding:4px 0;">{html.escape(location)}</td>
+                    </tr>
+                  </table>
+                </div>
+                
+                <p style="margin-top:24px;line-height:1.6;">If this was you, you can safely ignore this email. You may be asked to verify this device again in the future.</p>
+                
+                <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E5E7EB;color:{text_secondary};font-size:14px;">
+                  <p><strong>Wasn't you?</strong></p>
+                  <p>Please change your password immediately and contact our fraud department if you see any suspicious activity.</p>
+                </div>
+              </div>
+            </div>
+          </body>
+        </html>
+        """
+        
+        msg = MIMEMultipart()
+        msg['From'] = settings.SMTP_USER
+        msg['To'] = formataddr((safe_display_name, email))
+        msg['Subject'] = "Security Alert: New Device Login Detected"
+        msg.attach(MIMEText(html_content, 'html'))
+        
+        await asyncio.to_thread(_send_blocking_email, msg)
+        logger.info(f"Login alert sent to {email}")
+    except Exception as e:
+        logger.error(f"Failed to send login alert to {email}: {e}")

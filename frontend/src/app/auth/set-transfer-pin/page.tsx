@@ -12,6 +12,7 @@ import { Loader2, Lock, ArrowLeft, CheckCircle, Shield } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
 import { useLoadingStore } from '@/lib/store'
+import posthog from 'posthog-js'
 
 export default function SetTransferPinPage() {
   const router = useRouter()
@@ -19,7 +20,7 @@ export default function SetTransferPinPage() {
   const email = searchParams.get('email') || ''
   const { setUser } = useAuthStore()
   const { show, hide } = useLoadingStore()
-  
+
   const [transferPin, setTransferPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
   const [loading, setLoading] = useState(false)
@@ -28,7 +29,7 @@ export default function SetTransferPinPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!transferPin) {
       setError('Please enter a 4-digit PIN')
       return
@@ -49,7 +50,7 @@ export default function SetTransferPinPage() {
     show()
 
     try {
-      const response = await apiClient.post<{success: boolean; message: string; data?: any}>(
+      const response = await apiClient.post<{ success: boolean; message: string; data?: any }>(
         '/api/v1/auth/set-transfer-pin',
         {
           email,
@@ -68,9 +69,22 @@ export default function SetTransferPinPage() {
         }
         if (response.data?.user) {
           localStorage.setItem('user', JSON.stringify(response.data.user))
+
+          // PostHog identify
+          const userData = response.data.user;
+          posthog.identify(userData.id, {
+            email: userData.email,
+            name: `${userData.first_name} ${userData.last_name}`,
+            username: userData.username,
+            country: userData.country,
+            tier: userData.tier
+          });
+          posthog.capture('transfer_pin_set');
+          posthog.capture('registration_complete');
+
           setUser(response.data.user) // Update auth store
         }
-        
+
         setSuccess(true)
         setTimeout(() => {
           router.push('/dashboard')
@@ -78,7 +92,7 @@ export default function SetTransferPinPage() {
       }
     } catch (error: any) {
       console.error('Transfer PIN error:', error)
-      
+
       // Handle different error response formats
       if (error.response?.data?.detail) {
         if (typeof error.response.data.detail === 'string') {
@@ -161,7 +175,7 @@ export default function SetTransferPinPage() {
                   Transfer PIN
                 </label>
                 <div className="flex justify-center">
-                  <InputOTP 
+                  <InputOTP
                     maxLength={4}
                     onComplete={(value: string) => setTransferPin(value)}
                   >
@@ -181,7 +195,7 @@ export default function SetTransferPinPage() {
                   Confirm Transfer PIN
                 </label>
                 <div className="flex justify-center">
-                  <InputOTP 
+                  <InputOTP
                     maxLength={4}
                     onComplete={(value: string) => setConfirmPin(value)}
                   >
@@ -205,8 +219,8 @@ export default function SetTransferPinPage() {
               )}
 
               {/* Submit Button */}
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-green-600 hover:bg-green-700"
                 disabled={loading || !transferPin || !confirmPin || transferPin !== confirmPin}
               >
@@ -228,7 +242,7 @@ export default function SetTransferPinPage() {
 
         {/* Back to Login */}
         <div className="text-center mt-6">
-          <Link 
+          <Link
             href="/auth/login"
             className="inline-flex items-center text-sm text-gray-600 hover:text-green-600 transition-colors"
           >

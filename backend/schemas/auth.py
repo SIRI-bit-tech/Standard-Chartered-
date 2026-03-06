@@ -36,6 +36,7 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1)
     device_id: Optional[str] = None
     device_name: Optional[str] = None
+    telemetry_id: Optional[str] = None
 
 
 class PasswordResetRequest(BaseModel):

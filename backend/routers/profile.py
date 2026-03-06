@@ -66,6 +66,8 @@ async def get_profile(
             "phone_verified": user.phone_verified,
             "identity_verified": user.identity_verified,
             "two_factor_enabled": getattr(user, "two_factor_enabled", False),
+            "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or user.restricted_until > datetime.utcnow()),
+            "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "last_login": user.last_login.isoformat() if user.last_login else None
         },

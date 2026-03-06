@@ -150,6 +150,8 @@ class AdminEditUserRequest(BaseModel):
     postal_code: Optional[str] = None
     date_joined: Optional[datetime] = Field(None, description="Override user join date")
     is_active: Optional[bool] = None
+    is_restricted: Optional[bool] = None
+    restricted_until: Optional[datetime] = None
 
 class AdminAccountStatusRequest(BaseModel):
     account_id: str

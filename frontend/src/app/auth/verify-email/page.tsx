@@ -11,12 +11,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useLoadingStore } from '@/lib/store'
+import posthog from 'posthog-js'
 
 export default function EmailVerificationPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
-  
+
   const [verificationCode, setVerificationCode] = useState('')
   const [isCodeComplete, setIsCodeComplete] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -27,7 +28,7 @@ export default function EmailVerificationPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!isCodeComplete || !verificationCode || verificationCode.length !== 6) {
       setError('Please enter all 6 digits')
       return
@@ -47,14 +48,15 @@ export default function EmailVerificationPage() {
         email,
         verification_code: verificationCode
       }
-      
-      const response = await apiClient.post<{success: boolean; message: string; data?: any}>(
+
+      const response = await apiClient.post<{ success: boolean; message: string; data?: any }>(
         '/api/v1/auth/verify-email',
         requestData,
         { headers: { 'X-Show-Loader': '1' } }
       )
 
       if (response.success) {
+        posthog.capture('email_verified', { email });
         setSuccess(true)
         setTimeout(() => {
           router.push(`/auth/set-transfer-pin?email=${encodeURIComponent(email)}`)
@@ -62,7 +64,7 @@ export default function EmailVerificationPage() {
       }
     } catch (error: any) {
       let errorMessage = 'Verification failed. Please try again.'
-      
+
       if (error.response?.data) {
         const data = error.response.data
         if (typeof data === 'string') {
@@ -89,7 +91,7 @@ export default function EmailVerificationPage() {
     show()
 
     try {
-      const response = await apiClient.post<{success: boolean; message: string; data?: any}>(
+      const response = await apiClient.post<{ success: boolean; message: string; data?: any }>(
         '/api/v1/auth/resend-verification',
         { email },
         { headers: { 'X-Show-Loader': '1' } }
@@ -135,7 +137,7 @@ export default function EmailVerificationPage() {
             {success && (
               <Alert className="bg-green-50 border-green-200 text-green-800">
                 <AlertDescription>
-                  {verificationCode.length === 6 
+                  {verificationCode.length === 6
                     ? 'Email verified successfully! Redirecting...'
                     : 'New code sent successfully!'
                   }
@@ -153,7 +155,7 @@ export default function EmailVerificationPage() {
             {/* Verification Code Input */}
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="flex justify-center">
-                <InputOTP 
+                <InputOTP
                   maxLength={6}
                   onComplete={(value: string) => {
                     setVerificationCode(value)
@@ -172,8 +174,8 @@ export default function EmailVerificationPage() {
               </div>
 
               {/* Submit Button */}
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-green-600 hover:bg-green-700"
                 disabled={loading || !isCodeComplete}
               >
@@ -218,7 +220,7 @@ export default function EmailVerificationPage() {
 
         {/* Back to Login */}
         <div className="text-center mt-6">
-          <Link 
+          <Link
             href="/auth/login"
             className="inline-flex items-center text-sm text-gray-600 hover:text-green-600 transition-colors"
           >

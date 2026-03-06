@@ -11,6 +11,7 @@ import { apiClient } from '@/lib/api-client'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import { useLoadingStore } from '@/lib/store'
+import posthog from 'posthog-js'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -81,6 +82,7 @@ export default function RegisterPage() {
       )
 
       if (response.success) {
+        posthog.capture('registration_started', { email: formData.email, country: formData.country });
         setSuccess(true)
         // Redirect to email verification page with email parameter
         setTimeout(() => {

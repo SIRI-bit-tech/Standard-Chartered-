@@ -114,7 +114,7 @@ export const USER_TIERS = {
 }
 
 // Authentication provider
-export const AUTH_PROVIDER = (process.env.NEXT_PUBLIC_AUTH_PROVIDER || 'better-auth') as 'better-auth' | 'clerk'
+export const AUTH_PROVIDER = (process.env.NEXT_PUBLIC_AUTH_PROVIDER || 'stytch') as 'better-auth' | 'stytch'
 
 
 

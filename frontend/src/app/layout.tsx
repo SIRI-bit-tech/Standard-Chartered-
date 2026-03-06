@@ -4,6 +4,8 @@ import '../styles/globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from 'sonner'
 import { PWAInstaller } from '@/components/support/PWAInstaller'
+import { StytchClientProvider } from '@/providers/stytch-provider'
+import { CSPostHogProvider } from '@/providers/posthog-provider'
 
 export const metadata: Metadata = {
   title: 'Standard Chartered Bank - Personal, Business & Corporate Banking',
@@ -58,6 +60,9 @@ export default function RootLayout({
         <meta name="msapplication-config" content="/none" />
         <meta name="msapplication-TileColor" content="#0073CF" />
         <meta name="msapplication-tap-highlight" content="no" />
+
+        {/* Stytch Device Fingerprinting Script */}
+        <script src="https://js.stytch.com/stytch.js" defer></script>
       </head>
       <body className="bg-background text-foreground antialiased" style={{ colorScheme: 'light' }}>
         <script
@@ -77,17 +82,21 @@ export default function RootLayout({
             `,
           }}
         />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          forcedTheme="light"
-          disableTransitionOnChange
-        >
-          <PWAInstaller />
-          {children}
-          <Toaster position="top-center" richColors />
-        </ThemeProvider>
+        <StytchClientProvider>
+          <CSPostHogProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              enableSystem={false}
+              forcedTheme="light"
+              disableTransitionOnChange
+            >
+              <PWAInstaller />
+              {children}
+              <Toaster position="top-center" richColors />
+            </ThemeProvider>
+          </CSPostHogProvider>
+        </StytchClientProvider>
       </body>
     </html>
   )

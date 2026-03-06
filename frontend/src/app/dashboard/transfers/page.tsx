@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import posthog from 'posthog-js'
 import {
   Select,
   SelectContent,
@@ -393,6 +394,12 @@ export default function TransfersPage() {
           })
           setReceiptOpen(true)
           setInternalForm({ from_account_id: '', to_account_id: '', amount: 0, reference_memo: '' })
+          posthog.capture('transfer_initiated', {
+            type: 'internal',
+            amount: receiptAmt,
+            currency,
+            reference: receiptRef
+          });
         }
       } else if (transferType === 'domestic') {
         const payload = {
@@ -429,6 +436,12 @@ export default function TransfersPage() {
             memo: '',
           })
           setSelectedRecipient(null)
+          posthog.capture('transfer_initiated', {
+            type: 'domestic',
+            amount: receiptAmt,
+            currency,
+            reference: receiptRef
+          });
         }
       } else if (transferType === 'international') {
         const payload = {
@@ -470,6 +483,12 @@ export default function TransfersPage() {
             amount: 0,
             purpose: '',
           })
+          posthog.capture('transfer_initiated', {
+            type: 'international',
+            amount: receiptAmt,
+            currency,
+            reference: receiptRef
+          });
         }
       } else {
         const payload = {
@@ -506,6 +525,11 @@ export default function TransfersPage() {
             amount: 0,
             description: '',
           })
+          posthog.capture('transfer_initiated', {
+            type: 'ach',
+            amount: receiptAmt,
+            currency,
+          });
         }
       }
     } catch (err) {
@@ -520,6 +544,12 @@ export default function TransfersPage() {
         error: typeof detail === 'string' ? detail : 'Transfer failed',
       })
       setReceiptOpen(true)
+      posthog.capture('transfer_failed', {
+        type: transferType,
+        amount,
+        currency,
+        error: typeof detail === 'string' ? detail : 'Transfer failed'
+      });
       throw err
     } finally {
       setSubmitting(false)

@@ -19,6 +19,9 @@ class VirtualCardStatus(str, Enum):
     BLOCKED = "blocked"
     EXPIRED = "expired"
     CANCELLED = "cancelled"
+    SUSPENDED = "suspended"
+    PENDING = "pending"
+    DECLINED = "declined"
 
 
 class CreateVirtualCardRequest(BaseModel):
@@ -68,6 +71,15 @@ class VirtualCardResponse(BaseModel):
     last_used: Optional[datetime]
     updated_at: datetime
     
+    @validator('card_number', pre=True)
+    def mask_card_number(cls, v):
+        if not v:
+            return v
+        s = str(v).replace(" ", "")
+        if len(s) > 4:
+            return f"****{s[-4:]}"
+        return s
+
     class Config:
         from_attributes = True
 

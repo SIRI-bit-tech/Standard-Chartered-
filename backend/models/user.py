@@ -54,6 +54,8 @@ class User(Base):
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
     is_locked = Column(Boolean, default=False, nullable=False)
+    is_restricted = Column(Boolean, default=False, nullable=False)
+    restricted_until = Column(DateTime, nullable=True)
     
     # Two-Factor Authentication (TOTP)
     two_factor_enabled = Column(Boolean, default=False, nullable=False)

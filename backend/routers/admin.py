@@ -2361,6 +2361,12 @@ async def admin_edit_user(
             user.is_active = request.is_active
             user.is_locked = not request.is_active
             mark_changed("status")
+        if request.is_restricted is not None:
+            user.is_restricted = request.is_restricted
+            mark_changed("is_restricted")
+        if request.restricted_until is not None:
+            user.restricted_until = request.restricted_until
+            mark_changed("restricted_until")
         
         db.add(user)
         
@@ -2381,6 +2387,8 @@ async def admin_edit_user(
                 "city": request.city,
                 "state": request.state,
                 "postal_code": request.postal_code,
+                "is_restricted": request.is_restricted,
+                "restricted_until": request.restricted_until.isoformat() if request.restricted_until else None,
                 "date_joined": request.date_joined.isoformat() if request.date_joined else None
             })
         )
@@ -2471,6 +2479,8 @@ async def admin_get_user_detail(
                 "profile_picture_url": getattr(user, "profile_picture_url", None),
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "is_active": user.is_active,
+                "is_restricted": getattr(user, "is_restricted", False),
+                "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
             }
         }
     except (UnauthorizedError, NotFoundError):

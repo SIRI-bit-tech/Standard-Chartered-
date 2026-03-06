@@ -1,23 +1,26 @@
-"use client"
-
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import axios from "axios"
 import { API_BASE_URL, API_ENDPOINTS } from "@/constants"
+import { useStytch, useStytchUser, useStytchSession } from "@stytch/nextjs"
+import posthog from "posthog-js"
 
 export interface User {
   id: string
   email: string
   username: string
-  firstName: string
-  lastName: string
+  first_name: string
+  last_name: string
   country: string
   tier: "standard" | "priority" | "premium"
-  primaryCurrency: string
-  isEmailVerified: boolean
-  isTwoFaEnabled: boolean
-  createdAt: string
-  lastLogin?: string
+  primary_currency: string
+  email_verified: boolean
+  phone_verified: boolean
+  identity_verified: boolean
+  is_restricted: boolean
+  restricted_until: string | null
+  created_at: string
+  last_login?: string
 }
 
 export interface AuthContextType {
@@ -39,84 +42,110 @@ export interface RegisterData {
   country: string
   phone?: string
   password: string
+  street_address?: string
+  city?: string
+  state?: string
+  postal_code?: string
 }
 
 export function useAuth() {
   const router = useRouter()
+  const stytch = useStytch()
+  const { user: stytchUser, isInitialized: userInitialized } = useStytchUser()
+  const { session: stytchSession } = useStytchSession()
+
   const [user, setUser] = useState<User | null>(null)
-  const [accessToken, setAccessToken] = useState<string | null>(null)
-  const [refreshToken, setRefreshToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Initialize auth on mount
+  // Sync Stytch user to local state and backend profile
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        // Check for stored tokens
-        const storedAccessToken = localStorage.getItem("accessToken")
-        const storedRefreshToken = localStorage.getItem("refreshToken")
+    const syncUser = async () => {
+      if (!userInitialized) return
 
-        if (storedAccessToken) {
-          setAccessToken(storedAccessToken)
-          setRefreshToken(storedRefreshToken)
+      if (stytchUser && stytchSession) {
+        try {
+          // Fetch additional profile data from our backend using Stytch session
+          const tokens = stytch.session.getTokens()
+          const sessionToken = tokens?.session_token
 
-          // Verify token is still valid
-          try {
+          if (sessionToken) {
             const response = await axios.get(`${API_BASE_URL}${API_ENDPOINTS.PROFILE}`, {
               headers: {
-                Authorization: `Bearer ${storedAccessToken}`,
+                Authorization: `Bearer ${sessionToken}`,
               },
             })
             setUser(response.data.data)
-          } catch (error) {
-            // Token might be expired, try to refresh
-            if (storedRefreshToken) {
-              await refreshAccessToken()
-            } else {
-              // Clear invalid tokens
-              localStorage.removeItem("accessToken")
-              localStorage.removeItem("refreshToken")
+            localStorage.setItem('access_token', sessionToken)
+
+            // Identify user in PostHog
+            const userData = response.data.data;
+            if (userData?.id) {
+              posthog.identify(userData.id, {
+                email: userData.email,
+                name: `${userData.first_name} ${userData.last_name}`,
+                username: userData.username,
+                country: userData.country,
+                tier: userData.tier
+              });
             }
           }
+        } catch (error) {
+          console.error("Failed to sync Stytch user with backend profile:", error)
         }
-      } finally {
-        setLoading(false)
+      } else {
+        setUser(null)
       }
+      setLoading(false)
     }
 
-    initializeAuth()
-  }, [])
+    syncUser()
+  }, [stytchUser, stytchSession, userInitialized])
 
   const login = useCallback(
     async (email: string, password: string) => {
       setLoading(true)
       try {
+        // We use our backend login which handles Stytch + Local DB Sync
         const response = await axios.post(`${API_BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, {
-          email,
+          username: email,
           password,
         })
 
         const { token, data } = response.data
 
-        // Store tokens
+        // If Stytch returned a session token, set it in cookie so SDK picks it up
+        if (token.access_token && token.access_token.startsWith('session-')) {
+          document.cookie = `stytch_session=${token.access_token}; path=/; max-age=3600; secure; samesite=strict`
+          // Force SDK to re-sync
+          if (stytch.session) {
+            try { await (stytch.session as any).authenticate() } catch (e) { }
+          }
+        }
+
         localStorage.setItem("accessToken", token.access_token)
         localStorage.setItem("refreshToken", token.refresh_token)
-
-        setAccessToken(token.access_token)
-        setRefreshToken(token.refresh_token)
         setUser(data)
 
-        // Redirect to dashboard
+        // Identify user in PostHog
+        if (data?.id) {
+          posthog.identify(data.id, {
+            email: data.email,
+            name: `${data.first_name} ${data.last_name}`,
+            username: data.username,
+            country: data.country,
+            tier: data.tier
+          });
+        }
+
         router.push("/dashboard")
       } catch (error: any) {
-        const message =
-          error.response?.data?.detail || "Login failed. Please try again."
+        const message = error.response?.data?.detail || "Login failed. Please try again."
         throw new Error(message)
       } finally {
         setLoading(false)
       }
     },
-    [router]
+    [router, stytch]
   )
 
   const register = useCallback(
@@ -131,92 +160,65 @@ export function useAuth() {
           country: data.country,
           phone: data.phone,
           password: data.password,
+          street_address: data.street_address,
+          city: data.city,
+          state: data.state,
+          postal_code: data.postal_code,
         })
 
         const { token } = response.data
 
-        // Store tokens
+        if (token.access_token && token.access_token.startsWith('session-')) {
+          document.cookie = `stytch_session=${token.access_token}; path=/; max-age=3600; secure; samesite=strict`
+          if (stytch.session) {
+            try { await (stytch.session as any).authenticate() } catch (e) { }
+          }
+        }
+
         localStorage.setItem("accessToken", token.access_token)
-        localStorage.setItem("refreshToken", token.refresh_token)
-        localStorage.setItem("pendingEmailVerification", data.email)
-
-        setAccessToken(token.access_token)
-        setRefreshToken(token.refresh_token)
-
-        // Redirect to email verification
         router.push("/auth/verify-email")
       } catch (error: any) {
-        const message =
-          error.response?.data?.detail || "Registration failed. Please try again."
+        const message = error.response?.data?.detail || "Registration failed. Please try again."
         throw new Error(message)
       } finally {
         setLoading(false)
       }
     },
-    [router]
+    [router, stytch]
   )
 
   const logout = useCallback(async () => {
     try {
-      // Call logout endpoint if needed
-      if (accessToken) {
-        try {
-          await axios.post(`${API_BASE_URL}${API_ENDPOINTS.AUTH_LOGOUT}`, {}, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          })
-        } catch (error) {
-          // Continue logout even if API call fails
-          console.error("Logout API error:", error)
-        }
-      }
-
-      // Clear local state and storage
+      await stytch.session.revoke()
+      document.cookie = "stytch_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
       localStorage.removeItem("accessToken")
       localStorage.removeItem("refreshToken")
       setUser(null)
-      setAccessToken(null)
-      setRefreshToken(null)
 
-      // Redirect to home
+      // Reset PostHog identity
+      posthog.reset();
+
       router.push("/")
     } catch (error) {
       console.error("Logout error:", error)
     }
-  }, [accessToken, router])
+  }, [stytch, router])
 
   const refreshAccessToken = useCallback(async () => {
-    if (!refreshToken) {
-      await logout()
-      return
-    }
-
+    // Stytch manages session refreshing automatically via the SDK
+    // But we can manually trigger it if needed
     try {
-      const response = await axios.post(`${API_BASE_URL}${API_ENDPOINTS.AUTH_REFRESH}`, {
-        refresh_token: refreshToken,
-      })
-
-      const { access_token, refresh_token: newRefreshToken } = response.data
-
-      localStorage.setItem("accessToken", access_token)
-      if (newRefreshToken) {
-        localStorage.setItem("refreshToken", newRefreshToken)
-        setRefreshToken(newRefreshToken)
-      }
-
-      setAccessToken(access_token)
-    } catch (error) {
-      console.error("Token refresh failed:", error)
-      await logout()
+      await stytch.session.authenticate()
+    } catch (e) {
+      console.error("Token refresh failed:", e)
     }
-  }, [refreshToken, logout])
+  }, [stytch])
 
   return {
     user,
     loading,
-    accessToken,
-    refreshToken,
+    accessToken: typeof window !== 'undefined' ? stytch.session?.getTokens()?.session_token || null : null,
+    refreshToken: null, // Stytch uses rolling sessions
     login,
     register,
     logout,

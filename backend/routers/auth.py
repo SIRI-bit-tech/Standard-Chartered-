@@ -23,6 +23,7 @@ from config import settings
 from services.account import AccountService
 from utils.email import send_verification_email
 from utils.ip import get_client_ip, geolocate_ip
+from utils.errors import ConflictError, InternalServerError, ValidationError, NotFoundError
 import uuid
 from utils.totp import verify_totp
 
@@ -52,9 +53,32 @@ async def register(
         
         primary_currency = AccountService.CURRENCY_MAP.get(request.country, "USD")
 
+        # Create Stytch user if provider is stytch
+        stytch_user_id = None
+        if settings.AUTH_PROVIDER == "stytch":
+            from utils.stytch_client import get_stytch_client
+            stytch_client = get_stytch_client()
+            if stytch_client:
+                try:
+                    # Stytch creates the user and the password in one go
+                    stytch_resp = stytch_client.passwords.create(
+                        email=request.email,
+                        password=request.password,
+                        session_duration_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+                    )
+                    if stytch_resp.status_code in [200, 201]:
+                        stytch_user_id = stytch_resp.user_id
+                        logger.info(f"Stytch user created: {stytch_user_id}")
+                except Exception as e:
+                    logger.error(f"Failed to create Stytch user: {e}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Authentication provider failure. Please try again later."
+                    )
+
         # Create new user
         new_user = User(
-            id=str(uuid.uuid4()),
+            id=stytch_user_id or str(uuid.uuid4()),
             email=request.email,
             username=request.username,
             first_name=request.first_name,
@@ -169,17 +193,64 @@ async def login(
     http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """Login user with username and password, with optional 2FA requirement"""
-    result = await db.execute(
-        select(User).where((User.email == request.username) | (User.username == request.username))
-    )
-    user = result.scalar()
+    # Authentication & Fraud Protection via Stytch if configured
+    stytch_session_token = None
+    force_2fa = False
     
-    if not user or not verify_password(request.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+    if settings.AUTH_PROVIDER == "stytch":
+        from utils.stytch_client import get_stytch_client
+        stytch_client = get_stytch_client()
+        if stytch_client:
+            # 1. Fraud Check
+            if request.telemetry_id:
+                try:
+                    fraud_resp = stytch_client.fraud.fingerprint.lookup(telemetry_id=request.telemetry_id)
+                    action = fraud_resp.verdict.action
+                    logger.info(f"Stytch fraud verdict for {request.username}: {action}")
+                    
+                    if action == "BLOCK":
+                        logger.warning(f"Blocking login attempt due to fraud verdict: {request.username}")
+                        raise HTTPException(status_code=403, detail="Access denied due to security policy")
+                    elif action == "CHALLENGE":
+                        logger.info(f"Forcing 2FA challenge for {request.username} due to fraud verdict")
+                        force_2fa = True
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    logger.warning(f"Stytch fraud lookup failed: {e}")
+
+            # 2. Authenticate
+            try:
+                resp = stytch_client.passwords.authenticate(
+                    email=request.username,
+                    password=request.password,
+                    session_duration_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+                )
+                if resp.status_code == 200:
+                    stytch_session_token = resp.session_token
+                    # Find user by stytch user_id
+                    result = await db.execute(select(User).where(User.id == resp.user_id))
+                    user = result.scalar()
+                else:
+                    raise HTTPException(status_code=401, detail="Invalid credentials")
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Stytch authentication error: {e}")
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    # Fallback to local auth if not using Stytch or Stytch user not found
+    if not user:
+        result = await db.execute(
+            select(User).where((User.email == request.username) | (User.username == request.username))
         )
+        user = result.scalar()
+        
+        if not user or not verify_password(request.password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials"
+            )
     
     if not user.is_active:
         raise HTTPException(
@@ -193,8 +264,8 @@ async def login(
     ip_address = get_client_ip(http_request)
     geo = geolocate_ip(ip_address) or {}
 
-    # If 2FA is enabled, ALWAYS require completion (ignore trusted devices)
-    if getattr(user, "two_factor_enabled", False):
+    # If 2FA is enabled or forced by fraud verdict, require completion
+    if getattr(user, "two_factor_enabled", False) or force_2fa:
         # Record pending login attempt
         try:
             lh = LoginHistory(
@@ -262,6 +333,21 @@ async def login(
     # Update last login and issue tokens
     user.last_login = datetime.utcnow()
     db.add(user)
+    
+    # Alert user about new device login
+    if is_new_device:
+        try:
+             from utils.email import send_login_alert
+             await send_login_alert(
+                 email=user.email,
+                 first_name=user.first_name,
+                 device_name=device_name or "Unknown Device",
+                 ip_address=ip_address,
+                 location=f"{geo.get('city', 'Unknown')}, {geo.get('country', 'Unknown')}"
+             )
+        except Exception as e:
+            logger.error(f"Failed to send login alert: {e}")
+
     await db.commit()
     
     access_token = create_access_token({"sub": user.id, "email": user.username})
@@ -309,13 +395,15 @@ async def login(
             "country": user.country,
             "primary_currency": user.primary_currency,
             "tier": user.tier,
-            "token": access_token,
+            "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or user.restricted_until > datetime.utcnow()),
+            "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
+            "token": stytch_session_token or access_token,
             "is_new_device": is_new_device,
             "device_id": device_id,
             "device_name": device_name,
         },
         token=TokenResponse(
-            access_token=access_token,
+            access_token=stytch_session_token or access_token,
             refresh_token=refresh_token,
             expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )

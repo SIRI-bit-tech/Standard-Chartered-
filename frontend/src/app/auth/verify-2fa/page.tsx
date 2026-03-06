@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
+import posthog from 'posthog-js'
 
 export default function Verify2FA() {
   const [code, setCode] = useState('')
@@ -59,6 +60,17 @@ export default function Verify2FA() {
         localStorage.setItem('user', JSON.stringify(userData))
         setUser(userData as any)
         setToken(res.token.access_token)
+
+        // PostHog identify
+        posthog.identify(userData.id, {
+          email: userData.email,
+          name: `${userData.first_name} ${userData.last_name}`,
+          username: userData.username,
+          country: userData.country,
+          tier: userData.tier
+        });
+        posthog.capture('2fa_verified');
+        posthog.capture('login_success', { mfa: true });
         window.location.href = '/dashboard'
         return
       }
