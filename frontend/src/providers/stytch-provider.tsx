@@ -6,7 +6,7 @@ export function StytchClientProvider({ children }: { children: React.ReactNode }
     const client = useMemo(() => createStytchClient(), [])
 
     return (
-        <StytchProvider stytch={client}>
+        <StytchProvider stytch={client as any}>
             {children}
         </StytchProvider>
     )
