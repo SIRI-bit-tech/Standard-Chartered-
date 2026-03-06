@@ -25,8 +25,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # Auth Provider
-    AUTH_PROVIDER: str = "better-auth"
-    CLERK_SECRET_KEY: Optional[str] = None
+    AUTH_PROVIDER: str = "stytch"
+    STYTCH_PROJECT_ID: Optional[str] = None
+    STYTCH_SECRET: Optional[str] = None
     
     # Ably
     ABLY_API_KEY: str

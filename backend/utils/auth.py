@@ -91,7 +91,7 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
 
 
 async def get_current_user_id(request: Request) -> str:
-    """Extract and verify JWT from Authorization header; return user id (sub)."""
+    """Extract and verify token from Authorization header. Supports Stytch and local JWT."""
     auth = request.headers.get("Authorization")
     if not auth or not auth.startswith("Bearer "):
         raise HTTPException(
@@ -99,6 +99,21 @@ async def get_current_user_id(request: Request) -> str:
             detail="Missing or invalid authorization header",
         )
     token = auth.split(" ", 1)[1]
+    
+    # Try Stytch first if configured
+    if settings.AUTH_PROVIDER == "stytch":
+        from utils.stytch_client import get_stytch_client
+        stytch_client = get_stytch_client()
+        if stytch_client:
+            try:
+                # verify_session returns None if invalid, or raises exception
+                resp = stytch_client.sessions.authenticate(session_token=token)
+                if resp.status_code == 200:
+                    return str(resp.session.user_id)
+            except Exception:
+                # Fallback to local JWT if Stytch fails or token is a local JWT
+                pass
+
     payload = verify_token(token)
     if not payload or "sub" not in payload:
         raise HTTPException(

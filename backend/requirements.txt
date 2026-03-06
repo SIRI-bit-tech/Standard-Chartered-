@@ -20,3 +20,4 @@ pytest-asyncio
 httpx
 pytesseract
 Pillow
+stytch

@@ -28,6 +28,8 @@ type UserDetail = {
   postal_code?: string | null
   created_at?: string | null
   is_active?: boolean
+  is_restricted: boolean
+  restricted_until?: string | null
 }
 
 export function AdminEditUserDialog({
@@ -96,6 +98,8 @@ export function AdminEditUserDialog({
         city: form.city ?? '',
         state: form.state ?? '',
         postal_code: form.postal_code ?? '',
+        is_restricted: form.is_restricted,
+        restricted_until: form.restricted_until ? new Date(form.restricted_until).toISOString() : null,
       }
       if (form.created_at) {
         const newDt = new Date(form.created_at)
@@ -137,70 +141,107 @@ export function AdminEditUserDialog({
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm">First Name</label>
-                <Input value={form.first_name || ''} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
-              </div>
-              <div>
-                <label className="text-sm">Last Name</label>
-                <Input value={form.last_name || ''} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
-              </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm">Email</label>
-                <Input type="email" value={form.email || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              </div>
-              <div>
-                <label className="text-sm">Username</label>
-                <Input value={form.username || ''} onChange={(e) => setForm({ ...form, username: e.target.value })} />
-              </div>
+                <div>
+                  <label className="text-sm">First Name</label>
+                  <Input value={form.first_name || ''} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm">Last Name</label>
+                  <Input value={form.last_name || ''} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm">Phone</label>
-                <Input value={form.phone || ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <div>
+                  <label className="text-sm">Email</label>
+                  <Input type="email" value={form.email || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm">Username</label>
+                  <Input value={form.username || ''} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm">Phone</label>
+                  <Input value={form.phone || ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm">Country</label>
+                  <CountrySelector value={form.country || ''} onChange={(v) => setForm({ ...form, country: v })} />
+                </div>
               </div>
               <div>
-                <label className="text-sm">Country</label>
-                <CountrySelector value={form.country || ''} onChange={(v) => setForm({ ...form, country: v })} />
-              </div>
-              </div>
-              <div>
-              <label className="text-sm">Street Address</label>
-              <Input value={form.street_address || ''} onChange={(e) => setForm({ ...form, street_address: e.target.value })} />
+                <label className="text-sm">Street Address</label>
+                <Input value={form.street_address || ''} onChange={(e) => setForm({ ...form, street_address: e.target.value })} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-sm">City</label>
-                <Input value={form.city || ''} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                <div>
+                  <label className="text-sm">City</label>
+                  <Input value={form.city || ''} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm">State/Province</label>
+                  <Input value={form.state || ''} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm">Postal Code</label>
+                  <Input value={form.postal_code || ''} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} />
+                </div>
               </div>
               <div>
-                <label className="text-sm">State/Province</label>
-                <Input value={form.state || ''} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                <label className="text-sm">Date Joined</label>
+                <Input
+                  type="date"
+                  value={form.created_at ? form.created_at.slice(0, 10) : ''}
+                  max={todayISO}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (!v) {
+                      setForm({ ...form, created_at: null })
+                    } else {
+                      const iso = new Date(v + 'T00:00:00Z').toISOString()
+                      setForm({ ...form, created_at: iso })
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Can be set to any past date (not future).</p>
               </div>
-              <div>
-                <label className="text-sm">Postal Code</label>
-                <Input value={form.postal_code || ''} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} />
-              </div>
-              </div>
-              <div>
-            <label className="text-sm">Date Joined</label>
-            <Input
-              type="date"
-              value={form.created_at ? form.created_at.slice(0, 10) : ''}
-              max={todayISO}
-              onChange={(e) => {
-                const v = e.target.value
-                if (!v) {
-                  setForm({ ...form, created_at: null })
-                } else {
-                  const iso = new Date(v + 'T00:00:00Z').toISOString()
-                  setForm({ ...form, created_at: iso })
-                }
-              }}
-            />
-            <p className="text-xs text-muted-foreground mt-1">Can be set to any past date (not future).</p>
+
+              <div className="p-3 bg-red-50 rounded-lg border border-red-100 space-y-3">
+                <h4 className="text-sm font-bold text-red-700 uppercase tracking-wider">Security & Restrictions</h4>
+
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-red-900">Restrict Account</label>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-red-300 text-red-600 focus:ring-red-500"
+                    checked={form.is_restricted}
+                    onChange={(e) => setForm({ ...form, is_restricted: e.target.checked })}
+                  />
+                </div>
+
+                {form.is_restricted && (
+                  <div>
+                    <label className="text-sm text-red-700 mb-1 block">Restriction Ends</label>
+                    <Input
+                      type="datetime-local"
+                      className="bg-white border-red-200"
+                      value={form.restricted_until ? new Date(form.restricted_until).toISOString().slice(0, 16) : ''}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) {
+                          setForm({ ...form, restricted_until: null });
+                        } else {
+                          const iso = new Date(v).toISOString();
+                          setForm({ ...form, restricted_until: iso });
+                        }
+                      }}
+                    />
+                    <p className="text-[10px] text-red-500 mt-1 italic">
+                      User will see restriction alerts until this date.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

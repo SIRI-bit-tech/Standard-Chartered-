@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useLoadingStore } from '@/lib/store'
 import { ShieldCheck, Monitor, Smartphone } from 'lucide-react'
+import { stytchClient } from '@/lib/stytch-client'
+import posthog from 'posthog-js'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -46,6 +48,16 @@ export default function LoginPage() {
 
     try {
       const { device_id, device_name } = getDeviceInfo()
+
+      // Get Stytch Telemetry ID for fraud protection
+      let telemetry_id = ''
+      try {
+        // Cast to any to bypass missing property error in Stytch SDK types
+        telemetry_id = await (stytchClient as any).dfp.getTelemetryId()
+      } catch (dfpErr) {
+        console.warn('Failed to get Stytch telemetry ID', dfpErr)
+      }
+
       const response = await apiClient.post<{ success: boolean; data: any; token: any }>(
         '/api/v1/auth/login',
         {
@@ -53,6 +65,7 @@ export default function LoginPage() {
           password,
           device_id,
           device_name,
+          telemetry_id,
         },
         { headers: { 'X-Show-Loader': '1' } }
       )
@@ -98,6 +111,16 @@ export default function LoginPage() {
             localStorage.setItem('user', JSON.stringify(userData))
             setUser(userData)
             setToken(tokens.access_token)
+
+            // PostHog identify
+            posthog.identify(userData.id, {
+              email: userData.email,
+              name: `${userData.first_name} ${userData.last_name}`,
+              username: userData.username,
+              country: userData.country,
+              tier: userData.tier
+            });
+            posthog.capture('login_success');
           }
 
           setLoading(false)
@@ -206,6 +229,16 @@ export default function LoginPage() {
                         localStorage.setItem('user', JSON.stringify(userData))
                         setUser(userData)
                         setToken(tokens.access_token)
+
+                        // PostHog identify
+                        posthog.identify(userData.id, {
+                          email: userData.email,
+                          name: `${userData.first_name} ${userData.last_name}`,
+                          username: userData.username,
+                          country: userData.country,
+                          tier: userData.tier
+                        });
+                        posthog.capture('login_success', { device_trusted: true });
                       }
                       window.location.href = '/dashboard';
                     }
@@ -245,6 +278,16 @@ export default function LoginPage() {
                       localStorage.setItem('user', JSON.stringify(userData))
                       setUser(userData)
                       setToken(tokens.access_token)
+
+                      // PostHog identify
+                      posthog.identify(userData.id, {
+                        email: userData.email,
+                        name: `${userData.first_name} ${userData.last_name}`,
+                        username: userData.username,
+                        country: userData.country,
+                        tier: userData.tier
+                      });
+                      posthog.capture('login_success', { device_trusted: false });
                     }
                     window.location.href = '/dashboard'
                   }}
