@@ -1082,7 +1082,7 @@ async def admin_register(
             department=request.department,
             role=AdminRole.MODERATOR,  # Default role
             is_active=True,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         
         db.add(new_admin)
@@ -1094,7 +1094,7 @@ async def admin_register(
         return {
             "success": True,
             "message": "Admin registration successful",
-            "data": AdminResponse.from_orm(new_admin)
+            "data": AdminResponse.model_validate(new_admin)
         }
     except ValidationError as e:
         logger.error(f"ValidationError in admin registration: {e.message}")
@@ -2719,7 +2719,7 @@ async def get_audit_logs(
         stmt = stmt.offset(offset).limit(limit)
         result = await db.execute(stmt)
         logs = result.scalars().all()
-        return [AdminAuditLogResponse.from_orm(log) for log in logs]
+        return [AdminAuditLogResponse.model_validate(log) for log in logs]
     except UnauthorizedError:
         raise
     except Exception as e:
