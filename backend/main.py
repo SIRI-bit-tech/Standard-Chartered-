@@ -35,13 +35,32 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for app startup and shutdown"""
     # Startup: Create database tables
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        
-        # Add missing columns to users table if they don't exist
+        # 1. Run migrations FIRST to ensure columns are wide enough for Stytch IDs
         try:
             from sqlalchemy import text
-            print("Running database migrations...")
+            print("\n" + "="*50)
+            print("RUNNING CRITICAL DATABASE MIGRATIONS...")
+            print("="*50)
             
+            # Audit log and Admin table migrations (increasing ID lengths to 255 for Stytch)
+            # We do this FIRST so that any logging during startup doesn't crash
+            await conn.execute(text("ALTER TABLE admin_users ALTER COLUMN id TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_users ALTER COLUMN created_by TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_audit_logs ALTER COLUMN id TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_audit_logs ALTER COLUMN admin_id TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_audit_logs ALTER COLUMN resource_id TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_permissions ALTER COLUMN id TYPE VARCHAR(255)"))
+            
+            print("SUCCESS: ID column lengths increased to 255.")
+        except Exception as e:
+            print(f"MIGRATION NOTICE (Non-critical if already run): {e}")
+
+        # 2. Create tables
+        await conn.run_sync(Base.metadata.create_all)
+        
+        # 3. Add missing columns
+        try:
+            print("Checking for missing functional columns...")
             # Authentication columns
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR"
@@ -147,6 +166,17 @@ async def lifespan(app: FastAPI):
             await conn.execute(text(
                 "ALTER TABLE loan_products ADD COLUMN IF NOT EXISTS employment_required BOOLEAN DEFAULT TRUE"
             ))
+            
+            # Audit log and Admin table migrations (increasing ID lengths)
+            print("Increasing ID column lengths...")
+            await conn.execute(text("ALTER TABLE admin_users ALTER COLUMN id TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_users ALTER COLUMN created_by TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_audit_logs ALTER COLUMN id TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_audit_logs ALTER COLUMN admin_id TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_audit_logs ALTER COLUMN resource_id TYPE VARCHAR(255)"))
+            await conn.execute(text("ALTER TABLE admin_permissions ALTER COLUMN id TYPE VARCHAR(255)"))
+            
+            print("Database migrations completed.")
             await conn.execute(text(
                 "ALTER TABLE loan_products ADD COLUMN IF NOT EXISTS available_to_standard BOOLEAN DEFAULT TRUE"
             ))

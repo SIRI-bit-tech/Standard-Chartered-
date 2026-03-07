@@ -298,24 +298,30 @@ async def login(
                     logger.warning(f"Stytch fraud lookup failed: {e}")
 
             # 2. Authenticate
-            try:
-                resp = stytch_client.passwords.authenticate(
-                    email=request.username,
-                    password=request.password,
-                    session_duration_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-                )
-                if resp.status_code == 200:
-                    stytch_session_token = resp.session_token
-                    # Find user by stytch user_id
-                    result = await db.execute(select(User).where(User.id == resp.user_id))
-                    user = result.scalar()
-                else:
-                    # Non-200 from Stytch: log and fall through to local auth
-                    logger.warning(f"Stytch authenticate returned {resp.status_code} for {request.username}, trying local auth")
+            # Note: We only try Stytch if the identifier looks like an email
+            if "@" in request.username:
+                try:
+                    resp = stytch_client.passwords.authenticate(
+                        email=request.username,
+                        password=request.password,
+                        session_duration_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+                    )
+                    if resp.status_code == 200:
+                        stytch_session_token = resp.session_token
+                        # Find user by stytch user_id
+                        result = await db.execute(select(User).where(User.id == resp.user_id))
+                        user = result.scalar()
+                    else:
+                        # Non-200 from Stytch: log and fall through to local auth
+                        logger.warning(f"Stytch authenticate returned {resp.status_code} for {request.username}, trying local auth")
+                        user = None
+                except Exception as e:
+                    # Stytch unavailable or error: log and fall through to local auth
+                    # We use warning here because we fall back to local DB auth anyway
+                    logger.warning(f"Stytch authentication skipped/failed for {request.username}: {e}")
                     user = None
-            except Exception as e:
-                # Stytch unavailable or error: log and fall through to local auth
-                logger.error(f"Stytch authentication error: {e}")
+            else:
+                logger.info(f"Skipping Stytch auth for non-email username: {request.username}")
                 user = None
     
     # Fallback to local auth if not using Stytch or Stytch user not found
