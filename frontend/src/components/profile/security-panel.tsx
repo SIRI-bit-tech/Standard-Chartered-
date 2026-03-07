@@ -165,10 +165,12 @@ export function SecurityPanel() {
         toast({
           title: "Biometrics Enabled",
           description: "You can now log in using your fingerprint or face scan.",
+          variant: "success"
         })
         setBiometricsEnabled(true)
         if (user) setUser({ ...user, biometric_enabled: true })
-        loadStatus()
+        // Small delay before loading status to ensure UI confirms the local state first
+        setTimeout(() => loadStatus(), 500)
       }
     } catch (e: any) {
       console.error('Biometric registration error:', e)

@@ -30,7 +30,8 @@ class UserResponse(BaseModel):
     status: UserStatusEnum = UserStatusEnum.ACTIVE
     primary_currency: str
     is_email_verified: bool = False
-    is_two_fa_enabled: bool = False
+    two_factor_enabled: bool = False
+    biometric_enabled: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_login: Optional[datetime] = None

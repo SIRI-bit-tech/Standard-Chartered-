@@ -88,7 +88,7 @@ class AuthResponse(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     """Refresh token request"""
-    refresh_token: str
+    refresh_token: Optional[str] = None
 
 
 class ChangePasswordRequest(BaseModel):

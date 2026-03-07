@@ -519,12 +519,19 @@ async def login(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_access_token(
+    http_request: Request,
     request: RefreshTokenRequest,
     response: Response,
     db: AsyncSession = Depends(get_db)
 ):
     """Refresh access token using refresh token"""
-    payload = verify_token(request.refresh_token)
+    refresh_token = request.refresh_token or http_request.cookies.get("refresh_token")
+    
+    if not refresh_token:
+        from utils.errors import AuthenticationError
+        raise AuthenticationError(message="Refresh token missing")
+
+    payload = verify_token(refresh_token)
     
     if not payload or payload.get("type") != "refresh":
         from utils.errors import AuthenticationError
@@ -553,7 +560,7 @@ async def refresh_access_token(
     
     return TokenResponse(
         access_token=access_token,
-        refresh_token=request.refresh_token,
+        refresh_token=refresh_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
 
