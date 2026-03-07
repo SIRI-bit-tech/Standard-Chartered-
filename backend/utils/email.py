@@ -27,8 +27,8 @@ def mask_email(email: str) -> str:
 
 def _send_blocking_email(msg: MIMEMultipart) -> None:
     """Blocking SMTP operations with forced IPv4 and SSL support for reliability."""
-    # Increase timeout to 20s to allow for slower handshakes on cloud providers
-    timeout = getattr(settings, "SMTP_TIMEOUT_SECONDS", 20)
+    # Force a 30s timeout to allow for slower handshakes on cloud providers like Render
+    timeout = 30
     server = None
     try:
         # Resolve hostname to IPv4 only to avoid [Errno 101] (Network unreachable) on IPv6-less systems
