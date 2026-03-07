@@ -54,6 +54,8 @@ def _user_status(user: User) -> str:
         return "inactive"
     if getattr(user, "is_locked", False):
         return "suspended"
+    if getattr(user, "is_restricted", False):
+        return "restricted"
     return "active"
 
 
@@ -700,6 +702,8 @@ async def admin_list_users(
                 "email": u.email,
                 "status": _user_status(u),
                 "verification": _verification_status(u),
+                "is_restricted": getattr(u, "is_restricted", False),
+                "restricted_until": u.restricted_until.isoformat() if getattr(u, "restricted_until", None) else None,
             }
         )
 

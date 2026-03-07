@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { MoreHorizontal, ShieldCheck, AlertTriangle, Ban } from 'lucide-react'
 import { colors } from '@/types'
 import type { AdminUserRow } from '@/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -25,6 +25,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal'
 function statusBadge(status: AdminUserRow['status']) {
   if (status === 'active') return { bg: `${colors.success}20`, fg: colors.success, label: 'Active' }
   if (status === 'suspended') return { bg: `${colors.error}20`, fg: colors.error, label: 'Suspended' }
+  if (status === 'restricted') return { bg: `${colors.warning}20`, fg: colors.warning, label: 'Restricted' }
   return { bg: `${colors.gray300}55`, fg: colors.textSecondary, label: 'Inactive' }
 }
 
@@ -147,6 +148,39 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
                         }}
                       >
                         {u.status === 'active' ? 'Suspend User' : 'Activate User'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setConfirmConfig({
+                            isOpen: true,
+                            title: u.is_restricted ? 'Remove Restriction?' : 'Restrict Account?',
+                            description: u.is_restricted
+                              ? 'This will remove all restrictions from this user\'s account. They will regain full access.'
+                              : 'This will restrict this user\'s account. They can still log in but will see a restriction notice and will be unable to perform transfers or other sensitive actions.',
+                            confirmText: u.is_restricted ? 'Yes, Remove Restriction' : 'Yes, Restrict Account',
+                            variant: u.is_restricted ? 'default' : 'destructive',
+                            action: async () => {
+                              try {
+                                const adminId = localStorage.getItem('admin_id')
+                                if (!adminId) {
+                                  window.location.href = '/admin/auth/login'
+                                  return
+                                }
+                                const qs = new URLSearchParams({ admin_id: adminId })
+                                await apiClient.put(`/admin/users/edit?${qs.toString()}`, {
+                                  user_id: u.id,
+                                  is_restricted: !u.is_restricted,
+                                })
+                                window.location.reload()
+                              } catch (err: any) {
+                                logger.error('Failed to toggle user restriction', { error: err })
+                              }
+                            }
+                          })
+                        }}
+                      >
+                        <Ban className="mr-2 h-4 w-4" />
+                        {u.is_restricted ? 'Remove Restriction' : 'Restrict Account'}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {

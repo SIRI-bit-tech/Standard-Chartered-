@@ -249,7 +249,7 @@ export interface AdminDashboardOverviewResponse {
   system_alerts: AdminSystemAlert[]
 }
 
-export type AdminUserStatus = 'active' | 'suspended' | 'inactive'
+export type AdminUserStatus = 'active' | 'suspended' | 'inactive' | 'restricted'
 export type AdminVerificationStatus = 'verified' | 'pending' | 'needs_review'
 
 export interface AdminUserRow {
@@ -261,6 +261,8 @@ export interface AdminUserRow {
   email: string
   status: AdminUserStatus
   verification: AdminVerificationStatus
+  is_restricted?: boolean
+  restricted_until?: string | null
 }
 
 // Security types

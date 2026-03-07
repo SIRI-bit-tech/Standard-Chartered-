@@ -354,8 +354,8 @@ async def start_biometric_registration(
             domain=domain,
         )
         
-        # The SDK returns a response object with public_key_credential_creation_options
-        options_json = json.dumps(resp.public_key_credential_creation_options)
+        # The SDK returns a response object where public_key_credential_creation_options is already a JSON string
+        options_json = resp.public_key_credential_creation_options
         
         return WebAuthnRegisterStartResponse(
             success=True,
