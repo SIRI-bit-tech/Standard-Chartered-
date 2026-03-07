@@ -182,6 +182,31 @@ export function SecurityPanel() {
     }
   }
 
+  const handleDisableBiometrics = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await apiClient.post<{ success: boolean }>('/api/v1/security/biometrics/disable', {})
+      if (res?.success) {
+        setBiometricsEnabled(false)
+        toast({
+          title: "Success",
+          description: "Biometric authentication has been disabled.",
+        })
+        loadStatus()
+      }
+    } catch (e: any) {
+      const { message } = parseApiError(e)
+      toast({
+        title: "Error",
+        description: message,
+        variant: "destructive"
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-8">
       {/* Biometrics Section */}
@@ -205,9 +230,18 @@ export function SecurityPanel() {
                   Enable Biometrics
                 </button>
               ) : (
-                <div className="flex items-center gap-2 p-2 px-4 bg-green-50 text-green-700 rounded-xl border border-green-100 font-bold text-sm">
-                  <ShieldCheck className="w-4 h-4" />
-                  Enabled on this account
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <div className="flex items-center gap-2 p-2 px-4 bg-green-50 text-green-700 rounded-xl border border-green-100 font-bold text-sm">
+                    <ShieldCheck className="w-4 h-4" />
+                    Enabled on this account
+                  </div>
+                  <button
+                    onClick={handleDisableBiometrics}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-white text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-all font-semibold disabled:opacity-50"
+                    disabled={busy}
+                  >
+                    Disable Biometrics
+                  </button>
                 </div>
               )}
             </div>

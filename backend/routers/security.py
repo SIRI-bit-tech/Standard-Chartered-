@@ -413,3 +413,38 @@ async def finish_biometric_registration(
         logger.error(f"Failed to complete biometric registration: {e}")
         from utils.errors import InternalServerError
         raise InternalServerError(operation="biometric registration", original_error=e)
+@router.post("/biometrics/disable")
+async def disable_biometrics(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Disable biometric authentication for the user"""
+    try:
+        # Update user in DB
+        res = await db.execute(select(User).where(User.id == current_user_id))
+        user = res.scalar_one_or_none()
+        if not user:
+            from utils.errors import NotFoundError
+            raise NotFoundError(message="User not found")
+            
+        user.biometric_enabled = False
+        db.add(user)
+        
+        # Audit log
+        log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=user.id,
+            admin_email=user.email,
+            action="biometric_disabled",
+            resource_type="security",
+            resource_id=user.id,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(log)
+        
+        await db.commit()
+        return {"success": True, "message": "Biometrics disabled successfully"}
+    except Exception as e:
+        logger.error(f"Failed to disable biometrics: {e}")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="disable biometrics", original_error=e)

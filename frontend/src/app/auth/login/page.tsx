@@ -163,12 +163,26 @@ export default function LoginPage() {
     show()
 
     try {
+      // 1. Get authentication options from backend
+      const { public_key_credential_request_options } = await apiClient.post<{
+        success: boolean;
+        public_key_credential_request_options: string
+      }>('/api/v1/auth/biometrics/authenticate/start', {})
+
+      const options = JSON.parse(public_key_credential_request_options)
+
+      // Convert B64 challenges/IDs back to bytes for the browser
+      options.challenge = Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0))
+      if (options.allowCredentials) {
+        options.allowCredentials = options.allowCredentials.map((c: any) => ({
+          ...c,
+          id: Uint8Array.from(atob(c.id), ch => ch.charCodeAt(0))
+        }))
+      }
+
+      // 2. Browser prompt for face/fingerprint
       const credential = await navigator.credentials.get({
-        publicKey: {
-          challenge: new Uint8Array(32),
-          timeout: 60000,
-          userVerification: "required"
-        },
+        publicKey: options,
         mediation: 'optional'
       }) as any
 
@@ -176,6 +190,7 @@ export default function LoginPage() {
         throw new Error('Biometric authentication cancelled')
       }
 
+      // 3. Complete authentication
       const response = await apiClient.post<{ success: boolean; data: any; token: any }>(
         '/api/v1/auth/biometrics/authenticate',
         {

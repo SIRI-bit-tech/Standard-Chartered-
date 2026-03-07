@@ -10,9 +10,12 @@ from database import get_db
 from schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse, AuthResponse,
     RefreshTokenRequest, ChangePasswordRequest, PasswordResetRequest,
-    PasswordResetConfirm
+    PasswordResetConfirm, TwoFactorSetupRequest, TwoFactorVerifyRequest
 )
-from schemas.security import WebAuthnAuthenticateRequest
+from schemas.security import (
+    WebAuthnRegisterStartResponse, WebAuthnRegisterRequest,
+    WebAuthnAuthenticateStartResponse, WebAuthnAuthenticateRequest
+)
 from schemas.user import UserResponse
 from utils.auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
@@ -794,6 +797,34 @@ async def reset_password(
         success=True,
         message="Password has been reset successfully"
     )
+
+@router.post("/biometrics/authenticate/start", response_model=WebAuthnAuthenticateStartResponse)
+async def start_biometric_authentication():
+    """Start WebAuthn/Biometric authentication (Get options from Stytch)"""
+    from utils.stytch_client import get_stytch_client
+    stytch_client = get_stytch_client()
+    if not stytch_client:
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="biometric authentication", message="Stytch client not configured")
+
+    try:
+        # Extract domain from FRONTEND_URL
+        domain = settings.FRONTEND_URL.split("//")[-1].split(":")[0]
+        
+        # Stytch Python SDK uses webauthn.authenticate_start() — flat method
+        resp = stytch_client.webauthn.authenticate_start(
+            domain=domain
+        )
+        
+        return WebAuthnAuthenticateStartResponse(
+            success=True,
+            user_id=resp.user_id or "anonymous", # User ID may be unknown for Discoverable Credentials
+            public_key_credential_request_options=resp.public_key_credential_request_options
+        )
+    except Exception as e:
+        logger.error(f"Failed to start biometric authentication: {e}")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="biometric authentication", original_error=e)
 
 @router.post("/biometrics/authenticate", response_model=AuthResponse)
 async def biometric_authentication(
