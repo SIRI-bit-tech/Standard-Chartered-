@@ -26,19 +26,36 @@ def mask_email(email: str) -> str:
 
 
 def _send_blocking_email(msg: MIMEMultipart) -> None:
-    """Blocking SMTP operations moved to separate function for thread execution."""
+    """Blocking SMTP operations with forced IPv4 for better reliability."""
     timeout = getattr(settings, "SMTP_TIMEOUT_SECONDS", 10)
+    server = None
     try:
-        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout) as server:
-            server.starttls()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-    except (socket.timeout, TimeoutError) as e:
-        logger.error(
-            f"SMTP timeout after {timeout}s connecting to "
-            f"{settings.SMTP_SERVER}:{settings.SMTP_PORT}: {e}"
-        )
+        # Resolve hostname to IPv4 only to avoid [Errno 101] (Network unreachable) on IPv6-less systems
+        host_info = socket.getaddrinfo(settings.SMTP_SERVER, settings.SMTP_PORT, socket.AF_INET, socket.SOCK_STREAM)
+        ipv4_address = host_info[0][4][0]
+        
+        logger.info(f"Connecting to SMTP server {settings.SMTP_SERVER} ({ipv4_address}) on port {settings.SMTP_PORT}")
+        
+        server = smtplib.SMTP(ipv4_address, settings.SMTP_PORT, timeout=timeout)
+        server.set_debuglevel(0)
+        server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        server.send_message(msg)
+    except smtplib.SMTPAuthenticationError:
+        logger.error(f"SMTP Authentication failed for user {settings.SMTP_USER}. Check App Password.")
         raise
+    except (socket.timeout, TimeoutError) as e:
+        logger.error(f"SMTP timeout after {timeout}s: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to send email via {settings.SMTP_SERVER}: {e}")
+        raise
+    finally:
+        if server:
+            try:
+                server.quit()
+            except Exception:
+                pass
 
 
 async def send_verification_email(email: str, verification_token: str, first_name: str) -> None:
