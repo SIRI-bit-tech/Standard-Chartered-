@@ -9,13 +9,17 @@ from models.security import TrustedDevice
 from models.support import LoginHistory
 from datetime import datetime
 import uuid
+import logging
 from models.admin import AdminAuditLog
 from schemas.auth import ChangePasswordRequest
 from utils.auth import verify_password, hash_password
 from utils.ip import get_client_ip, geolocate_ip
 from schemas.security import WebAuthnRegisterStartResponse, WebAuthnRegisterRequest
 from utils.stytch_client import get_stytch_client
+from config import settings
 import json
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/security", tags=["Security"])
 
@@ -340,16 +344,17 @@ async def start_biometric_registration(
         raise InternalServerError(operation="biometric registration", message="Stytch client not configured")
 
     try:
-        # Start the WebAuthn registration process
-        # We set return_passkey_credential_options=True to optimize for Passkeys
-        resp = stytch_client.webauthn.register.start(
+        # Extract domain from FRONTEND_URL (e.g. localhost or myapp.vercel.app)
+        domain = settings.FRONTEND_URL.split("//")[-1].split(":")[0]
+        logger.info(f"Starting WebAuthn registration for user {current_user_id} on domain {domain}")
+        
+        # Stytch Python SDK uses webauthn.register_start() — flat method, not nested
+        resp = stytch_client.webauthn.register_start(
             user_id=current_user_id,
-            domain=settings.FRONTEND_URL.split("//")[-1].split(":")[0], # e.g. localhost or standardchartered.vercel.app
+            domain=domain,
         )
         
         # The SDK returns a response object with public_key_credential_creation_options
-        # We need to send this to the frontend
-        import json
         options_json = json.dumps(resp.public_key_credential_creation_options)
         
         return WebAuthnRegisterStartResponse(
@@ -377,7 +382,8 @@ async def finish_biometric_registration(
 
     try:
         # Finish the WebAuthn registration process
-        stytch_client.webauthn.register.authenticate(
+        # Stytch Python SDK uses webauthn.register() — flat method
+        stytch_client.webauthn.register(
             user_id=current_user_id,
             public_key_credential=request.public_key_credential
         )
