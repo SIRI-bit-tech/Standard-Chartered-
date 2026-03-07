@@ -26,8 +26,9 @@ def mask_email(email: str) -> str:
 
 
 def _send_blocking_email(msg: MIMEMultipart) -> None:
-    """Blocking SMTP operations with forced IPv4 for better reliability."""
-    timeout = getattr(settings, "SMTP_TIMEOUT_SECONDS", 10)
+    """Blocking SMTP operations with forced IPv4 and SSL support for reliability."""
+    # Increase timeout to 20s to allow for slower handshakes on cloud providers
+    timeout = getattr(settings, "SMTP_TIMEOUT_SECONDS", 20)
     server = None
     try:
         # Resolve hostname to IPv4 only to avoid [Errno 101] (Network unreachable) on IPv6-less systems
@@ -36,9 +37,14 @@ def _send_blocking_email(msg: MIMEMultipart) -> None:
         
         logger.info(f"Connecting to SMTP server {settings.SMTP_SERVER} ({ipv4_address}) on port {settings.SMTP_PORT}")
         
-        server = smtplib.SMTP(ipv4_address, settings.SMTP_PORT, timeout=timeout)
+        # Use SMTP_SSL for Port 465, standard SMTP with STARTTLS for 587
+        if settings.SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(ipv4_address, settings.SMTP_PORT, timeout=timeout)
+        else:
+            server = smtplib.SMTP(ipv4_address, settings.SMTP_PORT, timeout=timeout)
+            server.starttls()
+            
         server.set_debuglevel(0)
-        server.starttls()
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.send_message(msg)
     except smtplib.SMTPAuthenticationError:
