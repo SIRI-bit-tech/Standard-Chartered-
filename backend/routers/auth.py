@@ -12,6 +12,7 @@ from schemas.auth import (
     RefreshTokenRequest, ChangePasswordRequest, PasswordResetRequest,
     PasswordResetConfirm
 )
+from schemas.security import WebAuthnAuthenticateRequest
 from schemas.user import UserResponse
 from utils.auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
@@ -392,17 +393,20 @@ async def login(
         td_res = await db.execute(
             select(TrustedDevice).where(
                 TrustedDevice.user_id == user.id,
-                TrustedDevice.device_id == device_id,
+                TrustedDevice.device_id == (device_id or "").strip(),
                 TrustedDevice.active == True
-            )
+            ).limit(1)
         )
         existing_td = td_res.scalar_one_or_none()
         if existing_td:
             is_new_device = False
+            logger.info(f"Trusted device recognized for user {user.id}: {device_id}")
             # Update last_seen
             existing_td.last_seen = datetime.utcnow()
             existing_td.ip_address = ip_address
             db.add(existing_td)
+        else:
+            logger.info(f"New device detected for user {user.id}: {device_id}")
 
     # Update last login and issue tokens
     user.last_login = datetime.utcnow()
@@ -784,3 +788,97 @@ async def reset_password(
         success=True,
         message="Password has been reset successfully"
     )
+
+@router.post("/biometrics/authenticate", response_model=AuthResponse)
+async def biometric_authentication(
+    request: WebAuthnAuthenticateRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db)
+):
+    """Log in using WebAuthn/Biometrics (Discoverable Credentials)"""
+    from utils.stytch_client import get_stytch_client
+    stytch_client = get_stytch_client()
+    if not stytch_client:
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="biometric authentication", message="Stytch client not configured")
+
+    try:
+        # 1. Authenticate the passkey with Stytch
+        # This will identify the user and create a Stytch session
+        auth_resp = stytch_client.webauthn.authenticate(
+            public_key_credential=request.public_key_credential,
+            session_duration_minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        )
+        
+        if auth_resp.status_code not in [200, 201]:
+            from utils.errors import UnauthorizedError
+            raise UnauthorizedError(message="Biometric authentication failed")
+
+        stytch_user_id = auth_resp.user_id
+        
+        # 2. Get user from our DB
+        result = await db.execute(select(User).where(User.id == stytch_user_id))
+        user = result.scalar()
+        
+        if not user:
+            from utils.errors import NotFoundError
+            raise NotFoundError(message="User account not found")
+
+        # 3. Create our own tokens
+        access_token = create_access_token({"sub": user.id, "email": user.email})
+        refresh_token = create_refresh_token(user.id)
+        
+        # 4. Set cookies
+        def set_auth_cookies(resp: Response, access: str, refresh: str):
+            resp.set_cookie(
+                key="access_token",
+                value=access,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            )
+            resp.set_cookie(
+                key="refresh_token",
+                value=refresh,
+                httponly=True,
+                secure=True,
+                samesite="lax",
+                max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+            )
+
+        set_auth_cookies(response, access_token, refresh_token)
+        
+        # 5. Update user
+        user.last_login = datetime.utcnow()
+        db.add(user)
+        
+        # Audit Log
+        log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=user.id,
+            admin_email=user.email,
+            action="biometric_login",
+            resource_type="auth",
+            resource_id=user.id
+        )
+        db.add(log)
+        await db.commit()
+
+        return AuthResponse(
+            success=True,
+            message="Biometric login successful",
+            data={
+                "user": UserResponse.from_orm(user),
+                "redirect_to": "/dashboard"
+            },
+            token=TokenResponse(
+                access_token=access_token,
+                refresh_token=refresh_token,
+                expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            )
+        )
+    except Exception as e:
+        logger.error(f"Biometric authentication error: {e}")
+        from utils.errors import UnauthorizedError
+        raise UnauthorizedError(message="Biometric authentication failed", original_error=e)

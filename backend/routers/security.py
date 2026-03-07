@@ -13,6 +13,9 @@ from models.admin import AdminAuditLog
 from schemas.auth import ChangePasswordRequest
 from utils.auth import verify_password, hash_password
 from utils.ip import get_client_ip, geolocate_ip
+from schemas.security import WebAuthnRegisterStartResponse, WebAuthnRegisterRequest
+from utils.stytch_client import get_stytch_client
+import json
 
 router = APIRouter(prefix="/api/v1/security", tags=["Security"])
 
@@ -162,15 +165,33 @@ async def trust_device(
     if not device_id:
         from utils.errors import ValidationError
         raise ValidationError(message="device_id is required")
-    td = TrustedDevice(
-        id=str(uuid.uuid4()),
-        user_id=current_user_id,
-        device_id=device_id,
-        device_name=device_name,
-        user_agent=request.headers.get("User-Agent"),
-        ip_address=get_client_ip(request),
-        active=True
+        
+    # Check if existing
+    td_res = await db.execute(
+        select(TrustedDevice).where(
+            TrustedDevice.user_id == current_user_id,
+            TrustedDevice.device_id == device_id
+        )
     )
+    td = td_res.scalar_one_or_none()
+    
+    if td:
+        td.active = True
+        td.last_seen = datetime.utcnow()
+        td.device_name = device_name
+        td.ip_address = get_client_ip(request)
+        td.user_agent = request.headers.get("User-Agent")
+    else:
+        td = TrustedDevice(
+            id=str(uuid.uuid4()),
+            user_id=current_user_id,
+            device_id=device_id,
+            device_name=device_name,
+            user_agent=request.headers.get("User-Agent"),
+            ip_address=get_client_ip(request),
+            active=True
+        )
+    
     db.add(td)
     # Audit
     try:
@@ -299,3 +320,90 @@ async def change_password(
         pass
     await db.commit()
     return {"success": True, "message": "Password changed successfully"}
+
+
+@router.post("/biometrics/register/start", response_model=WebAuthnRegisterStartResponse)
+async def start_biometric_registration(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Start WebAuthn/Biometric registration ceremony"""
+    res = await db.execute(select(User).where(User.id == current_user_id))
+    user = res.scalar_one_or_none()
+    if not user:
+        from utils.errors import NotFoundError
+        raise NotFoundError(message="User not found")
+
+    stytch_client = get_stytch_client()
+    if not stytch_client:
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="biometric registration", message="Stytch client not configured")
+
+    try:
+        # Start the WebAuthn registration process
+        # We set return_passkey_credential_options=True to optimize for Passkeys
+        resp = stytch_client.webauthn.register.start(
+            user_id=current_user_id,
+            domain=settings.FRONTEND_URL.split("//")[-1].split(":")[0], # e.g. localhost or standardchartered.vercel.app
+        )
+        
+        # The SDK returns a response object with public_key_credential_creation_options
+        # We need to send this to the frontend
+        import json
+        options_json = json.dumps(resp.public_key_credential_creation_options)
+        
+        return WebAuthnRegisterStartResponse(
+            success=True,
+            user_id=current_user_id,
+            public_key_credential_creation_options=options_json
+        )
+    except Exception as e:
+        logger.error(f"Failed to start biometric registration: {e}")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="biometric registration", original_error=e)
+
+
+@router.post("/biometrics/register")
+async def finish_biometric_registration(
+    request: WebAuthnRegisterRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Complete WebAuthn/Biometric registration ceremony"""
+    stytch_client = get_stytch_client()
+    if not stytch_client:
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="biometric registration", message="Stytch client not configured")
+
+    try:
+        # Finish the WebAuthn registration process
+        stytch_client.webauthn.register.authenticate(
+            user_id=current_user_id,
+            public_key_credential=request.public_key_credential
+        )
+        
+        # Update user in DB
+        res = await db.execute(select(User).where(User.id == current_user_id))
+        user = res.scalar_one_or_none()
+        if user:
+            user.biometric_enabled = True
+            db.add(user)
+            await db.commit()
+            
+            # Audit log
+            log = AdminAuditLog(
+                id=str(uuid.uuid4()),
+                admin_id=user.id,
+                admin_email=user.email,
+                action="biometric_enabled",
+                resource_type="security",
+                resource_id=user.id
+            )
+            db.add(log)
+            await db.commit()
+
+        return {"success": True, "message": "Biometrics enabled successfully"}
+    except Exception as e:
+        logger.error(f"Failed to complete biometric registration: {e}")
+        from utils.errors import InternalServerError
+        raise InternalServerError(operation="biometric registration", original_error=e)

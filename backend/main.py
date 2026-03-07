@@ -73,6 +73,9 @@ async def lifespan(app: FastAPI):
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR"
             ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS biometric_enabled BOOLEAN DEFAULT FALSE NOT NULL"
+            ))
             
             # Address columns
             await conn.execute(text(

@@ -5,18 +5,22 @@ import { apiClient } from "@/lib/api-client"
 import type { TwoFactorSetupPayload } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { QRCodeSVG } from "qrcode.react"
-import { ShieldCheck, ShieldAlert, Key, Trash2, ShieldX, AlertTriangle } from 'lucide-react'
+import { ShieldCheck, ShieldAlert, Key, Trash2, ShieldX, AlertTriangle, Fingerprint, Smartphone } from 'lucide-react'
 import { ConfirmModal } from "@/components/ui/confirm-modal"
 import { useToast } from "@/hooks/use-toast"
 import { parseApiError } from "@/utils/error-handler"
+import { parseRegistrationOptions, encodeCredential } from "@/utils/webauthn"
+import { useAuthStore } from "@/lib/store"
 
 export function SecurityPanel() {
   const [busy, setBusy] = useState(false)
   const [enabled, setEnabled] = useState<boolean>(false)
+  const [biometricsEnabled, setBiometricsEnabled] = useState<boolean>(false)
   const [showSetup, setShowSetup] = useState(false)
   const [showDisableModal, setShowDisableModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const { toast } = useToast()
+  const { user, setUser } = useAuthStore()
   const [setupData, setSetupData] = useState<TwoFactorSetupPayload | null>(null)
   const [otp, setOtp] = useState('')
   const [disableOtp, setDisableOtp] = useState('')
@@ -33,6 +37,7 @@ export function SecurityPanel() {
     try {
       const prof = await apiClient.get<{ success: boolean; data: any }>('/api/v1/profile')
       setEnabled(!!prof?.data?.two_factor_enabled)
+      setBiometricsEnabled(!!prof?.data?.biometric_enabled)
     } catch { /* no-op */ }
   }
 
@@ -133,8 +138,83 @@ export function SecurityPanel() {
     }
   }
 
+  const handleRegisterBiometrics = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await apiClient.post<{
+        success: boolean;
+        public_key_credential_creation_options: string
+      }>('/api/v1/security/biometrics/register/start', {})
+
+      if (!res.success) throw new Error('Failed to start biometric registration')
+      const options = parseRegistrationOptions(res.public_key_credential_creation_options)
+      const credential = await navigator.credentials.create({
+        publicKey: options
+      }) as any
+
+      if (!credential) throw new Error('Biometric registration cancelled or failed')
+
+      const finishRes = await apiClient.post<{ success: boolean; message: string }>('/api/v1/security/biometrics/register', {
+        credential_id: credential.id,
+        public_key_credential: encodeCredential(credential)
+      })
+
+      if (finishRes.success) {
+        toast({
+          title: "Biometrics Enabled",
+          description: "You can now log in using your fingerprint or face scan.",
+        })
+        setBiometricsEnabled(true)
+        if (user) setUser({ ...user, biometric_enabled: true })
+        loadStatus()
+      }
+    } catch (e: any) {
+      console.error('Biometric registration error:', e)
+      const { message } = parseApiError(e)
+      toast({
+        title: "Registration Failed",
+        description: message || "This device might not support Passkeys, or you cancelled the request.",
+        variant: "destructive"
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-8">
+      {/* Biometrics Section */}
+      <div className="p-6 bg-gray-50 rounded-2xl border border-border/50">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
+          <div className={`p-3 rounded-full ${biometricsEnabled ? 'bg-indigo-100' : 'bg-primary/10'}`}>
+            {biometricsEnabled ? <Fingerprint className="w-6 h-6 text-indigo-600" /> : <Smartphone className="w-6 h-6 text-primary" />}
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-900">Biometric Authentication</h3>
+            <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+              Use your device's fingerprint or face scan to log into your account instantly. Faster and more secure than passwords.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {!biometricsEnabled ? (
+                <button
+                  onClick={handleRegisterBiometrics}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-primary text-white rounded-xl hover:opacity-90 transition-all font-semibold shadow-sm shadow-primary/20 disabled:opacity-50"
+                  disabled={busy}
+                >
+                  Enable Biometrics
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 p-2 px-4 bg-green-50 text-green-700 rounded-xl border border-green-100 font-bold text-sm">
+                  <ShieldCheck className="w-4 h-4" />
+                  Enabled on this account
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 2FA Section */}
       <div className="p-6 bg-gray-50 rounded-2xl border border-border/50">
         <div className="flex flex-col sm:flex-row items-start gap-4">

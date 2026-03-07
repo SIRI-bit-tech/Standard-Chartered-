@@ -60,6 +60,7 @@ class User(Base):
     # Two-Factor Authentication (TOTP)
     two_factor_enabled = Column(Boolean, default=False, nullable=False)
     two_factor_secret = Column(String, nullable=True)
+    biometric_enabled = Column(Boolean, default=False, nullable=False)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

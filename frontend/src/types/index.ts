@@ -15,6 +15,7 @@ export interface User {
   email_verified: boolean
   phone_verified: boolean
   identity_verified: boolean
+  biometric_enabled: boolean
   created_at: string
   last_login?: string
 }

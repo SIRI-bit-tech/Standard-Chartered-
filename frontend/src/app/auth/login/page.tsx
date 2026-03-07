@@ -8,6 +8,10 @@ import { ShieldCheck, Monitor, Smartphone, Eye, EyeOff } from 'lucide-react'
 import { stytchClient } from '@/lib/stytch-client'
 import { identifyUser, trackEvent } from '@/lib/analytics'
 import { parseApiError } from '@/utils/error-handler'
+import { Fingerprint } from 'lucide-react'
+import { encodeCredential } from '@/utils/webauthn'
+import { toast } from 'sonner'
+import type { User } from '@/types'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -94,8 +98,8 @@ export default function LoginPage() {
             localStorage.setItem('refresh_token', tokens.refresh_token)
             document.cookie = `accessToken=${tokens.access_token}; path=/; max-age=3600; secure; samesite=strict`
 
-            const userData = {
-              id: data.user_id || '',
+            const userData: User = {
+              id: data.user_id || data.id || '',
               email: data.email || '',
               username: data.username || '',
               first_name: data.first_name || '',
@@ -105,9 +109,10 @@ export default function LoginPage() {
               primary_currency: data.primary_currency || 'USD',
               tier: data.tier || 'basic',
               profile_picture_url: data.profile_picture_url || null,
-              email_verified: data.email_verified || false,
-              phone_verified: data.phone_verified || false,
-              identity_verified: data.identity_verified || false,
+              email_verified: !!data.email_verified,
+              phone_verified: !!data.phone_verified,
+              identity_verified: !!data.identity_verified,
+              biometric_enabled: !!data.biometric_enabled,
               created_at: data.created_at || new Date().toISOString(),
               last_login: data.last_login || new Date().toISOString()
             }
@@ -149,6 +154,86 @@ export default function LoginPage() {
       const { message, errorFields: fields } = parseApiError(err)
       setError(message)
       setErrorFields(fields)
+    }
+  }
+
+  const handleBiometricLogin = async () => {
+    setLoading(true)
+    setError('')
+    show()
+
+    try {
+      const credential = await navigator.credentials.get({
+        publicKey: {
+          challenge: new Uint8Array(32),
+          timeout: 60000,
+          userVerification: "required"
+        },
+        mediation: 'optional'
+      }) as any
+
+      if (!credential) {
+        throw new Error('Biometric authentication cancelled')
+      }
+
+      const response = await apiClient.post<{ success: boolean; data: any; token: any }>(
+        '/api/v1/auth/biometrics/authenticate',
+        {
+          credential_id: credential.id,
+          public_key_credential: encodeCredential(credential)
+        }
+      )
+
+      if (response.success && response.data && response.token) {
+        const tokens = response.token
+        const data = response.data.user
+
+        localStorage.setItem('access_token', tokens.access_token)
+        localStorage.setItem('refresh_token', tokens.refresh_token)
+        document.cookie = `accessToken=${tokens.access_token}; path=/; max-age=3600; secure; samesite=strict`
+
+        const userData: User = {
+          id: data.id || '',
+          email: data.email || '',
+          username: data.username || '',
+          first_name: data.first_name || '',
+          last_name: data.last_name || '',
+          phone: data.phone || undefined,
+          country: data.country || 'United States',
+          primary_currency: data.primary_currency || 'USD',
+          tier: data.tier || 'basic',
+          profile_picture_url: data.profile_picture_url || null,
+          email_verified: !!data.email_verified,
+          phone_verified: !!data.phone_verified,
+          identity_verified: !!data.identity_verified,
+          biometric_enabled: true,
+          created_at: data.created_at || new Date().toISOString(),
+          last_login: new Date().toISOString()
+        }
+
+        localStorage.setItem('user', JSON.stringify(userData))
+        setUser(userData)
+        setToken(tokens.access_token)
+
+        identifyUser(userData.id, {
+          country: userData.country,
+          tier: userData.tier,
+        })
+        trackEvent('login_success', { method: 'biometric' })
+
+        setLoading(false)
+        hide()
+        toast.success("Welcome back! Signed in with Biometrics.")
+        window.location.href = '/dashboard'
+      } else {
+        throw new Error('Authentication response invalid')
+      }
+    } catch (err: any) {
+      setLoading(false)
+      hide()
+      console.error('Biometric login error:', err)
+      const { message } = parseApiError(err)
+      setError(message || "Device could not verify your identity. Please use your password.")
     }
   }
 
@@ -212,8 +297,8 @@ export default function LoginPage() {
                         localStorage.setItem('refresh_token', tokens.refresh_token)
                         document.cookie = `accessToken=${tokens.access_token}; path=/; max-age=3600; secure; samesite=strict`
 
-                        const userData = {
-                          id: data.user_id || '',
+                        const userData: User = {
+                          id: data.user_id || data.id || '',
                           email: data.email || '',
                           username: data.username || '',
                           first_name: data.first_name || '',
@@ -223,9 +308,10 @@ export default function LoginPage() {
                           primary_currency: data.primary_currency || 'USD',
                           tier: data.tier || 'basic',
                           profile_picture_url: data.profile_picture_url || null,
-                          email_verified: data.email_verified || false,
-                          phone_verified: data.phone_verified || false,
-                          identity_verified: data.identity_verified || false,
+                          email_verified: !!data.email_verified,
+                          phone_verified: !!data.phone_verified,
+                          identity_verified: !!data.identity_verified,
+                          biometric_enabled: !!data.biometric_enabled,
                           created_at: data.created_at || new Date().toISOString(),
                           last_login: data.last_login || new Date().toISOString()
                         }
@@ -259,8 +345,8 @@ export default function LoginPage() {
                       localStorage.setItem('refresh_token', tokens.refresh_token)
                       document.cookie = `accessToken=${tokens.access_token}; path=/; max-age=3600; secure; samesite=strict`
 
-                      const userData = {
-                        id: data.user_id || '',
+                      const userData: any = {
+                        id: data.user_id || data.id || '',
                         email: data.email || '',
                         username: data.username || '',
                         first_name: data.first_name || '',
@@ -273,6 +359,7 @@ export default function LoginPage() {
                         email_verified: data.email_verified || false,
                         phone_verified: data.phone_verified || false,
                         identity_verified: data.identity_verified || false,
+                        biometric_enabled: data.biometric_enabled || false,
                         created_at: data.created_at || new Date().toISOString(),
                         last_login: data.last_login || new Date().toISOString()
                       }
@@ -377,6 +464,22 @@ export default function LoginPage() {
             className="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-semibold disabled:opacity-50 shadow-md"
           >
             {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+
+          <div className="relative flex items-center gap-4 py-2">
+            <div className="h-px bg-border flex-1" />
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold bg-white px-2">OR</span>
+            <div className="h-px bg-border flex-1" />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleBiometricLogin}
+            disabled={loading}
+            className="w-full py-4 bg-white border-2 border-primary/20 text-primary rounded-xl hover:bg-primary/5 transition-all font-bold flex items-center justify-center gap-3 shadow-sm group disabled:opacity-50"
+          >
+            <Fingerprint className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            Sign in with Passkey
           </button>
         </div>
 
