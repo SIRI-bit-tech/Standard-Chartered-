@@ -130,8 +130,8 @@ async def get_current_user_id(request: Request) -> str:
 
 
 def generate_verification_token() -> str:
-    """Generate email verification token"""
-    return secrets.token_urlsafe(32)
+    """Generate 6-digit email verification code"""
+    return ''.join(secrets.choice('0123456789') for _ in range(6))
 
 
 def generate_reset_token() -> str:

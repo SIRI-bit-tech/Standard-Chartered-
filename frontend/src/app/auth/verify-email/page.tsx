@@ -1,66 +1,107 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useSearchParams } from 'next/navigation'
 import { useLoadingStore } from '@/lib/store'
 import posthog from 'posthog-js'
-import { useEffect } from 'react'
-import { CheckCircle2, XCircle, Loader2, Mail, ArrowLeft, RefreshCw } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Mail, ArrowLeft, RefreshCw, ShieldCheck } from 'lucide-react'
 
 export default function EmailVerificationPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
 
+  const [code, setCode] = useState(['', '', '', '', '', ''])
   const [resending, setResending] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const [resendStatus, setResendStatus] = useState<'idle' | 'success'>('idle')
   const { show, hide } = useLoadingStore()
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  useEffect(() => {
-    const autoVerify = async () => {
-      const isStytch = !!searchParams.get('stytch_token')
-      const urlToken = searchParams.get('token') || searchParams.get('stytch_token')
-      if (!urlToken) return
+  const handleVerificationSuccess = (data: any) => {
+    posthog.capture('email_verified_code', { email: data?.email || email });
+    setSuccess(true)
+    setTimeout(() => {
+      const redirectEmail = data?.email || email
+      const vToken = data?.verification_token || ''
+      router.push(`/auth/set-transfer-pin?email=${encodeURIComponent(redirectEmail)}&token=${encodeURIComponent(vToken)}`)
+    }, 2000)
+  }
 
-      setVerifying(true)
-      show()
-
-      const endpoint = isStytch ? '/api/v1/auth/verify-magic-link' : '/api/v1/auth/verify-email'
-      const payload = isStytch ? { token: urlToken } : { email, token: urlToken }
-
-      try {
-        const response = await apiClient.post<{ success: boolean; message: string; data?: any }>(
-          endpoint,
-          payload,
-          { headers: { 'X-Show-Loader': '1' } }
-        )
-
-        if (response.success) {
-          posthog.capture('email_verified_magic_link', { email: response.data?.email || email });
-          setSuccess(true)
-          setTimeout(() => {
-            const redirectEmail = response.data?.email || email
-            const vToken = response.data?.verification_token || ''
-            router.push(`/auth/set-transfer-pin?email=${encodeURIComponent(redirectEmail)}&token=${encodeURIComponent(vToken)}`)
-          }, 2000)
-        }
-      } catch (err: any) {
-        setError(err.response?.data?.detail || 'Verification link is invalid or has expired.')
-      } finally {
-        setVerifying(false)
-        hide()
-      }
+  const handleInputChange = (index: number, value: string) => {
+    if (value.length > 1) {
+      value = value[0]
     }
-    autoVerify()
-  }, [searchParams])
+
+    if (!/^\d*$/.test(value)) return
+
+    const newCode = [...code]
+    newCode[index] = value
+    setCode(newCode)
+
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus()
+    }
+
+    // Auto-verify if all digits are filled
+    if (value && index === 5 && newCode.every(d => d !== '')) {
+      handleVerify(newCode.join(''))
+    }
+  }
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !code[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus()
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const pasteData = e.clipboardData.getData('text').slice(0, 6).split('')
+    if (pasteData.every(char => /^\d$/.test(char))) {
+      const newCode = [...code]
+      pasteData.forEach((char, i) => {
+        if (i < 6) newCode[i] = char
+      })
+      setCode(newCode)
+      inputRefs.current[Math.min(pasteData.length, 5)]?.focus()
+    }
+  }
+
+  const handleVerify = async (providedCode?: string) => {
+    const fullCode = providedCode || code.join('')
+    if (fullCode.length !== 6) {
+      setError('Please enter all 6 digits')
+      return
+    }
+
+    setVerifying(true)
+    setError('')
+    show()
+
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string; data?: any }>(
+        '/api/v1/auth/verify-email',
+        { email, verification_code: fullCode },
+        { headers: { 'X-Show-Loader': '1' } }
+      )
+
+      if (response.success) {
+        handleVerificationSuccess(response.data)
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Invalid verification code')
+    } finally {
+      setVerifying(false)
+      hide()
+    }
+  }
 
   const handleResendCode = async () => {
     setResending(true)
@@ -75,8 +116,8 @@ export default function EmailVerificationPage() {
       )
 
       if (response.success) {
-        setSuccess(true)
-        setTimeout(() => setSuccess(false), 3000)
+        setResendStatus('success')
+        setTimeout(() => setResendStatus('idle'), 5000)
       }
     } catch (error: any) {
       setError(error.response?.data?.detail || 'Failed to resend code. Please try again.')
@@ -91,118 +132,116 @@ export default function EmailVerificationPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4">
-            <Mail className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-600 rounded-full mb-4 shadow-lg shadow-green-200">
+            <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Verify Your Email</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Account Security</h1>
           <p className="text-gray-600 mt-2">
-            We've sent a verification link to<br />
-            <span className="font-medium text-green-600">{email}</span>
+            Verifying access for<br />
+            <span className="font-semibold text-green-730">{email}</span>
           </p>
         </div>
 
-        {/* Verification Form */}
-        {/* Status Display */}
-        <Card className="shadow-2xl border-0 overflow-hidden bg-white/80 backdrop-blur-md">
+        <Card className="shadow-2xl border-0 overflow-hidden bg-white/90 backdrop-blur-md">
           <div className="h-2 bg-gradient-to-r from-green-500 to-emerald-600" />
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-700 to-emerald-800">
-              {verifying ? 'Verifying Link' : success ? 'Successfully Verified' : 'Check Your Inbox'}
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="text-2xl font-bold text-gray-800">
+              {success ? 'Verified!' : 'Enter Verification Code'}
             </CardTitle>
-            <CardDescription className="text-gray-500 font-medium pt-2">
-              {verifying
-                ? 'Please wait while we confirm your security token...'
-                : success
-                  ? 'Your account is now active. Redirecting you to set up your secure PIN.'
-                  : 'We\'ve sent a secure magic link to your email address.'}
+            <CardDescription className="text-gray-500 font-medium">
+              {success
+                ? 'Your email has been confirmed. Redirecting...'
+                : 'Please enter the 6-digit code sent to your email.'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-8 py-6">
-            {/* Success Animation */}
-            {success && (
-              <div className="flex flex-col items-center justify-center animate-in zoom-in duration-500">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                  <CheckCircle2 className="w-12 h-12 text-green-600" />
+
+          <CardContent className="space-y-6 pt-4 pb-8">
+            {success ? (
+              <div className="flex flex-col items-center justify-center py-6 animate-in zoom-in duration-500">
+                <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle2 className="w-14 h-14 text-green-600" />
                 </div>
               </div>
-            )}
+            ) : (
+              <>
+                {error && (
+                  <Alert className="bg-red-50 border-red-200 text-red-800 animate-in slide-in-from-top duration-300">
+                    <div className="flex items-center gap-3">
+                      <XCircle className="w-5 h-5 flex-shrink-0" />
+                      <AlertDescription className="font-medium">{error}</AlertDescription>
+                    </div>
+                  </Alert>
+                )}
 
-            {/* Error Message */}
-            {error && (
-              <Alert className="bg-red-50 border-red-200 text-red-800 animate-in slide-in-from-top duration-300">
-                <div className="flex items-center gap-3">
-                  <XCircle className="w-5 h-5" />
-                  <AlertDescription className="font-medium">{error}</AlertDescription>
+                <div className="flex justify-between gap-2 max-w-[300px] mx-auto" onPaste={handlePaste}>
+                  {code.map((digit, i) => (
+                    <input
+                      key={i}
+                      ref={el => { inputRefs.current[i] = el }}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={e => handleInputChange(i, e.target.value)}
+                      onKeyDown={e => handleKeyDown(i, e)}
+                      className="w-10 h-14 text-center text-2xl font-bold bg-gray-50 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:bg-white focus:outline-none transition-all shadow-inner"
+                      disabled={verifying}
+                    />
+                  ))}
                 </div>
-              </Alert>
-            )}
 
-            {!success && !error && !verifying && (
-              <div className="flex flex-col items-center space-y-6">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-green-200 blur-2xl rounded-full opacity-20 animate-pulse" />
-                  <div className="relative w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200">
-                    <Mail className="w-12 h-12 text-white" />
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-center">
-                  <p className="text-gray-600 italic">
-                    Click the button in the email to automatically verify your account.
-                  </p>
-                  <p className="text-sm font-semibold text-emerald-700 bg-emerald-50 py-1 px-3 rounded-full inline-block">
-                    {email}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {verifying && (
-              <div className="flex flex-col items-center py-4">
-                <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
-                <p className="text-sm text-gray-500 mt-4 font-medium italic">Handshaking with our security provider...</p>
-              </div>
-            )}
-
-            {/* Resend Link */}
-            {!success && !verifying && (
-              <div className="pt-4 border-t border-gray-100 text-center">
-                <p className="text-sm text-gray-500 mb-4">
-                  Didn't receive the email? Check your spam folder or try again.
-                </p>
                 <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={handleResendCode}
-                  disabled={resending}
-                  className="rounded-full px-8 text-emerald-700 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all font-semibold"
+                  onClick={() => handleVerify()}
+                  disabled={verifying || code.some(d => !d)}
+                  className="w-full h-12 text-lg font-bold bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white rounded-xl shadow-lg shadow-green-100 transition-all active:scale-[0.98]"
                 >
-                  {resending ? (
+                  {verifying ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sending Link...
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Verifying...
                     </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Resend Magic Link
-                    </>
-                  )}
+                  ) : 'Verify Account'}
                 </Button>
-              </div>
+
+                <div className="text-center space-y-4">
+                  <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                    <Mail className="w-4 h-4" />
+                    <span>Check your spam if you don't see it</span>
+                  </div>
+
+                  <button
+                    onClick={handleResendCode}
+                    disabled={resending || verifying}
+                    className={`text-sm font-semibold transition-all flex items-center justify-center mx-auto ${resendStatus === 'success'
+                      ? 'text-green-600 bg-green-50 px-4 py-1 rounded-full'
+                      : 'text-green-600 hover:text-green-700 underline-offset-4 hover:underline'
+                      }`}
+                  >
+                    {resending ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    ) : resendStatus === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 mr-1" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-1" />
+                    )}
+                    {resendStatus === 'success' ? 'Code Sent!' : 'Resend Code'}
+                  </button>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
 
-        {/* Back to Login */}
-        <div className="text-center mt-6">
+        {/* Footer Links */}
+        <div className="flex items-center justify-between mt-8 px-2">
           <Link
             href="/auth/login"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-green-600 transition-colors"
+            className="inline-flex items-center text-sm font-medium text-gray-600 hover:text-green-600 transition-colors"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back to Login
           </Link>
+          <span className="text-xs text-gray-400 font-medium">© 2026 Standard Chartered</span>
         </div>
       </div>
     </div>

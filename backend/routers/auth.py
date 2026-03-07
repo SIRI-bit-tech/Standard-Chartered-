@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, status, HTTPException, Request, Response, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta, timezone
@@ -39,6 +39,7 @@ router = APIRouter()
 async def register(
     request: RegisterRequest,
     response: Response,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
     """Register new user with email verification"""
@@ -139,10 +140,11 @@ async def register(
             for account in default_accounts:
                 db.add(account)
 
-            # Always use local verification email to bypass Stytch billing/domain restrictions
+            # Background the email sending to avoid blocking registration on SMTP latency
             from utils.email import send_verification_email
-            logger.info(f"Sending custom verification email to {new_user.email}")
-            await send_verification_email(
+            logger.info(f"Queuing verification code task for {new_user.email}")
+            background_tasks.add_task(
+                send_verification_email,
                 email=new_user.email,
                 verification_token=new_user.email_verification_token,
                 first_name=new_user.first_name

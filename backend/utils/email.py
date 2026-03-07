@@ -65,11 +65,8 @@ def _send_blocking_email(msg: MIMEMultipart) -> None:
 
 
 async def send_verification_email(email: str, verification_token: str, first_name: str) -> None:
-    """Send verification email to user"""
+    """Send verification email with 6-digit code to user"""
     try:
-        encoded_token = quote(verification_token, safe='')
-        # Fix URL to include email and correct path to /auth/verify-email
-        verification_url = f"{settings.FRONTEND_URL}/auth/verify-email?token={encoded_token}&email={quote(email, safe='')}"
         escaped_first_name = html.escape(first_name or "Valued Customer")
         safe_display_name = (first_name or "Valued Customer").replace('\r', '').replace('\n', '').strip()
         brand_primary = "#0073CF"
@@ -90,17 +87,15 @@ async def send_verification_email(email: str, verification_token: str, first_nam
                 <h2 style="margin:0 0 8px 0;color:{text_primary};font-family:Arial,sans-serif">Verify Your Email</h2>
                 <div style="color:{text_secondary};font-family:Arial,sans-serif;line-height:1.6;font-size:14px">
                   <p>Hello {escaped_first_name},</p>
-                  <p>Confirm your email to activate your account and start banking with us.</p>
-                  <div style="margin:16px 0;padding:16px;border:1px solid {border};background:{brand_light};border-radius:8px;text-align:center">
-                    <a href="{verification_url}" style="display:inline-block;background:{brand_primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Verify Email</a>
+                  <p>Please use the following 6-digit verification code to activate your account:</p>
+                  <div style="margin:24px 0;padding:20px;border:1px solid {border};background:{brand_light};border-radius:12px;text-align:center">
+                    <span style="font-size:32px;font-weight:700;letter-spacing:8px;color:{brand_primary};font-family:monospace">{verification_token}</span>
                   </div>
-                  <p style="margin:0 0 8px 0;"><strong>Having trouble?</strong></p>
-                  <p>If the button doesn’t work, copy and paste this link into your browser:</p>
-                  <p style="word-break:break-all;color:{text_primary}">{verification_url}</p>
+                  <p>This code will expire in 24 hours. If you did not request this code, please ignore this email.</p>
                   <p style="margin:12px 0 8px 0;"><strong>What happens next</strong></p>
                   <ul style="margin:0 0 12px 18px;color:{text_primary}">
-                    <li>Your account features unlock after verification.</li>
-                    <li>If you didn’t request this, you can ignore this email safely.</li>
+                    <li>Enter this code on the verification page to unlock your account features.</li>
+                    <li>If you don't verify your account, you won't be able to access your dashboard.</li>
                   </ul>
                   <p>Need assistance? Visit Support in your dashboard after logging in.</p>
                 </div>

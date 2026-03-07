@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -44,7 +44,7 @@ async def verify_email(
     try:
         logger.info(f"Email verification attempt for: {request.email}")
         logger.info(f"Request data: {request}")
-        logger.info(f"Verification token received: {request.token}")
+        logger.info(f"Verification code received: {request.verification_code}")
         logger.info(f"Request validation passed successfully")
         
         # Find user by email
@@ -64,17 +64,17 @@ async def verify_email(
         
         # Check verification code and expiry
         if not user.email_verification_token:
-            logger.warning(f"Email verification failed - no token found: {request.email}")
-            raise ValidationError("No verification link found. Please request a new one.")
+            logger.warning(f"Email verification failed - no code found: {request.email}")
+            raise ValidationError("No verification code found. Please request a new one.")
         
         if user.email_verification_expires < datetime.now(timezone.utc).timestamp():
-            logger.warning(f"Email verification failed - link expired: {request.email}")
-            raise ValidationError("Verification link has expired. Please request a new one.")
+            logger.warning(f"Email verification failed - code expired: {request.email}")
+            raise ValidationError("Verification code has expired. Please request a new one.")
         
-        # Verify the token
-        if user.email_verification_token != request.token:
-            logger.warning(f"Email verification failed - invalid token: {request.email}")
-            raise ValidationError("Invalid verification link")
+        # Verify the code (stored in email_verification_token)
+        if user.email_verification_token != request.verification_code:
+            logger.warning(f"Email verification failed - invalid code: {request.email}")
+            raise ValidationError("Invalid verification code")
         
         # Mark email as verified
         user.email_verified = True
@@ -282,9 +282,10 @@ async def complete_pin_reset(
 @router.post("/resend-verification", response_model=AuthResponse)
 async def resend_verification_code(
     request: ResendVerificationRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
-    """Resend email verification code"""
+    """Resend 6-digit email verification code"""
     try:
         logger.info(f"Resend verification request for: {request.email}")
         
@@ -304,37 +305,28 @@ async def resend_verification_code(
             raise ConflictError("Email already verified")
         
         # Always use local verification email to bypass Stytch billing/domain restrictions
-        from utils.email import send_verification_email
-        try:
-            # Refresh token if needed or reuse existing
-            if not user.email_verification_token or user.email_verification_expires < datetime.now(timezone.utc).timestamp():
-                from utils.auth import generate_verification_token
-                user.email_verification_token = generate_verification_token()
-                user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 86400 # 24h
-                db.add(user)
-                await db.commit()
+        # Refresh token if needed or reuse existing
+        if not user.email_verification_token or len(user.email_verification_token) > 6 or user.email_verification_expires < datetime.now(timezone.utc).timestamp():
+            from utils.auth import generate_verification_token
+            user.email_verification_token = generate_verification_token()
+            user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 86400 # 24h
+            db.add(user)
+            await db.commit()
 
-            logger.info(f"Resending custom verification email to {user.email}")
-            await send_verification_email(
-                email=user.email,
-                verification_token=user.email_verification_token,
-                first_name=user.first_name
-            )
-            email_sent = True
-        except Exception as e:
-            logger.error(f"Failed to resend custom verification email: {e}")
-            email_sent = False
-        
-        if not email_sent:
-            logger.error(f"Failed to send verification email to: {request.email}")
-            from utils.errors import InternalServerError
-            raise InternalServerError(operation="sending verification email")
+        from utils.email import send_verification_email
+        logger.info(f"Queuing verification code resend for {user.email}")
+        background_tasks.add_task(
+            send_verification_email,
+            email=user.email,
+            verification_token=user.email_verification_token,
+            first_name=user.first_name
+        )
         
         logger.info(f"Verification code resent to: {request.email}")
         
         return AuthResponse(
             success=True,
-            message="A new magic link has been sent to your email.",
+            message="A new 6-digit verification code has been sent to your email.",
             data={"expires_in": 3600}
         )
         
@@ -343,7 +335,7 @@ async def resend_verification_code(
     except Exception as e:
         logger.error(f"Resend verification error: {e}")
         from utils.errors import InternalServerError
-        raise InternalServerError(operation="resend verification code", original_error=e)
+        raise InternalServerError(operation="resending verification code")
 
 
 @router.post("/set-transfer-pin", response_model=AuthResponse)
