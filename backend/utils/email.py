@@ -45,7 +45,8 @@ async def send_verification_email(email: str, verification_token: str, first_nam
     """Send verification email to user"""
     try:
         encoded_token = quote(verification_token, safe='')
-        verification_url = f"{settings.FRONTEND_URL}/dashboard/verify-email?token={encoded_token}"
+        # Fix URL to include email and correct path to /auth/verify-email
+        verification_url = f"{settings.FRONTEND_URL}/auth/verify-email?token={encoded_token}&email={quote(email, safe='')}"
         escaped_first_name = html.escape(first_name or "Valued Customer")
         safe_display_name = (first_name or "Valued Customer").replace('\r', '').replace('\n', '').strip()
         brand_primary = "#0073CF"

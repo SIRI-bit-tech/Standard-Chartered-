@@ -62,6 +62,7 @@ class PasswordResetConfirm(BaseModel):
 
 class EmailVerificationRequest(BaseModel):
     """Email verification request"""
+    email: EmailStr
     token: str
 
 

@@ -44,7 +44,7 @@ async def verify_email(
     try:
         logger.info(f"Email verification attempt for: {request.email}")
         logger.info(f"Request data: {request}")
-        logger.info(f"Verification code received: {request.verification_code}")
+        logger.info(f"Verification token received: {request.token}")
         logger.info(f"Request validation passed successfully")
         
         # Find user by email
@@ -65,16 +65,16 @@ async def verify_email(
         # Check verification code and expiry
         if not user.email_verification_token:
             logger.warning(f"Email verification failed - no token found: {request.email}")
-            raise ValidationError("No verification code found. Please request a new one.")
+            raise ValidationError("No verification link found. Please request a new one.")
         
         if user.email_verification_expires < datetime.now(timezone.utc).timestamp():
-            logger.warning(f"Email verification failed - code expired: {request.email}")
-            raise ValidationError("Verification code has expired. Please request a new one.")
+            logger.warning(f"Email verification failed - link expired: {request.email}")
+            raise ValidationError("Verification link has expired. Please request a new one.")
         
-        # Verify the code (stored token is the 6-digit code)
-        if user.email_verification_token != request.verification_code:
-            logger.warning(f"Email verification failed - invalid code: {request.email}")
-            raise ValidationError("Invalid verification code")
+        # Verify the token
+        if user.email_verification_token != request.token:
+            logger.warning(f"Email verification failed - invalid token: {request.email}")
+            raise ValidationError("Invalid verification link")
         
         # Mark email as verified
         user.email_verified = True
@@ -303,25 +303,27 @@ async def resend_verification_code(
             logger.info(f"Resend verification - email already verified: {request.email}")
             raise ConflictError("Email already verified")
         
-        # Send new verification magic link using Stytch
-        from utils.stytch_client import get_stytch_client
-        stytch_client = get_stytch_client()
-        if stytch_client:
-            try:
-                stytch_client.magic_links.email.send(
-                    email=user.email,
-                    login_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email",
-                    signup_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email"
-                )
-                logger.info(f"Stytch magic link resent to {user.email}")
-                email_sent = True
-            except Exception as e:
-                logger.error(f"Failed to resend Stytch magic link: {e}")
-                email_sent = False
-        else:
-            # Fallback to local email if Stytch not available (though less ideal for "magic link")
-            from services.email import email_service
-            email_sent = email_service.send_verification_email(user.email, user.email_verification_token)
+        # Always use local verification email to bypass Stytch billing/domain restrictions
+        from utils.email import send_verification_email
+        try:
+            # Refresh token if needed or reuse existing
+            if not user.email_verification_token or user.email_verification_expires < datetime.now(timezone.utc).timestamp():
+                from utils.auth import generate_verification_token
+                user.email_verification_token = generate_verification_token()
+                user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 86400 # 24h
+                db.add(user)
+                await db.commit()
+
+            logger.info(f"Resending custom verification email to {user.email}")
+            await send_verification_email(
+                email=user.email,
+                verification_token=user.email_verification_token,
+                first_name=user.first_name
+            )
+            email_sent = True
+        except Exception as e:
+            logger.error(f"Failed to resend custom verification email: {e}")
+            email_sent = False
         
         if not email_sent:
             logger.error(f"Failed to send verification email to: {request.email}")

@@ -26,15 +26,20 @@ export default function EmailVerificationPage() {
 
   useEffect(() => {
     const autoVerify = async () => {
+      const isStytch = !!searchParams.get('stytch_token')
       const urlToken = searchParams.get('token') || searchParams.get('stytch_token')
       if (!urlToken) return
 
       setVerifying(true)
       show()
+
+      const endpoint = isStytch ? '/api/v1/auth/verify-magic-link' : '/api/v1/auth/verify-email'
+      const payload = isStytch ? { token: urlToken } : { email, token: urlToken }
+
       try {
         const response = await apiClient.post<{ success: boolean; message: string; data?: any }>(
-          '/api/v1/auth/verify-magic-link',
-          { token: urlToken },
+          endpoint,
+          payload,
           { headers: { 'X-Show-Loader': '1' } }
         )
 

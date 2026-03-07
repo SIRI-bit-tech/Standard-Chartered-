@@ -139,27 +139,14 @@ async def register(
             for account in default_accounts:
                 db.add(account)
 
-            # Send verification magic link using Stytch BEFORE committing
-            # This ensures if email fails, we rollback the DB record
-            from utils.stytch_client import get_stytch_client
-            stytch_client = get_stytch_client()
-            if stytch_client:
-                logger.info(f"Sending Stytch Magic Link to {new_user.email}")
-                stytch_client.magic_links.email.login_or_create(
-                    email=new_user.email,
-                    login_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email",
-                    signup_magic_link_url=f"{settings.FRONTEND_URL}/auth/verify-email"
-                )
-                logger.info(f"Stytch Magic Link sent to {new_user.email}")
-            else:
-                # Fallback to local email if Stytch initialization failed
-                from utils.email import send_verification_email
-                logger.info(f"Sending local verification email to {new_user.email}")
-                await send_verification_email(
-                    email=new_user.email,
-                    verification_token=new_user.email_verification_token,
-                    first_name=new_user.first_name
-                )
+            # Always use local verification email to bypass Stytch billing/domain restrictions
+            from utils.email import send_verification_email
+            logger.info(f"Sending custom verification email to {new_user.email}")
+            await send_verification_email(
+                email=new_user.email,
+                verification_token=new_user.email_verification_token,
+                first_name=new_user.first_name
+            )
 
             await db.commit()
             logger.info(f"User registered successfully: {new_user.email}")
