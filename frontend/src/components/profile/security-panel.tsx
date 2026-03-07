@@ -18,6 +18,7 @@ export function SecurityPanel() {
   const [biometricsEnabled, setBiometricsEnabled] = useState<boolean>(false)
   const [showSetup, setShowSetup] = useState(false)
   const [showDisableModal, setShowDisableModal] = useState(false)
+  const [showBiometricDisableModal, setShowBiometricDisableModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const { toast } = useToast()
   const { user, setUser } = useAuthStore()
@@ -236,7 +237,7 @@ export function SecurityPanel() {
                     Enabled on this account
                   </div>
                   <button
-                    onClick={handleDisableBiometrics}
+                    onClick={() => setShowBiometricDisableModal(true)}
                     className="w-full sm:w-auto px-6 py-2.5 bg-white text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-all font-semibold disabled:opacity-50"
                     disabled={busy}
                   >
@@ -355,6 +356,19 @@ export function SecurityPanel() {
         title="Delete Account?"
         description="Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently removed."
         confirmText="Yes, Delete Everything"
+        variant="destructive"
+      />
+
+      <ConfirmModal
+        isOpen={showBiometricDisableModal}
+        onClose={() => setShowBiometricDisableModal(false)}
+        onConfirm={async () => {
+          setShowBiometricDisableModal(false);
+          await handleDisableBiometrics();
+        }}
+        title="Disable Biometric Authentication?"
+        description="Are you sure you want to disable biometric login? You will need to use your password and potentially 2FA to log in next time."
+        confirmText="Yes, Disable"
         variant="destructive"
       />
 

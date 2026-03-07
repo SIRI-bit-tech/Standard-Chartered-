@@ -799,7 +799,7 @@ async def reset_password(
     )
 
 @router.post("/biometrics/authenticate/start", response_model=WebAuthnAuthenticateStartResponse)
-async def start_biometric_authentication():
+async def start_biometric_authentication(request: Request):
     """Start WebAuthn/Biometric authentication (Get options from Stytch)"""
     from utils.stytch_client import get_stytch_client
     stytch_client = get_stytch_client()
@@ -808,8 +808,11 @@ async def start_biometric_authentication():
         raise InternalServerError(operation="biometric authentication", message="Stytch client not configured")
 
     try:
-        # Extract domain from FRONTEND_URL
-        domain = settings.FRONTEND_URL.split("//")[-1].split(":")[0]
+        # Extract domain dynamically from the origin or host
+        origin = request.headers.get("origin") or settings.FRONTEND_URL
+        domain = origin.split("//")[-1].split(":")[0]
+        
+        logger.info(f"Starting WebAuthn authentication on domain {domain}")
         
         # Stytch Python SDK uses webauthn.authenticate_start() — flat method
         resp = stytch_client.webauthn.authenticate_start(
@@ -887,7 +890,7 @@ async def biometric_authentication(
         set_auth_cookies(response, access_token, refresh_token)
         
         # 5. Update user
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.add(user)
         
         # Audit Log
@@ -897,7 +900,8 @@ async def biometric_authentication(
             admin_email=user.email,
             action="biometric_login",
             resource_type="auth",
-            resource_id=user.id
+            resource_id=user.id,
+            created_at=datetime.now(timezone.utc)
         )
         db.add(log)
         await db.commit()
@@ -906,7 +910,7 @@ async def biometric_authentication(
             success=True,
             message="Biometric login successful",
             data={
-                "user": UserResponse.from_orm(user),
+                "user": UserResponse.model_validate(user),
                 "redirect_to": "/dashboard"
             },
             token=TokenResponse(
@@ -916,6 +920,12 @@ async def biometric_authentication(
             )
         )
     except Exception as e:
-        logger.error(f"Biometric authentication error: {e}")
-        from utils.errors import UnauthorizedError
-        raise UnauthorizedError(message="Biometric authentication failed", original_error=e)
+        # Log the full details of the exception for debugging
+        logger.error(f"Biometric authentication error: {type(e).__name__}: {str(e)}")
+        if hasattr(e, "error_type"):
+            logger.error(f"Stytch error type: {e.error_type}")
+        if hasattr(e, "error_message"):
+            logger.error(f"Stytch error message: {e.error_message}")
+            
+        from utils.errors import AuthenticationError
+        raise AuthenticationError(message="Biometric authentication failed", original_error=e)

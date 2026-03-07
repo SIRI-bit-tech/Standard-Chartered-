@@ -9,7 +9,7 @@ import { stytchClient } from '@/lib/stytch-client'
 import { identifyUser, trackEvent } from '@/lib/analytics'
 import { parseApiError } from '@/utils/error-handler'
 import { Fingerprint } from 'lucide-react'
-import { encodeCredential } from '@/utils/webauthn'
+import { encodeCredential, parseAuthenticationOptions } from '@/utils/webauthn'
 import { toast } from 'sonner'
 import type { User } from '@/types'
 
@@ -169,18 +169,10 @@ export default function LoginPage() {
         public_key_credential_request_options: string
       }>('/api/v1/auth/biometrics/authenticate/start', {})
 
-      const options = JSON.parse(public_key_credential_request_options)
+      // 2. Prepare options for the browser
+      const options = parseAuthenticationOptions(public_key_credential_request_options)
 
-      // Convert B64 challenges/IDs back to bytes for the browser
-      options.challenge = Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0))
-      if (options.allowCredentials) {
-        options.allowCredentials = options.allowCredentials.map((c: any) => ({
-          ...c,
-          id: Uint8Array.from(atob(c.id), ch => ch.charCodeAt(0))
-        }))
-      }
-
-      // 2. Browser prompt for face/fingerprint
+      // 3. Browser prompt for face/fingerprint
       const credential = await navigator.credentials.get({
         publicKey: options,
         mediation: 'optional'
@@ -190,7 +182,7 @@ export default function LoginPage() {
         throw new Error('Biometric authentication cancelled')
       }
 
-      // 3. Complete authentication
+      // 4. Complete authentication
       const response = await apiClient.post<{ success: boolean; data: any; token: any }>(
         '/api/v1/auth/biometrics/authenticate',
         {

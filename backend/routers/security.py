@@ -7,7 +7,7 @@ from utils.totp import generate_secret_b32, otpauth_uri, verify_totp
 from models.user import User
 from models.security import TrustedDevice
 from models.support import LoginHistory
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import logging
 from models.admin import AdminAuditLog
@@ -328,24 +328,21 @@ async def change_password(
 
 @router.post("/biometrics/register/start", response_model=WebAuthnRegisterStartResponse)
 async def start_biometric_registration(
-    current_user_id: str = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db)
+    request: Request,
+    current_user_id: str = Depends(get_current_user_id)
 ):
     """Start WebAuthn/Biometric registration ceremony"""
-    res = await db.execute(select(User).where(User.id == current_user_id))
-    user = res.scalar_one_or_none()
-    if not user:
-        from utils.errors import NotFoundError
-        raise NotFoundError(message="User not found")
-
+    from utils.stytch_client import get_stytch_client
     stytch_client = get_stytch_client()
     if not stytch_client:
         from utils.errors import InternalServerError
         raise InternalServerError(operation="biometric registration", message="Stytch client not configured")
 
     try:
-        # Extract domain from FRONTEND_URL (e.g. localhost or myapp.vercel.app)
-        domain = settings.FRONTEND_URL.split("//")[-1].split(":")[0]
+        # Extract domain dynamically from the origin or host
+        origin = request.headers.get("origin") or settings.FRONTEND_URL
+        domain = origin.split("//")[-1].split(":")[0]
+        
         logger.info(f"Starting WebAuthn registration for user {current_user_id} on domain {domain}")
         
         # Stytch Python SDK uses webauthn.register_start() — flat method, not nested
