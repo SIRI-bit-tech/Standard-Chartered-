@@ -140,7 +140,10 @@ async def register(
             for account in default_accounts:
                 db.add(account)
 
-            # Background the email sending to avoid blocking registration on SMTP latency
+            await db.commit()
+            logger.info(f"User registered successfully: {new_user.email}")
+            
+            # Queue email AFTER successful commit to ensure user exists
             from utils.email import send_verification_email
             logger.info(f"Queuing verification code task for {new_user.email}")
             background_tasks.add_task(
@@ -149,9 +152,6 @@ async def register(
                 verification_token=new_user.email_verification_token,
                 first_name=new_user.first_name
             )
-
-            await db.commit()
-            logger.info(f"User registered successfully: {new_user.email}")
             
         except Exception as e:
             await db.rollback()
@@ -168,22 +168,18 @@ async def register(
                 except Exception as cleanup_err:
                     logger.error(f"Failed to cleanup Stytch user {stytch_user_id}: {cleanup_err}")
             
-            # If it's a Stytch error, parse and return it to user
+            # If it's a Stytch error, parse and re-raise appropriately
             from utils.stytch_client import parse_stytch_error
-            # If the error is from Stytch client call itself
             try:
                 msg, code = parse_stytch_error(e)
                 if msg:
-                   raise ValidationError(message=msg, error_code=str(code))
-            except (ValidationError, Exception) as inner:
-                if isinstance(inner, ValidationError):
-                    raise inner
+                   from utils.errors import ValidationError
+                   raise ValidationError(message=msg, operation="stytch registration")
+            except Exception:
+                pass
             
-            from utils.errors import InternalServerError
-            raise InternalServerError(
-                operation="user registration",
-                original_error=e
-            ) from e
+            # Re-raise the original error if we didn't raise a validation error
+            raise e
 
 
         # Generate tokens

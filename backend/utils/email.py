@@ -26,22 +26,19 @@ def mask_email(email: str) -> str:
 
 
 def _send_blocking_email(msg: MIMEMultipart) -> None:
-    """Blocking SMTP operations with forced IPv4 and SSL support for reliability."""
+    """Blocking SMTP operations with hostname for correct SSL/TLS certificates."""
     # Force a 30s timeout to allow for slower handshakes on cloud providers like Render
     timeout = 30
     server = None
     try:
-        # Resolve hostname to IPv4 only to avoid [Errno 101] (Network unreachable) on IPv6-less systems
-        host_info = socket.getaddrinfo(settings.SMTP_SERVER, settings.SMTP_PORT, socket.AF_INET, socket.SOCK_STREAM)
-        ipv4_address = host_info[0][4][0]
-        
-        logger.info(f"Connecting to SMTP server {settings.SMTP_SERVER} ({ipv4_address}) on port {settings.SMTP_PORT}")
+        # We use the hostname for the handshake to ensure SSL certificates validate correctly
+        logger.info(f"Connecting to SMTP server {settings.SMTP_SERVER} on port {settings.SMTP_PORT}")
         
         # Use SMTP_SSL for Port 465, standard SMTP with STARTTLS for 587
         if settings.SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(ipv4_address, settings.SMTP_PORT, timeout=timeout)
+            server = smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout)
         else:
-            server = smtplib.SMTP(ipv4_address, settings.SMTP_PORT, timeout=timeout)
+            server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout)
             server.starttls()
             
         server.set_debuglevel(0)
@@ -108,7 +105,7 @@ async def send_verification_email(email: str, verification_token: str, first_nam
         </html>
         """
         msg = MIMEMultipart()
-        msg['From'] = settings.SMTP_USER
+        msg['From'] = formataddr(("Standard Chartered Bank", settings.SMTP_FROM))
         msg['To'] = formataddr((safe_display_name, email))
         msg['Subject'] = "Verify Your Standard Chartered Account"
         
@@ -172,7 +169,7 @@ async def send_login_alert(email: str, first_name: str, device_name: str, ip_add
         """
         
         msg = MIMEMultipart()
-        msg['From'] = settings.SMTP_USER
+        msg['From'] = formataddr(("Standard Chartered Bank", settings.SMTP_FROM))
         msg['To'] = formataddr((safe_display_name, email))
         msg['Subject'] = "Security Alert: New Device Login Detected"
         msg.attach(MIMEText(html_content, 'html'))
