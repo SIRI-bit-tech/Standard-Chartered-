@@ -26,22 +26,21 @@ def mask_email(email: str) -> str:
 
 
 def _send_blocking_email(msg: MIMEMultipart) -> None:
-    """Blocking SMTP operations with hostname for correct SSL/TLS certificates."""
-    # Force a 30s timeout to allow for slower handshakes on cloud providers like Render
+    """Standardized SMTP connection for high-reliability services like Resend."""
     timeout = 30
     server = None
     try:
-        # We use the hostname for the handshake to ensure SSL certificates validate correctly
-        logger.info(f"Connecting to SMTP server {settings.SMTP_SERVER} on port {settings.SMTP_PORT}")
+        logger.info(f"Connecting to Resend SMTP ({settings.SMTP_SERVER}:{settings.SMTP_PORT})")
         
-        # Use SMTP_SSL for Port 465, standard SMTP with STARTTLS for 587
-        if settings.SMTP_PORT == 465:
+        # Use SMTP_SSL for Port 465 (Implicit SSL), standard SMTP with STARTTLS for 587
+        if int(settings.SMTP_PORT) == 465:
             server = smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout)
         else:
             server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout)
             server.starttls()
             
         server.set_debuglevel(0)
+        # For Resend, username is always 'resend' and password is the API key
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
         server.send_message(msg)
     except smtplib.SMTPAuthenticationError:
