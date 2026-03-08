@@ -70,13 +70,16 @@ export default function RootLayout({
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function(registration) {
-                      console.log('SW Registered');
-                    }
-                  ).catch(err => {
-                    console.log('SW Registration Failed', err);
-                  });
+                  // Delay registration for mobile stability
+                  setTimeout(() => {
+                    navigator.serviceWorker.register('/sw.js').then(
+                      function(registration) {
+                        console.log('SW Registered');
+                      }
+                    ).catch(err => {
+                      console.log('SW Registration Failed', err);
+                    });
+                  }, 3000);
                 });
               }
             `,

@@ -38,15 +38,16 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch Event - Network first, fallback to cache for improved PWA status
+// Fetch Event - Network first, fallback to cache
 self.addEventListener('fetch', (event) => {
-    // Only handle GET requests
+    // 1. Only handle GET requests
     if (event.request.method !== 'GET') return;
 
-    // Skip tracking/analytics scripts to avoid blocking or errors
+    // 2. CRITICAL: Skip ALL third-party requests (PostHog, Stytch, Google, etc.)
+    // Intercepting these on mobile causes iOS Chrome/Safari to crash the tab.
     const url = new URL(event.request.url);
-    if (url.hostname.includes('posthog') || url.hostname.includes('analytics') || url.hostname.includes('stytch')) {
-        return;
+    if (url.origin !== self.location.origin) {
+        return; 
     }
 
     event.respondWith(

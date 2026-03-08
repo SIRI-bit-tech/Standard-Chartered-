@@ -1,31 +1,32 @@
- 'use client'
- 
- import { useEffect, useState } from 'react'
- import { Button } from '@/components/ui/button'
- import { Input } from '@/components/ui/input'
- import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
- import { apiClient } from '@/lib/api-client'
- import { logger } from '@/lib/logger'
- import type { Account, VirtualCardType, VirtualCardSummary } from '@/types'
- import { colors } from '@/types'
- import { VirtualCard3D } from '@/components/cards/VirtualCard3D'
- 
- interface Props {
-   onCreated: () => void
- }
- 
- export function VirtualCardApply({ onCreated }: Props) {
-   const [accounts, setAccounts] = useState<Account[]>([])
-   const [form, setForm] = useState({
-     account_id: '',
-     card_type: 'debit' as VirtualCardType,
-     card_name: '',
-     daily_limit: '',
-     monthly_limit: '',
-   })
-   const [busy, setBusy] = useState(false)
+'use client'
+
+import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { apiClient } from '@/lib/api-client'
+import { logger } from '@/lib/logger'
+import type { Account, VirtualCardType, VirtualCardSummary } from '@/types'
+import { colors } from '@/types'
+import { VirtualCard3D } from '@/components/cards/VirtualCard3D'
+import { useToast } from '@/hooks/use-toast'
+
+interface Props {
+  onCreated: () => void
+}
+
+export function VirtualCardApply({ onCreated }: Props) {
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [form, setForm] = useState({
+    account_id: '',
+    card_type: 'debit' as VirtualCardType,
+    card_name: '',
+    daily_limit: '',
+    monthly_limit: '',
+  })
+  const [busy, setBusy] = useState(false)
   const [cards, setCards] = useState<VirtualCardSummary[]>([])
- const filteredCards = cards.filter((c) => c.status !== 'cancelled')
+  const filteredCards = cards.filter((c) => c.status !== 'cancelled')
   const existingTypes = new Set(filteredCards.map((c) => c.card_type))
   const hasBothTypes = existingTypes.has('debit') && existingTypes.has('credit')
   const blockedNotExpired = cards.some(
@@ -35,9 +36,9 @@
       (c.expiry_year > new Date().getFullYear() ||
         (c.expiry_year === new Date().getFullYear() && c.expiry_month >= new Date().getMonth() + 1)),
   )
- 
+
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       try {
         const res = await apiClient.get<{ success: boolean; data: Account[] }>(`/api/v1/accounts/`)
         if (res.success && Array.isArray(res.data)) setAccounts(res.data)
@@ -45,19 +46,28 @@
         logger.error('Failed to fetch accounts', { error: e })
       }
     })()
-    ;(async () => {
-      try {
-        const resp = await apiClient.get<{ cards: VirtualCardSummary[] }>(`/api/v1/cards/list`)
-        const list = Array.isArray(resp.cards) ? resp.cards : []
-        setCards(list)
-      } catch (e) {
-        logger.error('Failed to fetch cards', { error: e })
-      }
-    })()
+      ; (async () => {
+        try {
+          const resp = await apiClient.get<{ cards: VirtualCardSummary[] }>(`/api/v1/cards/list`)
+          const list = Array.isArray(resp.cards) ? resp.cards : []
+          setCards(list)
+        } catch (e) {
+          logger.error('Failed to fetch cards', { error: e })
+        }
+      })()
   }, [])
 
+  const { toast } = useToast()
+
   async function submit() {
-    if (!form.account_id || !form.card_name) return
+    if (!form.account_id || !form.card_name) {
+      toast({
+        title: "Incomplete Form",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      })
+      return
+    }
     setBusy(true)
     try {
       const payload = {
@@ -70,10 +80,26 @@
       }
       const res = await apiClient.post(`/api/v1/cards/create`, payload) as { success: boolean; data?: { id: string } }
       if (res.success && res.data?.id) {
+        toast({
+          title: "Application Successful",
+          description: "Your card has been applied for successfully.",
+          variant: "default",
+        })
+
+        // Wait a small bit for user to see toast, then reload
+        setTimeout(() => {
+          window.location.reload()
+        }, 2000)
+
         onCreated()
       }
-    } catch (e) {
+    } catch (e: any) {
       logger.error('Create virtual card failed', { error: e })
+      toast({
+        title: "Application Failed",
+        description: e.response?.data?.detail || "There was an error processing your card application.",
+        variant: "destructive"
+      })
     } finally {
       setBusy(false)
     }
@@ -175,8 +201,8 @@ function VirtualCardApplyPreview({ name, type }: { name: string; type: VirtualCa
     card_number: '',
     expiry_month: 0,
     expiry_year: 0,
-     status: 'pending',
-     card_type: type,
-   }
-   return <div className="mt-2"><VirtualCard3D card={card} /></div>
- }
+    status: 'pending',
+    card_type: type,
+  }
+  return <div className="mt-2"><VirtualCard3D card={card} /></div>
+}
