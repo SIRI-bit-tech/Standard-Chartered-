@@ -43,10 +43,9 @@ export default function LoginPage() {
     }
   }
 
-  const handleLogin = async (e?: React.MouseEvent) => {
+  const handleLogin = async (e?: React.FormEvent | React.MouseEvent) => {
     if (e) {
       e.preventDefault()
-      e.stopPropagation()
     }
 
     setLoading(true)
@@ -404,13 +403,15 @@ export default function LoginPage() {
           </div>
         )}
 
-        <div className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Username
             </label>
             <input
               type="text"
+              name="username"
+              autoComplete="username"
               value={username}
               onChange={(e) => {
                 setUsername(e.target.value);
@@ -430,6 +431,8 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
+                name="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -465,15 +468,16 @@ export default function LoginPage() {
           </div>
 
           <button
-            type="button"
-            onClick={handleLogin}
+            type="submit"
             disabled={loading}
             className="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition font-semibold disabled:opacity-50 shadow-md"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
+        </form>
 
-          <div className="relative flex items-center gap-4 py-2">
+        <div className="mt-6">
+          <div className="relative flex items-center gap-4 py-2 mb-4">
             <div className="h-px bg-border flex-1" />
             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold bg-white px-2">OR</span>
             <div className="h-px bg-border flex-1" />

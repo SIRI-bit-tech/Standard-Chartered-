@@ -40,7 +40,14 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event - Network first, fallback to cache for improved PWA status
 self.addEventListener('fetch', (event) => {
+    // Only handle GET requests
     if (event.request.method !== 'GET') return;
+
+    // Skip tracking/analytics scripts to avoid blocking or errors
+    const url = new URL(event.request.url);
+    if (url.hostname.includes('posthog') || url.hostname.includes('analytics') || url.hostname.includes('stytch')) {
+        return;
+    }
 
     event.respondWith(
         fetch(event.request)
@@ -56,7 +63,16 @@ self.addEventListener('fetch', (event) => {
             })
             .catch(() => {
                 // Fallback to cache if network fails
-                return caches.match(event.request);
+                return caches.match(event.request).then((cachedResponse) => {
+                    // We MUST return a Response object (not undefined) or respondWith fails
+                    if (cachedResponse) return cachedResponse;
+
+                    // If not in cache, returning a custom offline response or a basic empty response
+                    return new Response('Network error occurred', {
+                        status: 408,
+                        headers: { 'Content-Type': 'text/plain' }
+                    });
+                });
             })
     );
 });
