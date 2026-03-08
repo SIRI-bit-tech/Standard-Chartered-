@@ -26,31 +26,41 @@ def mask_email(email: str) -> str:
 
 
 def _send_blocking_email(msg: MIMEMultipart) -> None:
-    """Standardized SMTP connection for high-reliability services like Resend."""
-    timeout = 30
+    """Robust SMTP connection with step-by-step diagnostic logging for cloud environments."""
+    timeout = 60  # Increased to 60s for slow SSL handshakes on Render
     server = None
     try:
-        logger.info(f"Connecting to Resend SMTP ({settings.SMTP_SERVER}:{settings.SMTP_PORT})")
+        logger.info(f"STEP 1: Starting connection to {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
         
-        # Use SMTP_SSL for Port 465 (Implicit SSL), standard SMTP with STARTTLS for 587
+        # Explicitly decide between SSL or STARTTLS
         if int(settings.SMTP_PORT) == 465:
+            logger.info("STEP 2: Using Implicit SSL (Port 465)")
             server = smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout)
         else:
+            logger.info("STEP 2: Using STARTTLS (Port 587)")
             server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout)
+            logger.info("STEP 3: Sending EHLO...")
+            server.ehlo()
+            logger.info("STEP 4: Upgrading to TLS...")
             server.starttls()
-            
-        server.set_debuglevel(0)
-        # For Resend, username is always 'resend' and password is the API key
+            logger.info("STEP 5: Sending EHLO again after TLS...")
+            server.ehlo()
+
+        logger.info(f"STEP 6: Attempting login for user: {settings.SMTP_USER}")
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+        
+        logger.info("STEP 7: Dispatching email message...")
         server.send_message(msg)
+        logger.info("STEP 8: Email sent successfully!")
+
     except smtplib.SMTPAuthenticationError:
-        logger.error(f"SMTP Authentication failed for user {settings.SMTP_USER}. Check App Password.")
+        logger.error(f"FATAL: SMTP Authentication failed. Check if your API Key or App Password is correct.")
         raise
-    except (socket.timeout, TimeoutError) as e:
-        logger.error(f"SMTP timeout after {timeout}s: {e}")
+    except (socket.timeout, TimeoutError, smtplib.SMTPConnectError) as e:
+        logger.error(f"NETWORK ERROR: Connection to {settings.SMTP_SERVER} timed out after {timeout}s. This usually means the cloud provider is blocking this port.")
         raise
     except Exception as e:
-        logger.error(f"Failed to send email via {settings.SMTP_SERVER}: {e}")
+        logger.error(f"FAILURE: Unexpected error during email dispatch to {settings.SMTP_SERVER}: {e}")
         raise
     finally:
         if server:
