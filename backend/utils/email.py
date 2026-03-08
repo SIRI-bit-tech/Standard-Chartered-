@@ -8,6 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
 from email.utils import formataddr
+import httpx
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -25,42 +26,58 @@ def mask_email(email: str) -> str:
         return "***"
 
 
+def _send_email_via_api(to_email: str, subject: str, html_content: str) -> bool:
+    """Send email via Resend's HTTP API. This bypasses all SMTP port blocks."""
+    if not settings.RESEND_API_KEY or settings.RESEND_API_KEY == 're_your_api_key_here':
+        logger.warning("RESEND_API_KEY not set. Falling back to SMTP (which may fail on Render).")
+        return False
+
+    try:
+        logger.info(f"Dispatching email via Resend API to {mask_email(to_email)}")
+        with httpx.Client(timeout=10.0) as client:
+            response = client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": f"Standard Chartered Bank <{settings.SMTP_FROM}>",
+                    "to": [to_email],
+                    "subject": subject,
+                    "html": html_content,
+                },
+            )
+            
+            if response.status_code in [200, 201]:
+                logger.info(f"API delivery successful: {response.json().get('id')}")
+                return True
+            else:
+                logger.error(f"Resend API error ({response.status_code}): {response.text}")
+                return False
+    except Exception as e:
+        logger.error(f"Resend API dispatch failed: {e}")
+        return False
+
+
 def _send_blocking_email(msg: MIMEMultipart) -> None:
-    """Robust SMTP connection with step-by-step diagnostic logging for cloud environments."""
-    timeout = 60  # Increased to 60s for slow SSL handshakes on Render
+    """Fallback SMTP logic if API is not available."""
+    timeout = 60
     server = None
     try:
-        logger.info(f"STEP 1: Starting connection to {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
+        logger.info(f"FALLBACK: Connecting to SMTP {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
         
-        # Explicitly decide between SSL or STARTTLS
         if int(settings.SMTP_PORT) == 465:
-            logger.info("STEP 2: Using Implicit SSL (Port 465)")
             server = smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout)
         else:
-            logger.info("STEP 2: Using STARTTLS (Port 587)")
             server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=timeout)
-            logger.info("STEP 3: Sending EHLO...")
-            server.ehlo()
-            logger.info("STEP 4: Upgrading to TLS...")
             server.starttls()
-            logger.info("STEP 5: Sending EHLO again after TLS...")
-            server.ehlo()
 
-        logger.info(f"STEP 6: Attempting login for user: {settings.SMTP_USER}")
         server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-        
-        logger.info("STEP 7: Dispatching email message...")
         server.send_message(msg)
-        logger.info("STEP 8: Email sent successfully!")
-
-    except smtplib.SMTPAuthenticationError:
-        logger.error(f"FATAL: SMTP Authentication failed. Check if your API Key or App Password is correct.")
-        raise
-    except (socket.timeout, TimeoutError, smtplib.SMTPConnectError) as e:
-        logger.error(f"NETWORK ERROR: Connection to {settings.SMTP_SERVER} timed out after {timeout}s. This usually means the cloud provider is blocking this port.")
-        raise
+        logger.info("SMTP delivery successful!")
     except Exception as e:
-        logger.error(f"FAILURE: Unexpected error during email dispatch to {settings.SMTP_SERVER}: {e}")
+        logger.error(f"FAILURE: SMTP delivery failed: {e}")
         raise
     finally:
         if server:
@@ -82,6 +99,7 @@ async def send_verification_email(email: str, verification_token: str, first_nam
         border = "#E5E7EB"
         logo_url = f"{settings.FRONTEND_URL}/logo.png" if getattr(settings, "FRONTEND_URL", None) else None
         header_brand = f"<img src='{logo_url}' alt='Standard Chartered' style='height:42px'/>" if logo_url else "<div style='font-weight:700;font-size:18px;color:%s'>Standard Chartered</div>" % brand_primary
+        
         html_content = f"""
         <html>
           <body style="margin:0;padding:0;background:#F8F9FA;">
@@ -113,20 +131,28 @@ async def send_verification_email(email: str, verification_token: str, first_nam
           </body>
         </html>
         """
+        
+        subject = "Verify Your Standard Chartered Account"
+        
+        # Try API delivery first
+        success = await asyncio.to_thread(_send_email_via_api, email, subject, html_content)
+        if success:
+            return
+
+        # Fallback to SMTP
         msg = MIMEMultipart()
         msg['From'] = formataddr(("Standard Chartered Bank", settings.SMTP_FROM))
         msg['To'] = formataddr((safe_display_name, email))
-        msg['Subject'] = "Verify Your Standard Chartered Account"
-        
+        msg['Subject'] = subject
         msg.attach(MIMEText(html_content, 'html'))
         
-        # Send using the blocking function in a separate thread/task
         await asyncio.to_thread(_send_blocking_email, msg)
         logger.info(f"Verification email sent to {mask_email(email)}")
         
     except Exception as e:
         logger.error(f"Failed to send verification email to {mask_email(email)}: {e}")
         raise e
+
 
 async def send_login_alert(email: str, first_name: str, device_name: str, ip_address: str, location: str) -> None:
     """Send alert about login from new device"""
@@ -177,10 +203,18 @@ async def send_login_alert(email: str, first_name: str, device_name: str, ip_add
         </html>
         """
         
+        subject = "Security Alert: New Device Login Detected"
+
+        # Try API delivery first
+        success = await asyncio.to_thread(_send_email_via_api, email, subject, html_content)
+        if success:
+            return
+
+        # Fallback to SMTP
         msg = MIMEMultipart()
         msg['From'] = formataddr(("Standard Chartered Bank", settings.SMTP_FROM))
         msg['To'] = formataddr((safe_display_name, email))
-        msg['Subject'] = "Security Alert: New Device Login Detected"
+        msg['Subject'] = subject
         msg.attach(MIMEText(html_content, 'html'))
         
         await asyncio.to_thread(_send_blocking_email, msg)

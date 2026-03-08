@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str
     SMTP_FROM: str
     SMTP_TIMEOUT_SECONDS: int = 10  # Connection/operation timeout for SMTP
+    RESEND_API_KEY: Optional[str] = None # API Key for Resend API delivery
     
     # Frontend
     FRONTEND_URL: str = "http://localhost:3000"
