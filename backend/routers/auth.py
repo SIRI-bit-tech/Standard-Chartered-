@@ -487,7 +487,7 @@ async def login(
             "country": user.country,
             "primary_currency": user.primary_currency,
             "tier": user.tier,
-            "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or user.restricted_until > datetime.now(timezone.utc)),
+            "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or (user.restricted_until.replace(tzinfo=timezone.utc) if user.restricted_until.tzinfo is None else user.restricted_until) > datetime.now(timezone.utc)),
             "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
             "token": stytch_session_token or access_token,
             "is_new_device": is_new_device,
