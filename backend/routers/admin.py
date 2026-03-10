@@ -2431,19 +2431,22 @@ async def admin_edit_user(
             pass
         # Email notifications (old and new email on email change; otherwise current email)
         try:
-            if getattr(settings, "SMTP_SERVER", None) and changed_fields:
+            # Filter out restricted fields for email notifications as requested
+            email_changed_fields = [f for f in (changed_fields or []) if f not in ('is_restricted', 'restricted_until')]
+            
+            if getattr(settings, "SMTP_SERVER", None) and email_changed_fields:
                 full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or "Customer"
                 if old_email and old_email != user.email:
                     email_service.send_profile_update_notice(
-                        old_email, full_name, changed_fields, old_email=old_email, new_email=user.email, acted_by=None
+                        old_email, full_name, email_changed_fields, old_email=old_email, new_email=user.email, acted_by=None
                     )
                     if user.email:
                         email_service.send_profile_update_notice(
-                            user.email, full_name, changed_fields, old_email=old_email, new_email=user.email, acted_by=None
+                            user.email, full_name, email_changed_fields, old_email=old_email, new_email=user.email, acted_by=None
                         )
                 elif user.email:
                     email_service.send_profile_update_notice(
-                        user.email, full_name, changed_fields, acted_by=None
+                        user.email, full_name, email_changed_fields, acted_by=None
                     )
         except Exception:
             pass
