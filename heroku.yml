@@ -1,0 +1,7 @@
+build:
+  docker:
+    web: 
+      dockerfile: backend/Dockerfile
+      context: backend
+run:
+  web: uvicorn main:app --host 0.0.0.0 --port $PORT
