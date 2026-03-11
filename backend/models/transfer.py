@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, JSON
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, JSON, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -77,6 +77,17 @@ class Transfer(Base):
     
     # Relationships
     from_account = relationship("Account", foreign_keys=[from_account_id])
+
+    __table_args__ = (
+        # Transfer history per sender account
+        Index("ix_transfers_from_account_created", "from_account_id", "created_at"),
+        # Transfer history per user
+        Index("ix_transfers_user_created", "from_user_id", "created_at"),
+        # Filter pending/processing/failed transfers
+        Index("ix_transfers_status", "status"),
+        # Scheduled transfer runner (picks up transfers due for processing)
+        Index("ix_transfers_scheduled_status", "status", "scheduled_for"),
+    )
 
 
 class Beneficiary(Base):

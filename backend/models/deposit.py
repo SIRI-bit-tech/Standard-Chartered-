@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Boolean
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Boolean, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -79,3 +79,12 @@ class Deposit(Base):
     # Relationships
     account = relationship("Account", foreign_keys=[account_id])
     user = relationship("User", foreign_keys=[user_id])
+
+    __table_args__ = (
+        # Deposits for an account filtered by status (account detail view)
+        Index("ix_deposits_account_status", "account_id", "status"),
+        # Paginated deposit history per user
+        Index("ix_deposits_user_created", "user_id", "created_at"),
+        # Admin approval queue: all pending deposits
+        Index("ix_deposits_status_created", "status", "created_at"),
+    )

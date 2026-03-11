@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Boolean
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Boolean, Index
 from datetime import datetime
 import enum
 from database import Base
@@ -71,6 +71,13 @@ class BillPayment(Base):
     # Related transaction
     transaction_id = Column(String, nullable=True)
 
+    __table_args__ = (
+        # Paginated bill payment history per user
+        Index("ix_bill_payments_user_created", "user_id", "created_at"),
+        # Filter by status (pending/failed payments)
+        Index("ix_bill_payments_status", "status"),
+    )
+
 
 class ScheduledPayment(Base):
     """Scheduled/recurring bill payments"""
@@ -100,3 +107,10 @@ class ScheduledPayment(Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        # Scheduled payment runner: find active schedules due for processing
+        Index("ix_scheduled_payments_next_date_active", "next_payment_date", "is_active"),
+        # All scheduled payments per user
+        Index("ix_scheduled_payments_user_active", "user_id", "is_active"),
+    )

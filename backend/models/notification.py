@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Boolean, Enum, ForeignKey, Text
+from sqlalchemy import Column, String, DateTime, Boolean, Enum, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -58,6 +58,13 @@ class Notification(Base):
     
     # Relationships
     user = relationship("User", back_populates="notifications")
+
+    __table_args__ = (
+        # Unread notification feed (badge count + notification panel)
+        Index("ix_notifications_user_status", "user_id", "status"),
+        # Paginated notification history per user
+        Index("ix_notifications_user_created", "user_id", "created_at"),
+    )
 
 
 class NotificationPreference(Base):

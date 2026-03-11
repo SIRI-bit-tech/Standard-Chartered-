@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Integer, Boolean
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Integer, Boolean, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -120,6 +120,13 @@ class LoanApplication(Base):
     rejection_reason = Column(String, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    __table_args__ = (
+        # User's applications by status (application dashboard)
+        Index("ix_loan_applications_user_status", "user_id", "status"),
+        # Admin review queue: all pending/under_review applications
+        Index("ix_loan_applications_status_created", "status", "created_at"),
+    )
+
 
 class Loan(Base):
     """Active loan accounts"""
@@ -160,6 +167,13 @@ class Loan(Base):
     
     # Relationships
     user = relationship("User", back_populates="loans")
+
+    __table_args__ = (
+        # User's active/completed loans (loan dashboard)
+        Index("ix_loans_user_status", "user_id", "status"),
+        # Payment scheduler: find all active loans with upcoming payments
+        Index("ix_loans_next_payment", "status", "next_payment_date"),
+    )
 
 
 class LoanPayment(Base):

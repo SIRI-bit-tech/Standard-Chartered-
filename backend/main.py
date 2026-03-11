@@ -347,6 +347,56 @@ async def lifespan(app: FastAPI):
                 pass
             
             print("Database migrations completed successfully!")
+
+            # ── Composite Indexes ────────────────────────────────────────────
+            # CREATE INDEX IF NOT EXISTS is safe to run every startup;
+            # it's a no-op when the index already exists.
+            print("Ensuring composite indexes exist...")
+            index_ddls = [
+                # transactions ─ paginated history + status filter
+                "CREATE INDEX IF NOT EXISTS ix_transactions_account_created ON transactions (account_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_transactions_user_created    ON transactions (user_id,    created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_transactions_status          ON transactions (status)",
+                # transfers ─ history + status + scheduled runner
+                "CREATE INDEX IF NOT EXISTS ix_transfers_from_account_created ON transfers (from_account_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_transfers_user_created         ON transfers (from_user_id,    created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_transfers_status               ON transfers (status)",
+                "CREATE INDEX IF NOT EXISTS ix_transfers_scheduled_status     ON transfers (status, scheduled_for)",
+                # loans ─ user dashboard + payment scheduler
+                "CREATE INDEX IF NOT EXISTS ix_loans_user_status   ON loans (user_id, status)",
+                "CREATE INDEX IF NOT EXISTS ix_loans_next_payment  ON loans (status,  next_payment_date)",
+                # loan_applications ─ user view + admin review queue
+                "CREATE INDEX IF NOT EXISTS ix_loan_applications_user_status    ON loan_applications (user_id, status)",
+                "CREATE INDEX IF NOT EXISTS ix_loan_applications_status_created ON loan_applications (status,  created_at)",
+                # deposits ─ account/user history + admin approval queue
+                "CREATE INDEX IF NOT EXISTS ix_deposits_account_status  ON deposits (account_id, status)",
+                "CREATE INDEX IF NOT EXISTS ix_deposits_user_created    ON deposits (user_id,    created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_deposits_status_created  ON deposits (status,     created_at)",
+                # notifications ─ unread feed + history
+                "CREATE INDEX IF NOT EXISTS ix_notifications_user_status  ON notifications (user_id, status)",
+                "CREATE INDEX IF NOT EXISTS ix_notifications_user_created ON notifications (user_id, created_at)",
+                # support_tickets ─ user view + admin queue + priority queue
+                "CREATE INDEX IF NOT EXISTS ix_support_tickets_user_status      ON support_tickets (user_id, status)",
+                "CREATE INDEX IF NOT EXISTS ix_support_tickets_status_created   ON support_tickets (status,  created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_support_tickets_status_priority  ON support_tickets (status,  priority)",
+                # login_history ─ security audit trail
+                "CREATE INDEX IF NOT EXISTS ix_login_history_user_created ON login_history (user_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_login_history_user_success ON login_history (user_id, login_successful)",
+                # bill_payments + scheduled_payments
+                "CREATE INDEX IF NOT EXISTS ix_bill_payments_user_created        ON bill_payments       (user_id, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_bill_payments_status              ON bill_payments       (status)",
+                "CREATE INDEX IF NOT EXISTS ix_scheduled_payments_next_date_active ON scheduled_payments (next_payment_date, is_active)",
+                "CREATE INDEX IF NOT EXISTS ix_scheduled_payments_user_active    ON scheduled_payments  (user_id, is_active)",
+                # virtual_cards ─ card management
+                "CREATE INDEX IF NOT EXISTS ix_virtual_cards_account_status ON virtual_cards (account_id, status)",
+                "CREATE INDEX IF NOT EXISTS ix_virtual_cards_user_status    ON virtual_cards (user_id,    status)",
+            ]
+            for ddl in index_ddls:
+                try:
+                    await conn.execute(text(ddl))
+                except Exception as idx_err:
+                    print(f"Index notice (non-critical): {idx_err}")
+            print(f"Composite indexes ensured ({len(index_ddls)} checked).")
             
             # Seed default loan products if none exist
             check_products = await conn.execute(text("SELECT id FROM loan_products LIMIT 1"))

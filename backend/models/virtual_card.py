@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Boolean, Integer
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Boolean, Integer, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -99,3 +99,10 @@ class VirtualCard(Base):
     # Relationships
     user = relationship("User", foreign_keys=[user_id])
     account = relationship("Account", foreign_keys=[account_id])
+
+    __table_args__ = (
+        # List active/blocked cards for an account
+        Index("ix_virtual_cards_account_status", "account_id", "status"),
+        # List all cards for a user (card management page)
+        Index("ix_virtual_cards_user_status", "user_id", "status"),
+    )

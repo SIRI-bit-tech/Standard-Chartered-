@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Enum, ForeignKey, Text, Boolean
+from sqlalchemy import Column, String, DateTime, Enum, ForeignKey, Text, Boolean, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -56,6 +56,15 @@ class SupportTicket(Base):
     # Relationships
     user = relationship("User", back_populates="support_tickets")
     messages = relationship("TicketMessage", back_populates="ticket", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        # User's open/in-progress tickets (support dashboard)
+        Index("ix_support_tickets_user_status", "user_id", "status"),
+        # Admin queue: all open tickets ordered by creation
+        Index("ix_support_tickets_status_created", "status", "created_at"),
+        # Admin priority queue
+        Index("ix_support_tickets_status_priority", "status", "priority"),
+    )
 
 
 class TicketMessage(Base):
@@ -162,3 +171,10 @@ class LoginHistory(Base):
     
     # Relationships
     user = relationship("User", back_populates="login_history")
+
+    __table_args__ = (
+        # Security audit: recent logins per user
+        Index("ix_login_history_user_created", "user_id", "created_at"),
+        # Filter failed logins (security monitoring)
+        Index("ix_login_history_user_success", "user_id", "login_successful"),
+    )

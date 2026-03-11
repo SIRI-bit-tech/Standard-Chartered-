@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text
+from sqlalchemy import Column, String, Float, DateTime, Enum, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -62,3 +62,12 @@ class Transaction(Base):
     # Relationships
     user = relationship("User", back_populates="transactions")
     account = relationship("Account", back_populates="transactions")
+
+    __table_args__ = (
+        # Paginated transaction history per account (most common dashboard query)
+        Index("ix_transactions_account_created", "account_id", "created_at"),
+        # Paginated transaction history per user
+        Index("ix_transactions_user_created", "user_id", "created_at"),
+        # Filter by status (pending/failed jobs, admin views)
+        Index("ix_transactions_status", "status"),
+    )
