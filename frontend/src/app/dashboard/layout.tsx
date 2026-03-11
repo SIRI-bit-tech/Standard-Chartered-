@@ -12,16 +12,12 @@ import { LinkClickLoader } from '@/components/ui/link-click-loader'
 import Script from 'next/script'
 
 import { RestrictionProvider } from '@/components/auth/RestrictionProvider'
-import { RestrictionBanner } from '@/components/auth/RestrictionBanner'
-import { useAuth } from '@/hooks/use-auth'
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { user } = useAuth()
-
   // Ensure API client sends Bearer token for authenticated requests (e.g. transfers with PIN)
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -39,11 +35,6 @@ export default function DashboardLayout({
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0 xl:pb-0 pb-24">
           <DashboardHeader />
-          {user?.is_restricted && (
-            <div className="restriction-allow">
-              <RestrictionBanner userName={`${user.first_name} ${user.last_name}`} />
-            </div>
-          )}
           <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
             {children}
           </main>

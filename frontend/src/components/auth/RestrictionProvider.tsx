@@ -18,6 +18,13 @@ export const RestrictionProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     const isRestricted = !!user?.is_restricted;
 
+    useEffect(() => {
+        // Automatically show modal on mount if restricted
+        if (isRestricted) {
+            setIsModalOpen(true);
+        }
+    }, [isRestricted]);
+
     const showRestrictionModal = useCallback(() => {
         setIsModalOpen(true);
     }, []);
@@ -91,6 +98,7 @@ export const RestrictionProvider: React.FC<{ children: React.ReactNode }> = ({ c
             <RestrictionModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
+                userName={user ? `${user.first_name} ${user.last_name}` : undefined}
             />
         </RestrictionContext.Provider>
     );
