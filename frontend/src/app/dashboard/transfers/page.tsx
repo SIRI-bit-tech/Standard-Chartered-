@@ -36,7 +36,6 @@ import type {
   Account,
   TransferTypeTab,
   TransferSummaryState,
-  InternalTransferForm,
   DomesticTransferForm,
   InternationalTransferForm,
   ACHTransferForm,
@@ -44,7 +43,6 @@ import type {
 
 // Map tab to fee key
 const FEE_KEYS: Record<TransferTypeTab, keyof typeof TRANSFER_FEES> = {
-  internal: 'INTERNAL',
   domestic: 'DOMESTIC',
   international: 'INTERNATIONAL',
   ach: 'ACH',
@@ -98,7 +96,7 @@ export default function TransfersPage() {
   const { setAccounts } = useAccountStore()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new')
-  const [transferType, setTransferType] = useState<TransferTypeTab>('internal')
+  const [transferType, setTransferType] = useState<TransferTypeTab>('domestic')
 
   // State for recipient search and selection
   const [searchQuery, setSearchQuery] = useState('')
@@ -152,12 +150,6 @@ export default function TransfersPage() {
   const [transferError, setTransferError] = useState('')
 
   // Form state per type (single design: one active form at a time)
-  const [internalForm, setInternalForm] = useState<InternalTransferForm>({
-    from_account_id: '',
-    to_account_id: '',
-    amount: 0,
-    reference_memo: '',
-  })
   const [domesticForm, setDomesticForm] = useState<DomesticTransferForm>({
     from_account_id: '',
     recipient_name: '',
@@ -261,9 +253,7 @@ export default function TransfersPage() {
 
   // Sync "from account" into each form when switching type
   const currentFromAccountId =
-    transferType === 'internal'
-      ? internalForm.from_account_id
-      : transferType === 'domestic'
+    transferType === 'domestic'
         ? domesticForm.from_account_id
         : transferType === 'international'
           ? internationalForm.from_account_id
@@ -278,13 +268,11 @@ export default function TransfersPage() {
 
   // Current amount and fee for summary (real-time)
   const amount =
-    transferType === 'internal'
-      ? internalForm.amount
-      : transferType === 'domestic'
-        ? domesticForm.amount
-        : transferType === 'international'
-          ? internationalForm.amount
-          : achForm.amount
+    transferType === 'domestic'
+      ? domesticForm.amount
+      : transferType === 'international'
+        ? internationalForm.amount
+        : achForm.amount
   const fee = TRANSFER_FEES[FEE_KEYS[transferType]] ?? 0
   const totalToPay = amount + fee
   const primaryAccount = accountsList.find((a) => a.is_primary) ?? accountsList[0]
@@ -302,14 +290,6 @@ export default function TransfersPage() {
 
   const validateBeforeReview = (): string | null => {
     if (amount <= 0) return 'Enter a valid amount.'
-
-    if (transferType === 'internal') {
-      if (!internalForm.from_account_id) return 'Select a “From” account.'
-      if (!internalForm.to_account_id) return 'Select a “To” account.'
-      if (internalForm.from_account_id === internalForm.to_account_id)
-        return 'From and To accounts must be different.'
-      return null
-    }
 
     if (transferType === 'domestic') {
       if (!domesticForm.from_account_id) return 'Select a “From” account.'
@@ -369,38 +349,7 @@ export default function TransfersPage() {
     }
 
     try {
-      if (transferType === 'internal') {
-        const payload = {
-          transfer_pin: pin,
-          from_account_id: internalForm.from_account_id,
-          to_account_id: internalForm.to_account_id,
-          amount: internalForm.amount,
-          description: internalForm.reference_memo || undefined,
-        }
-        const res = await apiClient.post<{ success: boolean; data?: { transfer_id: string; reference: string }; message?: string }>(
-          '/api/v1/transfers/internal',
-          payload,
-        )
-        if (res.success) {
-          const receiptRef = res.data?.reference
-          const receiptAmt = internalForm.amount
-          setReceiptData({
-            id: res.data?.transfer_id,
-            status: 'processing',
-            type: 'internal',
-            amount: receiptAmt,
-            currency,
-            reference: receiptRef,
-          })
-          setReceiptOpen(true)
-          setInternalForm({ from_account_id: '', to_account_id: '', amount: 0, reference_memo: '' })
-          trackEvent('transfer_initiated', {
-            type: 'internal',
-            status: 'success'
-          });
-
-        }
-      } else if (transferType === 'domestic') {
+      if (transferType === 'domestic') {
         const payload = {
           transfer_pin: pin,
           from_account_id: domesticForm.from_account_id,
@@ -552,8 +501,6 @@ export default function TransfersPage() {
     }
   }
 
-  const ownAccountsExcludingFrom = accountsList.filter((a) => a.id !== currentFromAccountId)
-
   return (
     <div className="space-y-6">
       {/* Page title - no breadcrumb, no header per requirements */}
@@ -562,7 +509,7 @@ export default function TransfersPage() {
           Move Money
         </h1>
         <p className="mt-1 text-sm" style={{ color: colors.textSecondary }}>
-          Transfer between your accounts or to other recipients.
+          Transfer to other recipients or external accounts.
         </p>
       </div>
 
@@ -612,67 +559,6 @@ export default function TransfersPage() {
                 <Skeleton className="h-64 w-full rounded-xl" />
               ) : (
                 <>
-                  {transferType === 'internal' && (
-                    <>
-                      <SectionCard number={1} title="Sender Information">
-                        <FromAccountSelect
-                          accounts={accountsList}
-                          value={internalForm.from_account_id}
-                          onChange={(id) => {
-                            setFromAccountId(id)
-                            setInternalForm((p) => ({ ...p, from_account_id: id }))
-                          }}
-                        />
-                      </SectionCard>
-                      <SectionCard number={2} title="Recipient & Amount">
-                        <div className="space-y-4">
-                          <div>
-                            <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                              To Account
-                            </Label>
-                            <Select
-                              value={internalForm.to_account_id}
-                              onValueChange={(v) => setInternalForm((p) => ({ ...p, to_account_id: v }))}
-                            >
-                              <SelectTrigger className="w-full mt-1.5" style={{ borderColor: colors.border }}>
-                                <SelectValue placeholder="Select destination account" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ownAccountsExcludingFrom.map((acc) => (
-                                  <SelectItem key={acc.id} value={acc.id}>
-                                    {acc.nickname || acc.type} - ****{acc.account_number.slice(-4)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <AmountInput
-                            label={`Amount (${currency})`}
-                            value={internalForm.amount}
-                            onChange={(v) => setInternalForm((p) => ({ ...p, amount: v }))}
-                            currency={currency}
-                          />
-                          <div>
-                            <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                              Reference / Memo
-                            </Label>
-                            <Input
-                              placeholder="e.g. Rent Payment"
-                              value={internalForm.reference_memo}
-                              onChange={(e) => setInternalForm((p) => ({ ...p, reference_memo: e.target.value }))}
-                              className="mt-1.5"
-                            />
-                          </div>
-                        </div>
-                      </SectionCard>
-                      <InfoBanner
-                        variant="success"
-                        icon="zap"
-                        message="Instant Transfer Eligible — Funds will be available immediately in the recipient account."
-                      />
-                    </>
-                  )}
-
                   {transferType === 'domestic' && (
                     <>
                       <SectionCard number={1} title="Funding Account">
@@ -1056,7 +942,7 @@ export default function TransfersPage() {
                 <TransferSummaryCard
                   summary={summary}
                   onConfirm={handleReviewTransfer}
-                  confirmLabel={transferType === 'internal' ? 'Confirm Transfer' : 'Review Transfer'}
+                  confirmLabel="Review Transfer"
                   disclaimer="Rates are subject to market volatility. Final conversion at execution. Fees may vary by destination."
                   secureMessage="Secure transaction handled by 256-bit SSL."
                   loading={submitting}
@@ -1080,7 +966,7 @@ export default function TransfersPage() {
       <ReceiptModal
         open={receiptOpen}
         onClose={() => setReceiptOpen(false)}
-        data={receiptData || { status: 'unknown', type: 'internal', amount: 0, currency }}
+        data={receiptData || { status: 'unknown', type: 'domestic', amount: 0, currency }}
       />
 
       {activeTab === 'history' && (

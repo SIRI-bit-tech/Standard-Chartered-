@@ -9,6 +9,7 @@ from . import auth
 from . import verification
 from . import accounts
 from . import transfers
+from . import withdrawals
 from . import loans
 from . import notifications
 from . import support
@@ -23,6 +24,7 @@ __all__ = [
     "verification",
     "accounts",
     "transfers",
+    "withdrawals",
     "loans",
     "notifications",
     "support",

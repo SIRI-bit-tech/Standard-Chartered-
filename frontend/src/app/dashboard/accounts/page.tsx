@@ -296,18 +296,29 @@ function AccountCard({ account, primaryCurrency }: { account: Account; primaryCu
         <Button variant="outline" size="sm" className="flex-1 text-xs" asChild>
           <Link href={`/dashboard/accounts/${account.id}`}>View Details</Link>
         </Button>
-        <Button size="sm" className="flex-1 gap-1 text-xs" asChild>
-          <Link
-            href={
-              isCrypto
-                ? `/dashboard/accounts/${account.id}?action=withdraw`
-                : '/dashboard/transfers'
-            }
-          >
-            <ArrowRightLeft className="h-3.5 w-3.5" />
-            {primaryAction}
-          </Link>
-        </Button>
+        {isCrypto ? (
+          <Button size="sm" className="flex-1 gap-1 text-xs" asChild>
+            <Link href={`/dashboard/accounts/${account.id}?action=withdraw`}>
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+              Withdraw
+            </Link>
+          </Button>
+        ) : (
+          <div className="flex flex-1 gap-2">
+            <Button size="sm" className="flex-1 gap-1 text-xs" asChild>
+              <Link href="/dashboard/transfers">
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                Transfer
+              </Link>
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs" asChild>
+              <Link href="/dashboard/withdraw">
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                Withdraw
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )

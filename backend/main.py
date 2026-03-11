@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from config import settings
 from database import engine, Base
-from routers import auth, verification, accounts, transfers, loans, notifications, support, profile, documents, bill_payments, deposits, virtual_cards, admin
+from routers import auth, verification, accounts, transfers, withdrawals, loans, notifications, support, profile, documents, bill_payments, deposits, virtual_cards, admin
 from routers import security as security_router
 import logging
 import asyncio
@@ -490,6 +490,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(verification.router, tags=["Verification"])
 app.include_router(accounts.router, prefix="/api/v1/accounts", tags=["Accounts"])
 app.include_router(transfers.router, prefix="/api/v1/transfers", tags=["Transfers"])
+app.include_router(withdrawals.router, prefix="/api/v1/withdrawals", tags=["Withdrawals"])
 app.include_router(loans.router, prefix="/api/v1/loans", tags=["Loans"])
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(support.router, prefix="/api/v1/support", tags=["Support"])

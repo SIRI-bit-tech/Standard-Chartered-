@@ -90,7 +90,6 @@ export const TRANSACTION_TYPES = {
 
 // Transfer types
 export const TRANSFER_TYPES = {
-  INTERNAL: 'internal',
   DOMESTIC: 'domestic',
   INTERNATIONAL: 'international',
   ACH: 'ach',
@@ -99,7 +98,6 @@ export const TRANSFER_TYPES = {
 
 // Transfer fees
 export const TRANSFER_FEES = {
-  INTERNAL: 0,
   DOMESTIC: 2.5,
   INTERNATIONAL: 25,
   ACH: 0,

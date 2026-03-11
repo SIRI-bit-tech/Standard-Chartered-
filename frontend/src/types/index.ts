@@ -53,7 +53,7 @@ export interface Transaction {
 }
 
 // Transfer types
-export type TransferTypeTab = 'internal' | 'domestic' | 'international' | 'ach'
+export type TransferTypeTab = 'domestic' | 'international' | 'ach'
 
 export interface Transfer {
   id: string
@@ -143,13 +143,6 @@ export interface AdminTransactionRow {
 }
 
 /** Form state for internal transfer (own accounts) */
-export interface InternalTransferForm {
-  from_account_id: string
-  to_account_id: string
-  amount: number
-  reference_memo: string
-}
-
 /** Form state for domestic wire / transfer to other local accounts */
 export interface DomesticTransferForm {
   from_account_id: string

@@ -43,6 +43,37 @@ export function DashboardHeader() {
     }
   }, [user, setUser])
 
+  // Hydrate notifications from API so existing in-app notifications appear even before realtime updates
+  useEffect(() => {
+    if (!user?.id) return
+    let active = true
+    ; (async () => {
+      try {
+        const res = await apiClient.get<{
+          success: boolean
+          data: { id: string; title: string; message: string; type: any; status: any; created_at: string }[]
+        }>('/api/v1/notifications?limit=20')
+        if (!active) return
+        if (res.success && Array.isArray(res.data)) {
+          const mapped: Notification[] = res.data.map((n) => ({
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            status: n.status,
+            created_at: n.created_at,
+          }))
+          setNotifications(mapped)
+        }
+      } catch {
+        // Ignore failures; realtime channel may still populate notifications
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [user?.id, setNotifications])
+
   const notifChannel = user?.id ? `banking:notifications:${user.id}` : undefined
   useUserRealtime(notifChannel as string, (payload) => {
     if (payload?.title && payload?.message) {

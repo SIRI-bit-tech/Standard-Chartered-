@@ -5,7 +5,6 @@ import { colors } from '@/types'
 import type { TransferTypeTab } from '@/types'
 
 const TABS: { value: TransferTypeTab; label: string }[] = [
-  { value: 'internal', label: 'Internal' },
   { value: 'domestic', label: 'Domestic' },
   { value: 'international', label: 'International' },
   { value: 'ach', label: 'ACH' },

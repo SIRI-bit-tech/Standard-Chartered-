@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from models.user import User, UserTier
 from models.admin import AdminAuditLog
 from models.security import TrustedDevice
+from models.notification import Notification, NotificationType
 from models.support import LoginHistory
 from database import get_db
 from schemas.auth import (
@@ -406,33 +407,55 @@ async def login(
     user.last_login = datetime.utcnow()
     db.add(user)
     
-    # Alert user about new device login
+    # Alert user about new device login (email + in-app notification)
     if is_new_device:
         try:
-             from utils.email import send_login_alert
-             await send_login_alert(
-                 email=user.email,
-                 first_name=user.first_name,
-                 device_name=device_name or "Unknown Device",
-                 ip_address=ip_address,
-                 location=f"{geo.get('city', 'Unknown')}, {geo.get('country', 'Unknown')}"
-             )
+            from utils.email import send_login_alert
+            await send_login_alert(
+                email=user.email,
+                first_name=user.first_name,
+                device_name=device_name or "Unknown Device",
+                ip_address=ip_address,
+                location=f"{geo.get('city', 'Unknown')}, {geo.get('country', 'Unknown')}"
+            )
         except Exception as e:
             logger.error(f"Failed to send login alert: {e}")
+        # Create persistent in-app notification
+        try:
+            notif = Notification(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                type=NotificationType.SECURITY,
+                title="New device login detected",
+                message=f"We detected a login from {device_name or 'a new device'} at {geo.get('city', 'Unknown')}, {geo.get('country', 'Unknown')}.",
+                action_url=f"{settings.FRONTEND_URL}/dashboard/profile",
+            )
+            db.add(notif)
+        except Exception:
+            pass
 
     await db.commit()
-    
+
     access_token = create_access_token({"sub": user.id, "email": user.username})
     refresh_token = create_refresh_token(user.id)
     
-    # Publish notification
+    # Publish real-time notification for login (includes ID when new device)
     try:
         if settings.ABLY_API_KEY and settings.ABLY_API_KEY != "your-ably-api-key":
+            extra_data = {}
+            if is_new_device:
+                extra_data = {
+                    "device_name": device_name or "Unknown Device",
+                    "ip_address": ip_address,
+                    "city": geo.get("city"),
+                    "country": geo.get("country"),
+                }
             AblyRealtimeManager.publish_notification(
                 user.id,
                 "login",
                 "New Login",
-                f"You logged in on {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+                f"You logged in on {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}",
+                extra_data or None,
             )
     except Exception as e:
         logger.warning(f"Failed to publish notification: {e}")

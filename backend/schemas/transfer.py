@@ -11,33 +11,20 @@ class TransferType(str, Enum):
     DOMESTIC = "domestic"
     INTERNATIONAL = "international"
     PEER_TO_PEER = "peer_to_peer"
-
-
+    
+    
 class TransferStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-
-
+    
+    
 class BeneficiaryType(str, Enum):
     OWN_ACCOUNT = "own_account"
     REGISTERED = "registered"
     NEW = "new"
-
-
-class InternalTransferRequest(BaseModel):
-    """Internal transfer request"""
-    transfer_pin: str = Field(..., pattern=r"^\d{4}$", description="4-digit transfer PIN")
-    from_account_id: str
-    to_account_id: str
-    amount: float = Field(..., gt=0)
-    description: Optional[str] = Field(None, max_length=200)
-
-    @validator("transfer_pin")
-    def validate_transfer_pin_strength(cls, v: str) -> str:
-        return validate_transfer_pin_strength(v)
 
 
 class DomesticTransferRequest(BaseModel):
