@@ -181,7 +181,7 @@ function AccountCard({ account, primaryCurrency }: { account: Account; primaryCu
   const balanceLabel =
     isCrypto ? 'MARKET VALUE (BTC)' : 'AVAILABLE BALANCE'
 
-  const primaryAction = isCrypto ? 'Withdraw' : 'Transfer'
+
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault()

@@ -50,7 +50,6 @@ const FEE_KEYS: Record<TransferTypeTab, keyof typeof TRANSFER_FEES> = {
 
 // Estimated delivery copy per type
 const ESTIMATED_DELIVERY: Record<TransferTypeTab, string> = {
-  internal: 'Instant',
   domestic: '1-2 business days',
   international: '1-5 business days',
   ach: '1-3 business days',
@@ -252,15 +251,8 @@ export default function TransfersPage() {
   }, [activeTab, user?.id, filters.q, filters.period, filters.status, filters.type, historyPage, historyPageSize])
 
   // Sync "from account" into each form when switching type
-  const currentFromAccountId =
-    transferType === 'domestic'
-        ? domesticForm.from_account_id
-        : transferType === 'international'
-          ? internationalForm.from_account_id
-          : achForm.from_account_id
 
   const setFromAccountId = (id: string) => {
-    setInternalForm((p) => ({ ...p, from_account_id: id }))
     setDomesticForm((p) => ({ ...p, from_account_id: id }))
     setInternationalForm((p) => ({ ...p, from_account_id: id }))
     setAchForm((p) => ({ ...p, from_account_id: id }))
