@@ -63,7 +63,7 @@ class Transfer(Base):
     # Status tracking
     approval_required = Column(String, nullable=True)
     approval_code = Column(String, nullable=True)
-    requires_mfa = Column(String, default=False, nullable=False)
+    requires_mfa = Column(String, default="false", nullable=False)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -113,7 +113,7 @@ class Beneficiary(Base):
     iban = Column(String, nullable=True)
     
     # Status
-    is_active = Column(String, default=True, nullable=False)
+    is_active = Column(String, default="true", nullable=False)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
