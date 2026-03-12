@@ -789,7 +789,7 @@ async def get_transfer_history(
         acc_res = await db.execute(select(Account).where(Account.id.in_(acc_ids)))
         acc_map = {a.id: a for a in acc_res.scalars().all()}
     # Batch load users for those accounts
-    user_ids = list({a.user_id for a in acc_map.values()})
+    user_ids = list({*(a.user_id for a in acc_map.values()), user_id})
     user_map = {}
     if user_ids:
         u_res = await db.execute(select(User).where(User.id.in_(user_ids)))
@@ -827,30 +827,49 @@ async def get_transfer_history(
         if tr:
             subtitle = type_label(getattr(tr, "type", None))
             if direction == "debit":
-                # Outgoing: show the actual sender (current user)
-                counterparty = my_display_name or "Sender"
+                # Outgoing: show the beneficiary
+                dest_acc = acc_map.get(getattr(tr, "to_account_id", None))
+                if dest_acc:
+                    if dest_acc.user_id == user_id:
+                        # Internal transfer to own account -> show user's name
+                        counterparty = my_display_name or "Siri Dev"
+                    else:
+                        u = user_map.get(dest_acc.user_id)
+                        if u:
+                            full_name = f"{getattr(u, 'first_name', '')} {getattr(u, 'last_name', '')}".strip()
+                            counterparty = full_name or u.username or "Recipient"
+                else:
+                    # External transfer or from description
+                    name = None
+                    try:
+                        desc = str(getattr(tr, "description", ""))
+                        if "|" in desc:
+                             name = desc.split("|", 1)[0].strip()
+                    except: pass
+                    counterparty = name or tr.description or "Recipient"
             else:
                 # Incoming: show sender
                 src_acc = acc_map.get(getattr(tr, "from_account_id", None))
                 if src_acc:
                     if src_acc.user_id == user_id:
-                        counterparty = src_acc.nickname or f"Own {getattr(src_acc.account_type, 'value', str(src_acc.account_type)).title()} Account"
+                         # Internal transfer from own account -> show user's name
+                         counterparty = my_display_name or "Siri Dev"
                     else:
                         u = user_map.get(src_acc.user_id)
                         if u:
                             full_name = f"{getattr(u, 'first_name', '')} {getattr(u, 'last_name', '')}".strip()
                             counterparty = full_name or u.username or "Sender"
                 else:
-                    # For external incoming, prefer sender name from description if encoded "name | bank"
+                    # For external incoming
                     name = None
                     try:
-                        if getattr(tr, "description", None) and "|" in tr.description:
-                            parts = [p.strip() for p in tr.description.split("|", 1)]
-                            name = parts[0] if parts else None
-                            if len(parts) == 2:
-                                bank_name = parts[1]
-                    except Exception:
-                        name = None
+                        desc = str(getattr(tr, "description", ""))
+                        if "|" in desc:
+                             parts = [p.strip() for p in desc.split("|", 1)]
+                             name = parts[0]
+                             if len(parts) == 2:
+                                 bank_name = parts[1]
+                    except: pass
                     counterparty = name or tr.description or "External Bank"
             # Extract recipient bank from encoded "name | bank" where applicable
             if not bank_name:
@@ -955,7 +974,13 @@ async def get_transfer(
     recipient_account_masked = None
     # Best-effort: infer from available fields
     if to_acc:
-        recipient_name = "Own Account" if from_acc and to_acc and from_acc.user_id == to_acc.user_id else "Recipient Account"
+        if from_acc and to_acc and from_acc.user_id == to_acc.user_id:
+            # Internal transfer to self
+             u_res = await db.execute(select(User).where(User.id == user_id))
+             u = u_res.scalar_one_or_none()
+             recipient_name = f"{u.first_name} {u.last_name}".strip() if u else "Siri Dev"
+        else:
+             recipient_name = "Recipient Account"
         recipient_account_masked = mask_account(to_acc)
     elif getattr(transfer, "to_account_number", None):
         num = transfer.to_account_number
