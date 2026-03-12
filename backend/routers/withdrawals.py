@@ -12,6 +12,7 @@ from models.transaction import Transaction, TransactionType as TxType, Transacti
 from models.transfer import Transfer, TransferStatus, TransferType
 from schemas.transfer import TransferStatusUpdateResponse
 from utils.auth import get_current_user_id, verify_password
+from utils.transfer_helpers import _ensure_user_active, _verify_transfer_pin
 
 from schemas.pin_policy import validate_transfer_pin_strength
 from pydantic import BaseModel, Field, validator
@@ -33,75 +34,6 @@ class InternalWithdrawRequest(BaseModel):
     @validator("transfer_pin")
     def _validate_transfer_pin_strength(cls, v: str) -> str:
         return validate_transfer_pin_strength(v)
-
-
-MAX_FAILED_ATTEMPTS = 5
-LOCKOUT_DURATION = timedelta(hours=1)
-
-
-async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        from utils.errors import NotFoundError
-        raise NotFoundError(message="User not found")
-    if not user.is_active:
-        from utils.errors import UnauthorizedError
-        raise UnauthorizedError(message="Account suspended")
-
-
-async def _verify_transfer_pin(db: AsyncSession, user_id: str, transfer_pin: str) -> None:
-    """Verify user's transfer PIN; raises HTTPException/APIError if invalid."""
-    result = await db.execute(
-        select(User).where(User.id == user_id).with_for_update()
-    )
-    user = result.scalar_one_or_none()
-    if not user:
-        from utils.errors import NotFoundError
-        raise NotFoundError(message="User not found")
-    if not user.transfer_pin:
-        from utils.errors import ValidationError
-        raise ValidationError(
-            message="Transfer PIN not set. Please set your PIN first.",
-            details={"field": "transfer_pin"},
-        )
-
-    now = datetime.utcnow()
-    if user.transfer_pin_locked_until and user.transfer_pin_locked_until > now:
-        retry_after = int((user.transfer_pin_locked_until - now).total_seconds())
-        from utils.errors import APIError
-        raise APIError(
-            status_code=423,
-            message=f"Transfer PIN locked. Try again in {retry_after} seconds.",
-            error_code="PIN_LOCKED",
-            details={"field": "transfer_pin", "retry_after": retry_after},
-        )
-
-    if not verify_password(transfer_pin, user.transfer_pin):
-        user.transfer_pin_failed_attempts = (user.transfer_pin_failed_attempts or 0) + 1
-        if user.transfer_pin_failed_attempts >= MAX_FAILED_ATTEMPTS:
-            user.transfer_pin_locked_until = now + LOCKOUT_DURATION
-            await db.commit()
-            retry_after = int(LOCKOUT_DURATION.total_seconds())
-            from utils.errors import APIError
-            raise APIError(
-                status_code=423,
-                message=f"Transfer PIN locked. Try again in {retry_after} seconds.",
-                error_code="PIN_LOCKED",
-                details={"field": "transfer_pin", "retry_after": retry_after},
-            )
-
-        await db.commit()
-        from utils.errors import ValidationError
-        raise ValidationError(
-            message="Invalid transfer PIN",
-            details={"field": "transfer_pin"},
-        )
-
-    if user.transfer_pin_failed_attempts or user.transfer_pin_locked_until:
-        user.transfer_pin_failed_attempts = 0
-        user.transfer_pin_locked_until = None
-        await db.commit()
 
 
 router = APIRouter(tags=["Withdrawals"])

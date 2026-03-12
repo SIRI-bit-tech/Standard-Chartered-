@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 import httpx
 import asyncio
 from utils.crypto import get_bitcoin_price
+from utils.transfer_helpers import _ensure_user_active, _verify_transfer_pin
 from database import AsyncSessionLocal
 
 router = APIRouter(tags=["transfers"])
