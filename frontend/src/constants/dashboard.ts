@@ -5,6 +5,7 @@ import {
   Receipt,
   PiggyBank,
   ArrowDownCircle,
+  ArrowUpCircle,
   CreditCard,
   LifeBuoy,
   User,
@@ -15,6 +16,7 @@ export const DASHBOARD_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/dashboard/accounts', label: 'Accounts', icon: Wallet },
   { href: '/dashboard/transfers', label: 'Transfers', icon: ArrowLeftRight },
+  { href: '/dashboard/withdraw', label: 'Withdraw', icon: ArrowUpCircle },
   { href: '/dashboard/bills', label: 'Bills', icon: Receipt },
   { href: '/dashboard/loans', label: 'Loans', icon: PiggyBank },
   { href: '/dashboard/deposits', label: 'Deposits', icon: ArrowDownCircle },
@@ -29,6 +31,12 @@ export const QUICK_ACTIONS: QuickActionItem[] = [
     label: 'Transfer Funds',
     description: 'Internal & External',
     icon: ArrowLeftRight,
+  },
+  {
+    href: '/dashboard/withdraw',
+    label: 'Withdraw Funds',
+    description: 'Withdraw to your own accounts',
+    icon: ArrowUpCircle,
   },
   {
     href: '/dashboard/bills',
