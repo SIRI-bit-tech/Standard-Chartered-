@@ -97,7 +97,7 @@ export default function DashboardPage() {
     : (primaryAccount?.currency || getCurrencyFromCountry(user.country))
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 pb-4">
       <section>
         <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: colors.textPrimary }}>
           Welcome back, {user.username}!
@@ -129,7 +129,7 @@ export default function DashboardPage() {
         <QuickActionsGrid />
       </section>
 
-      <section className="rounded-xl border bg-card p-6" style={{ borderColor: colors.border }}>
+      <section className="rounded-xl border bg-card p-4 sm:p-6" style={{ borderColor: colors.border }}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold" style={{ color: colors.textPrimary }}>
             Recent Transactions

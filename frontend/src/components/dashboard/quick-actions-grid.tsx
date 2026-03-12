@@ -8,7 +8,7 @@ import { colors } from '@/types'
 
 export function QuickActionsGrid() {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
       {QUICK_ACTIONS.map((action) => {
         const Icon = action.icon
         return (
@@ -16,7 +16,7 @@ export function QuickActionsGrid() {
             key={action.href}
             href={action.href}
             className={cn(
-              'flex flex-col items-center justify-center rounded-xl border p-6 transition-colors',
+              'flex flex-col items-center justify-center rounded-xl border p-4 sm:p-6 transition-colors min-h-[110px]',
               'border-(--qa-border-color)',
               'hover:border-primary hover:bg-primary/5',
               action.className

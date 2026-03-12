@@ -33,9 +33,9 @@ export default function DashboardLayout({
           {`(function(){try{document.documentElement.classList.add('app-preloading');var d=document.createElement('div');d.id='app-boot-preloader';d.innerHTML='<div class="dot"></div>';document.body.appendChild(d);}catch(e){}})();`}
         </Script>
         <DashboardSidebar />
-        <div className="flex flex-1 flex-col min-w-0 xl:pb-0 pb-24">
+        <div className="flex flex-1 flex-col min-w-0 xl:pb-0 pb-20 overflow-hidden">
           <DashboardHeader />
-          <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
             {children}
           </main>
           <SessionKeeper />

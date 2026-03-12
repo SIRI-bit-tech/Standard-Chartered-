@@ -22,8 +22,9 @@ export default function BottomNavbar() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 xl:hidden z-40" style={{ padding: '0 12px 12px 12px' }}>
+    <nav className="fixed bottom-0 left-0 right-0 xl:hidden z-50 pointer-events-none" style={{ padding: '0 12px 12px 12px' }}>
       <div
+        className="pointer-events-auto"
         style={{
           position: 'relative',
           display: 'flex',
