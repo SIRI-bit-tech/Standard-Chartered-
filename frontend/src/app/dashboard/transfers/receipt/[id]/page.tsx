@@ -42,7 +42,7 @@ export default function TransferReceiptPage() {
   }, [data])
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
+    <div className="mx-auto max-w-lg p-4 sm:p-6">
       <div className="rounded-2xl border p-6 shadow-sm" style={{ borderColor: colors.border, background: colors.white }}>
         {loading ? (
           <p style={{ color: colors.textSecondary }}>Loading receipt…</p>
@@ -50,64 +50,64 @@ export default function TransferReceiptPage() {
           <p className="text-sm" style={{ color: colors.error }}>{error}</p>
         ) : data ? (
           <>
-            <div className="flex flex-col items-center gap-2 py-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: data.status === 'completed' ? `${colors.success}20` : colors.primaryLight }}>
-                <span className="text-2xl" style={{ color: data.status === 'completed' ? colors.success : colors.primary }}>✓</span>
+            <div className="flex flex-col items-center gap-1.5 py-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: data.status === 'completed' ? `${colors.success}15` : colors.primaryLight }}>
+                <span className="text-xl" style={{ color: data.status === 'completed' ? colors.success : colors.primary }}>✓</span>
               </div>
-              <h1 className="text-xl font-semibold" style={{ color: colors.textPrimary }}>
+              <h1 className="text-lg font-bold" style={{ color: colors.textPrimary }}>
                 {data.status === 'completed' ? 'Transfer Successful' : data.status === 'pending' || data.status === 'processing' ? 'Transfer Processing' : 'Transfer Status'}
               </h1>
-              <p className="text-sm" style={{ color: colors.textSecondary }}>
+              <p className="text-xs opacity-75" style={{ color: colors.textSecondary }}>
                 Your transaction has been processed successfully.
               </p>
             </div>
-            <div className="my-6 text-center">
-              <p className="text-[11px] font-semibold tracking-widest uppercase" style={{ color: colors.textSecondary }}>
+            <div className="my-4 text-center">
+              <p className="text-[10px] font-bold tracking-widest uppercase opacity-70" style={{ color: colors.textSecondary }}>
                 AMOUNT TRANSFERRED
               </p>
-              <p className="mt-1 text-4xl font-extrabold" style={{ color: colors.primary }}>
+              <p className="mt-0.5 text-3xl font-black" style={{ color: colors.primary }}>
                 {amountText}
               </p>
             </div>
             <hr className="my-5" style={{ borderColor: colors.border }} />
-            <div className="grid grid-cols-2 gap-6 text-sm">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4 text-xs">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>
-                  Transaction Reference
+                <p className="text-[10px] font-bold uppercase tracking-tight" style={{ color: colors.textSecondary }}>
+                  Ref. Number
                 </p>
-                <p className="mt-1 font-medium" style={{ color: colors.textPrimary }}>
+                <p className="mt-0.5 font-semibold truncate" style={{ color: colors.textPrimary }}>
                   {data.reference_number}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>
+                <p className="text-[10px] font-bold uppercase tracking-tight" style={{ color: colors.textSecondary }}>
                   Date & Time
                 </p>
-                <p className="mt-1 font-medium" style={{ color: colors.textPrimary }}>
-                  {data.created_at ? new Date(data.created_at).toLocaleString() : '—'}
+                <p className="mt-0.5 font-semibold" style={{ color: colors.textPrimary }}>
+                  {data.created_at ? new Date(data.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>
+                <p className="text-[10px] font-bold uppercase tracking-tight" style={{ color: colors.textSecondary }}>
                   From Account
                 </p>
-                <p className="mt-1 font-medium" style={{ color: colors.textPrimary }}>
+                <p className="mt-0.5 font-semibold truncate" style={{ color: colors.textPrimary }}>
                   {data.from_account_masked || '—'}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>
+                <p className="text-[10px] font-bold uppercase tracking-tight" style={{ color: colors.textSecondary }}>
                   Recipient Bank
                 </p>
-                <p className="mt-1 font-medium" style={{ color: colors.textPrimary }}>
+                <p className="mt-0.5 font-semibold truncate" style={{ color: colors.textPrimary }}>
                   {data.recipient_bank || '—'}
                 </p>
               </div>
-              <div className="col-span-2 md:col-span-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: colors.textSecondary }}>
+              <div className="col-span-2">
+                <p className="text-[10px] font-bold uppercase tracking-tight" style={{ color: colors.textSecondary }}>
                   Recipient Name
                 </p>
-                <p className="mt-1 font-medium" style={{ color: colors.textPrimary }}>
+                <p className="mt-0.5 font-semibold" style={{ color: colors.textPrimary }}>
                   {data.recipient_name || data.recipient_account_masked || '—'}
                 </p>
               </div>
