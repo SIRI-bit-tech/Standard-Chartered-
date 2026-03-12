@@ -498,6 +498,7 @@ export interface QuickActionItem {
   label: string
   description?: string
   icon: ComponentType<{ className?: string; size?: number }>
+  className?: string
 }
 
 // Color theme variables

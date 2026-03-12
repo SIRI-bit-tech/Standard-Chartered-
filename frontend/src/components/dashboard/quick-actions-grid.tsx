@@ -17,8 +17,9 @@ export function QuickActionsGrid() {
             href={action.href}
             className={cn(
               'flex flex-col items-center justify-center rounded-xl border p-6 transition-colors',
-              'border-[color:var(--qa-border-color)]',
+              'border-(--qa-border-color)',
               'hover:border-primary hover:bg-primary/5',
+              action.className
             )}
             style={{ ['--qa-border-color' as any]: colors.border } as CSSProperties}
           >

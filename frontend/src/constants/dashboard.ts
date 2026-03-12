@@ -37,6 +37,7 @@ export const QUICK_ACTIONS: QuickActionItem[] = [
     label: 'Withdraw Funds',
     description: 'Withdraw to your own accounts',
     icon: ArrowUpCircle,
+    className: 'xl:hidden',
   },
   {
     href: '/dashboard/bills',
