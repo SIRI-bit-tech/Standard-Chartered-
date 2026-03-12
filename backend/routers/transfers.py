@@ -23,6 +23,7 @@ import uuid
 from datetime import datetime, timedelta
 import httpx
 import asyncio
+from utils.crypto import get_bitcoin_price
 from database import AsyncSessionLocal
 
 router = APIRouter(tags=["transfers"])
@@ -1102,15 +1103,7 @@ async def crypto_withdraw(
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     
     # 1. Fetch current BTC price for internal accounting and conversion
-    btc_price = 1.0
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            resp = await client.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd")
-            data = resp.json()
-            btc_price = data.get("bitcoin", {}).get("usd", 0)
-    except Exception:
-        logger.warning("Failed to fetch BTC price for withdrawal accounting, using fallback")
-        btc_price = 65000.0
+    btc_price = await get_bitcoin_price()
 
     async with db.begin():
         # Fetch source crypto account

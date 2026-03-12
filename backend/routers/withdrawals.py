@@ -15,6 +15,7 @@ from utils.auth import get_current_user_id, verify_password
 
 from schemas.pin_policy import validate_transfer_pin_strength
 from pydantic import BaseModel, Field, validator
+from utils.crypto import get_bitcoin_price
 
 from routers.transfers import _schedule_auto_complete
 
@@ -117,12 +118,8 @@ async def internal_withdraw(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Move money between the user's own accounts (current, savings, etc).
-
-    This is the new home for what used to be "internal transfer":
-    - Debits `from_account_id`
-    - Credits `to_account_id`
-    - Uses a `Transfer` record with type=INTERNAL for history/receipts
+    Move money between the user's own accounts (current, savings, crypto).
+    Supports real-time conversion if one account is crypto.
     """
     await _ensure_user_active(db, user_id)
 
@@ -148,10 +145,30 @@ async def internal_withdraw(
 
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
 
+    # If cross-currency (crypto involved), get current price
+    is_conversion = from_account_preview.currency != to_account_preview.currency
+    btc_price = 0.0
+    
+    if is_conversion:
+        btc_price = await get_bitcoin_price()
+
     transfer_id = str(uuid.uuid4())
     reference_number = str(uuid.uuid4())[:12].upper()
     fee_amount = 0.0
-    total_amount = request.amount + fee_amount
+    
+    # The 'amount' in request is in the currency of the FROM account
+    debit_amount = request.amount
+    credit_amount = request.amount
+    
+    if is_conversion:
+        if from_account_preview.currency == "BTC":
+            # Crypto -> Fiat
+            credit_amount = debit_amount * btc_price
+        else:
+            # Fiat -> Crypto
+            credit_amount = debit_amount / btc_price
+
+    total_debit = debit_amount + fee_amount
 
     try:
         async with db.begin():
@@ -161,36 +178,37 @@ async def internal_withdraw(
                 .with_for_update()
             )
             from_account = from_account_res.scalar_one_or_none()
-            if not from_account:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Source account not found")
-
+            
             to_account_res = await db.execute(
                 select(Account)
                 .where(Account.id == request.to_account_id)
                 .with_for_update()
             )
             to_account = to_account_res.scalar_one_or_none()
-            if not to_account:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Destination account not found")
 
-            if from_account.currency != to_account.currency:
-                from utils.errors import ValidationError
-                raise ValidationError(
-                    message="Currency mismatch between accounts",
-                    details={"field": "to_account_id"},
-                )
-
-            if (from_account.available_balance or 0.0) < total_amount:
+            if (from_account.available_balance or 0.0) < total_debit:
                 from utils.errors import ValidationError
                 raise ValidationError(
                     message="Insufficient funds",
                     details={"field": "amount"},
                 )
 
+            # Record balances
             from_before = from_account.balance or 0.0
-            from_account.balance = from_before - total_amount
-            from_account.available_balance = (from_account.available_balance or 0.0) - total_amount
+            to_before = to_account.balance or 0.0
+            
+            # Update balances
+            from_account.balance = from_before - total_debit
+            from_account.available_balance = (from_account.available_balance or 0.0) - total_debit
             from_account.updated_at = datetime.utcnow()
+            
+            to_account.balance = to_before + credit_amount
+            to_account.available_balance = (to_account.available_balance or 0.0) + credit_amount
+            to_account.updated_at = datetime.utcnow()
+
+            description = request.description or f"Transfer to {to_account.account_type.value} account"
+            if is_conversion:
+                description = f"Currency conversion ({from_account.currency} to {to_account.currency})"
 
             new_transfer = Transfer(
                 id=transfer_id,
@@ -198,42 +216,70 @@ async def internal_withdraw(
                 from_user_id=user_id,
                 to_account_id=to_account.id,
                 type=TransferType.INTERNAL,
-                amount=request.amount,
-                currency=from_account.currency,
+                amount=credit_amount, # Recipient receives this
+                currency=to_account.currency,
                 fee_amount=fee_amount,
-                total_amount=total_amount,
+                total_amount=total_debit, # Sender pays this
                 reference_number=reference_number,
-                description=request.description or "Internal account transfer",
+                description=description,
                 status=TransferStatus.PROCESSING,
                 requires_mfa="false",
                 created_at=datetime.utcnow(),
             )
             db.add(new_transfer)
 
+            # Source Transaction
             from_tx = Transaction(
                 id=str(uuid.uuid4()),
                 account_id=from_account.id,
                 user_id=user_id,
                 type=TxType.WITHDRAWAL,
-                status=TxStatus.PROCESSING,
-                amount=total_amount,
+                status=TxStatus.COMPLETED,
+                amount=total_debit,
                 currency=from_account.currency,
                 balance_before=from_before,
                 balance_after=from_account.balance,
-                description="Internal account transfer",
+                description=description,
                 reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
                 transfer_id=new_transfer.id,
                 created_at=datetime.utcnow(),
             )
             db.add(from_tx)
-
-        _schedule_auto_complete(transfer_id, 120)
+            
+            # Destination Transaction
+            to_tx = Transaction(
+                id=str(uuid.uuid4()),
+                account_id=to_account.id,
+                user_id=user_id,
+                type=TxType.DEPOSIT,
+                status=TxStatus.COMPLETED,
+                amount=credit_amount,
+                currency=to_account.currency,
+                balance_before=to_before,
+                balance_after=to_account.balance,
+                description=description,
+                reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+                transfer_id=new_transfer.id,
+                created_at=datetime.utcnow(),
+            )
+            db.add(to_tx)
+            
+            # Mark transfer completed since it's internal & immediate
+            new_transfer.status = TransferStatus.COMPLETED
+            new_transfer.processed_at = datetime.utcnow()
 
         return TransferStatusUpdateResponse(
             success=True,
             transfer_id=transfer_id,
-            status=TransferStatus.PROCESSING.value,
-            message="Withdrawal between your accounts is processing",
+            status=TransferStatus.COMPLETED.value,
+            message="Transfer completed successfully",
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("Internal conversion failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error processing internal conversion",
         )
     except HTTPException:
         raise

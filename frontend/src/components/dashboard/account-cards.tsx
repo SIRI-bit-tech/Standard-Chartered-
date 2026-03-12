@@ -105,9 +105,11 @@ function AccountCard({ account, primaryCurrency }: { account: Account; primaryCu
   const hasIdentifier = !!identifier
   const displayNumber = !hasIdentifier
     ? 'Pending setup'
-    : numberVisible || isCrypto
-      ? identifier
-      : `**** ${identifier.slice(-4)}`
+    : isCrypto
+      ? `${identifier.slice(0, 8)}...${identifier.slice(-4)}`
+      : numberVisible
+        ? identifier
+        : `**** ${identifier.slice(-4)}`
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -133,13 +135,10 @@ function AccountCard({ account, primaryCurrency }: { account: Account; primaryCu
         </span>
         <Icon className="h-5 w-5" style={{ color: colors.primary }} />
       </div>
-      <p className="text-sm" style={{ color: colors.textSecondary }}>
-        {account.nickname || 'Unnamed Account'}
-      </p>
       <div className="mt-0.5 flex items-center gap-1 min-w-0">
         <p className={cn(
           "font-mono text-[10px] sm:text-xs text-gray-500",
-          isCrypto ? "break-all" : "truncate"
+          "truncate"
         )}>
           {displayNumber}
         </p>

@@ -11,51 +11,25 @@ from utils.auth import get_current_user_id
 from utils.account_helpers import _get_owned_account, _get_statement_by_id
 import httpx
 from datetime import datetime, timedelta
+from utils.logger import logger
 
 router = APIRouter()
 
-# Simple in-memory cache for crypto prices to avoid rate limits
-price_cache = {}
-CACHE_TTL = 60 # seconds
+from utils.crypto import get_crypto_price
 
 
 @router.get("/crypto-price")
-async def get_crypto_price(symbol: str = Query("bitcoin")):
-    """Get crypto price with caching to avoid rate limits"""
-    now = datetime.now()
-    
-    # Check cache
-    if symbol in price_cache:
-        cached_price, expiry = price_cache[symbol]
-        if now < expiry:
-            return {"success": True, "price": cached_price, "source": "cache"}
-
-    # Fetch from CoinGecko
+async def get_crypto_price_endpoint(symbol: str = Query("bitcoin")):
+    """Get crypto price using the centralized utility."""
     try:
-        async with httpx.AsyncClient() as client:
-            url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol}&vs_currencies=usd"
-            response = await client.get(url, timeout=10.0)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if symbol in data and "usd" in data[symbol]:
-                    price = float(data[symbol]["usd"])
-                    # Update cache
-                    price_cache[symbol] = (price, now + timedelta(seconds=CACHE_TTL))
-                    return {"success": True, "price": price, "source": "api"}
-            
-            # If rate limited or error, try to return expired cache if exists
-            if symbol in price_cache:
-                return {"success": True, "price": price_cache[symbol][0], "source": "expired_cache"}
-                
-            # Fallback
-            return {"success": True, "price": 65000.0, "source": "fallback"}
-            
+        price = await get_crypto_price(symbol)
+        return {"success": True, "price": price, "source": "real-time"}
     except Exception as e:
-        print(f"Error fetching crypto price: {e}")
-        if symbol in price_cache:
-            return {"success": True, "price": price_cache[symbol][0], "source": "expired_cache"}
-        return {"success": True, "price": 65000.0, "source": "fallback"}
+        logger.error(f"Endpoint failed to get price for {symbol}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Price data for {symbol} is currently unavailable."
+        )
 
 
 @router.get("/")
