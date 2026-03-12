@@ -171,102 +171,106 @@ async def internal_withdraw(
     total_debit = debit_amount + fee_amount
 
     try:
-        async with db.begin():
-            from_account_res = await db.execute(
-                select(Account)
-                .where(Account.id == request.from_account_id)
-                .with_for_update()
-            )
-            from_account = from_account_res.scalar_one_or_none()
-            
-            to_account_res = await db.execute(
-                select(Account)
-                .where(Account.id == request.to_account_id)
-                .with_for_update()
-            )
-            to_account = to_account_res.scalar_one_or_none()
+        # Note: A transaction is likely already begun by the previous executes
+        # If we want to ensure isolation, we could use begin_nested() or just commit() at the end
+        
+        from_account_res = await db.execute(
+            select(Account)
+            .where(Account.id == request.from_account_id)
+            .with_for_update()
+        )
+        from_account = from_account_res.scalar_one_or_none()
+        
+        to_account_res = await db.execute(
+            select(Account)
+            .where(Account.id == request.to_account_id)
+            .with_for_update()
+        )
+        to_account = to_account_res.scalar_one_or_none()
 
-            if (from_account.available_balance or 0.0) < total_debit:
-                from utils.errors import ValidationError
-                raise ValidationError(
-                    message="Insufficient funds",
-                    details={"field": "amount"},
-                )
+        if not from_account or not to_account:
+             raise HTTPException(status_code=404, detail="Account not found")
 
-            # Record balances
-            from_before = from_account.balance or 0.0
-            to_before = to_account.balance or 0.0
-            
-            # Update balances
-            from_account.balance = from_before - total_debit
-            from_account.available_balance = (from_account.available_balance or 0.0) - total_debit
-            from_account.updated_at = datetime.utcnow()
-            
-            to_account.balance = to_before + credit_amount
-            to_account.available_balance = (to_account.available_balance or 0.0) + credit_amount
-            to_account.updated_at = datetime.utcnow()
-
-            description = request.description or f"Transfer to {to_account.account_type.value} account"
-            if is_conversion:
-                description = f"Currency conversion ({from_account.currency} to {to_account.currency})"
-
-            new_transfer = Transfer(
-                id=transfer_id,
-                from_account_id=from_account.id,
-                from_user_id=user_id,
-                to_account_id=to_account.id,
-                type=TransferType.INTERNAL,
-                amount=credit_amount, # Recipient receives this
-                currency=to_account.currency,
-                fee_amount=fee_amount,
-                total_amount=total_debit, # Sender pays this
-                reference_number=reference_number,
-                description=description,
-                status=TransferStatus.PROCESSING,
-                requires_mfa="false",
-                created_at=datetime.utcnow(),
+        if (from_account.available_balance or 0.0) < total_debit:
+            from utils.errors import ValidationError
+            raise ValidationError(
+                message="Insufficient funds",
+                details={"field": "amount"},
             )
-            db.add(new_transfer)
 
-            # Source Transaction
-            from_tx = Transaction(
-                id=str(uuid.uuid4()),
-                account_id=from_account.id,
-                user_id=user_id,
-                type=TxType.WITHDRAWAL,
-                status=TxStatus.COMPLETED,
-                amount=total_debit,
-                currency=from_account.currency,
-                balance_before=from_before,
-                balance_after=from_account.balance,
-                description=description,
-                reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
-                transfer_id=new_transfer.id,
-                created_at=datetime.utcnow(),
-            )
-            db.add(from_tx)
-            
-            # Destination Transaction
-            to_tx = Transaction(
-                id=str(uuid.uuid4()),
-                account_id=to_account.id,
-                user_id=user_id,
-                type=TxType.DEPOSIT,
-                status=TxStatus.COMPLETED,
-                amount=credit_amount,
-                currency=to_account.currency,
-                balance_before=to_before,
-                balance_after=to_account.balance,
-                description=description,
-                reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
-                transfer_id=new_transfer.id,
-                created_at=datetime.utcnow(),
-            )
-            db.add(to_tx)
-            
-            # Mark transfer completed since it's internal & immediate
-            new_transfer.status = TransferStatus.COMPLETED
-            new_transfer.processed_at = datetime.utcnow()
+        # Record balances
+        from_before = from_account.balance or 0.0
+        to_before = to_account.balance or 0.0
+        
+        # Update balances
+        from_account.balance = from_before - total_debit
+        from_account.available_balance = (from_account.available_balance or 0.0) - total_debit
+        from_account.updated_at = datetime.utcnow()
+        
+        to_account.balance = to_before + credit_amount
+        to_account.available_balance = (to_account.available_balance or 0.0) + credit_amount
+        to_account.updated_at = datetime.utcnow()
+
+        description = request.description or f"Transfer to {to_account.account_type.value} account"
+        if is_conversion:
+            description = f"Currency conversion ({from_account.currency} to {to_account.currency})"
+
+        new_transfer = Transfer(
+            id=transfer_id,
+            from_account_id=from_account.id,
+            from_user_id=user_id,
+            to_account_id=to_account.id,
+            type=TransferType.INTERNAL,
+            amount=credit_amount, # Recipient receives this
+            currency=to_account.currency,
+            fee_amount=fee_amount,
+            total_amount=total_debit, # Sender pays this
+            reference_number=reference_number,
+            description=description,
+            status=TransferStatus.COMPLETED,
+            requires_mfa="false",
+            created_at=datetime.utcnow(),
+            processed_at=datetime.utcnow(),
+        )
+        db.add(new_transfer)
+
+        # Source Transaction
+        from_tx = Transaction(
+            id=str(uuid.uuid4()),
+            account_id=from_account.id,
+            user_id=user_id,
+            type=TxType.WITHDRAWAL,
+            status=TxStatus.COMPLETED,
+            amount=total_debit,
+            currency=from_account.currency,
+            balance_before=from_before,
+            balance_after=from_account.balance,
+            description=description,
+            reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+            transfer_id=new_transfer.id,
+            created_at=datetime.utcnow(),
+        )
+        db.add(from_tx)
+        
+        # Destination Transaction
+        to_tx = Transaction(
+            id=str(uuid.uuid4()),
+            account_id=to_account.id,
+            user_id=user_id,
+            type=TxType.DEPOSIT,
+            status=TxStatus.COMPLETED,
+            amount=credit_amount,
+            currency=to_account.currency,
+            balance_before=to_before,
+            balance_after=to_account.balance,
+            description=description,
+            reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
+            transfer_id=new_transfer.id,
+            created_at=datetime.utcnow(),
+        )
+        db.add(to_tx)
+        
+        await db.commit()
 
         return TransferStatusUpdateResponse(
             success=True,
@@ -274,19 +278,17 @@ async def internal_withdraw(
             status=TransferStatus.COMPLETED.value,
             message="Transfer completed successfully",
         )
-    except Exception:
-        db.rollback()
-        logger.exception("Internal conversion failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error processing internal conversion",
-        )
     except HTTPException:
+        await db.rollback()
         raise
-    except Exception:
+    except Exception as e:
+        await db.rollback()
+        logger.exception("Internal conversion failed: %s", str(e))
+        
+        # Try to record a failed transfer log separately
         try:
-            db.add(
-                Transfer(
+            async with AsyncSessionLocal() as fail_db:
+                fail_transfer = Transfer(
                     id=transfer_id,
                     from_account_id=request.from_account_id,
                     from_user_id=user_id,
@@ -295,27 +297,19 @@ async def internal_withdraw(
                     amount=request.amount,
                     currency=from_account_preview.currency,
                     fee_amount=fee_amount,
-                    total_amount=total_amount,
+                    total_amount=total_debit,
                     reference_number=reference_number,
                     description=request.description or "Internal account transfer",
                     status=TransferStatus.FAILED,
                     created_at=datetime.utcnow(),
                 )
-            )
-            await db.commit()
-        except Exception:
-            await db.rollback()
+                fail_db.add(fail_transfer)
+                await fail_db.commit()
+        except:
+            pass
 
-        logger.exception(
-            "Internal withdrawal failed - transfer_id=%s from_account=%s to_account=%s user_id=%s amount=%s",
-            transfer_id,
-            request.from_account_id,
-            request.to_account_id,
-            user_id,
-            request.amount,
-        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error processing withdrawal",
+            detail="Error processing internal conversion",
         )
 

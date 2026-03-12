@@ -1105,7 +1105,8 @@ async def crypto_withdraw(
     # 1. Fetch current BTC price for internal accounting and conversion
     btc_price = await get_bitcoin_price()
 
-    async with db.begin():
+    try:
+        # Note: Transaction is already begun by previous executes
         # Fetch source crypto account
         result = await db.execute(
             select(Account).where(Account.id == request.from_account_id).with_for_update()
@@ -1129,8 +1130,6 @@ async def crypto_withdraw(
         to_account_id = None
         transfer_currency = "BTC"
         transfer_amount = request.amount_btc # This is what we record in the transfer 'amount' field
-        # BUT for internal conversion, we want _auto_complete_transfer to credit USD.
-        # _auto_complete_transfer uses transfer.amount.
         
         if is_internal:
             dest_acc_res = await db.execute(
@@ -1193,6 +1192,12 @@ async def crypto_withdraw(
             created_at=datetime.utcnow()
         )
         db.add(tx)
+        
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        logger.exception("Crypto withdrawal failed")
+        raise
 
     _schedule_auto_complete(transfer_id, 120)
     
