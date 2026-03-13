@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
+import { API_BASE_URL } from "@/constants"
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("")
@@ -30,7 +31,7 @@ export function ForgotPasswordForm() {
       }
 
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/auth/request-password-reset`,
+        `${API_BASE_URL}/api/auth/request-password-reset`,
         { email }
       )
 

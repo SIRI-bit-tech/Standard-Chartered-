@@ -7,6 +7,7 @@ import axios from "axios"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuthContext } from "@/context/auth-context"
+import { API_BASE_URL } from "@/constants"
 
 export interface DocumentUploadProps {
   documentType: string
@@ -81,7 +82,7 @@ export function DocumentUpload({ documentType, onSuccess }: DocumentUploadProps)
       formData.append("user_id", user.id)
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/documents/upload`,
+        `${API_BASE_URL}/api/documents/upload`,
         formData,
         {
           headers: {

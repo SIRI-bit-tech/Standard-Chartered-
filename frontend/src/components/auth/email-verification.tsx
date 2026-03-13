@@ -8,6 +8,7 @@ import axios from "axios"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { API_BASE_URL } from "@/constants"
 
 export function EmailVerification() {
   const router = useRouter()
@@ -41,7 +42,7 @@ export function EmailVerification() {
       }
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/auth/verify-email`,
+        `${API_BASE_URL}/api/auth/verify-email`,
         { token }
       )
 
@@ -69,7 +70,7 @@ export function EmailVerification() {
     try {
       // Call resend email endpoint
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/auth/resend-verification`,
+        `${API_BASE_URL}/api/auth/resend-verification`,
         { email }
       )
       setSuccess(true)

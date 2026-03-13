@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import axios from "axios"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAuthContext } from "@/context/auth-context"
+import { API_BASE_URL } from "@/constants"
 import { ConfirmModal } from "@/components/ui/confirm-modal"
 import { toast } from "sonner"
 import { Button } from "../ui/button"
@@ -35,7 +36,7 @@ export function DocumentList() {
   const fetchDocuments = async () => {
     try {
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/documents/list`,
+        `${API_BASE_URL}/api/documents/list`,
         {
           params: { user_id: user?.id },
           headers: {
@@ -62,7 +63,7 @@ export function DocumentList() {
 
     try {
       await axios.delete(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/documents/${documentId}`,
+        `${API_BASE_URL}/api/documents/${documentId}`,
         {
           params: { user_id: user?.id },
           headers: {

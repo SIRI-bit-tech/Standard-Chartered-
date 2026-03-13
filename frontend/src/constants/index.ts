@@ -1,5 +1,10 @@
 // API Configuration
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+// Auto-upgrade http to https for any production cloud URL (Heroku, Render, etc) 
+// but keep http for local development (localhost/127.0.0.1)
+export const API_BASE_URL = (rawApiUrl.includes('localhost') || rawApiUrl.includes('127.0.0.1'))
+  ? rawApiUrl
+  : rawApiUrl.replace('http://', 'https://')
 export const API_VERSION = 'v1'
 export const API_ENDPOINTS = {
   // Auth
