@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     # Admin
     ADMIN_CODE: str
     
+    # Biller Directory APIs
+    METHOD_FI_API_KEY: Optional[str] = None
+    SALT_EDGE_APP_ID: Optional[str] = None
+    SALT_EDGE_SECRET: Optional[str] = None
+    
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = False

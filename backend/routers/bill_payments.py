@@ -49,8 +49,19 @@ async def get_payee_catalog(
     q: str | None = Query(None),
     country: str | None = Query(None),
     current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
 ):
-    items = global_query_catalog(category=category, q=q, country=country)
+    # Determine country: provided param or user's registered country
+    if not country:
+        user_res = await db.execute(select(User).where(User.id == current_user_id))
+        user = user_res.scalar_one_or_none()
+        if user:
+            # We map full country name to ISO if necessary, or use as is
+            # For simplicity, we assume user.country is either full name or ISO
+            country = user.country
+            
+    # The new query_catalog is async and hits real APIs
+    items = await global_query_catalog(category=category, q=q, country=country)
     return {"success": True, "data": items, "message": "Biller catalog retrieved"}
 
 class ImportFromCatalog(BaseModel):
