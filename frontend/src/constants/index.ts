@@ -1,26 +1,11 @@
 // API Configuration
-const getApiBaseUrl = () => {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
-  
-  // If we're in the browser on a production domain, we MUST use a secure production URL
-  if (typeof window !== 'undefined') {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    if (!isLocal) {
-      // If the env var is local but we are NOT on a local domain, 
-      // it means the wrong .env was pushed. We can try to infer or at least upgrade.
-      if (envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
-        // Fallback or warning - in a real app you might want to point to a known production URL
-        // For now, let's keep the envUrl but we'll try to upgrade if it starts with http
-      }
-      return envUrl.replace('http://', 'https://')
-    }
-  }
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+// Force https for production Heroku/Vercel environments to prevent Mixed Content errors
+export const API_BASE_URL = rawApiUrl.includes('herokuapp.com') ? rawApiUrl.replace('http://', 'https://') : rawApiUrl
 
-  // For server-side or local development
-  return envUrl
+if (typeof window !== 'undefined') {
+  console.log("🔍 [DEBUG] Current API_BASE_URL:", API_BASE_URL)
 }
-
-export const API_BASE_URL = getApiBaseUrl()
 export const API_VERSION = 'v1'
 export const API_ENDPOINTS = {
   // Auth
