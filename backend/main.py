@@ -465,7 +465,8 @@ app = FastAPI(
     title="Standard Chartered Banking API",
     description="Production-ready banking platform REST API",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # CORS middleware
