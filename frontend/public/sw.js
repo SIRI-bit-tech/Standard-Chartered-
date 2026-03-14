@@ -1,6 +1,5 @@
-const CACHE_NAME = 'sc-banking-v3';
+const CACHE_NAME = 'sc-banking-v4';
 const ASSETS_TO_CACHE = [
-    '/',
     '/manifest.json',
     '/standardcharted.png',
     '/logo.png',
@@ -18,7 +17,7 @@ self.addEventListener('install', (event) => {
             return cache.addAll(ASSETS_TO_CACHE);
         })
     );
-    self.skipWaiting();
+    globalThis.skipWaiting();
 });
 
 // Activate Event
@@ -35,7 +34,7 @@ self.addEventListener('activate', (event) => {
             );
         })
     );
-    self.clients.claim();
+    globalThis.clients.claim();
 });
 
 // Fetch Event - Network first, fallback to cache
@@ -47,33 +46,37 @@ self.addEventListener('fetch', (event) => {
     // Intercepting these on mobile causes iOS Chrome/Safari to crash the tab.
     const url = new URL(event.request.url);
     if (url.origin !== self.location.origin) {
-        return; 
+        return;
+    }
+
+    const destination = event.request.destination;
+    const isStaticAsset =
+        destination === 'style' ||
+        destination === 'script' ||
+        destination === 'image' ||
+        destination === 'font';
+
+    if (!isStaticAsset) {
+        return;
     }
 
     event.respondWith(
-        fetch(event.request)
-            .then((response) => {
-                // If successful, clone it and put in cache
-                if (response && response.status === 200 && response.type === 'basic') {
-                    const responseToCache = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(event.request, responseToCache);
-                    });
-                }
-                return response;
-            })
-            .catch(() => {
-                // Fallback to cache if network fails
-                return caches.match(event.request).then((cachedResponse) => {
-                    // We MUST return a Response object (not undefined) or respondWith fails
-                    if (cachedResponse) return cachedResponse;
+        caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) return cachedResponse;
 
-                    // If not in cache, returning a custom offline response or a basic empty response
-                    return new Response('Network error occurred', {
-                        status: 408,
-                        headers: { 'Content-Type': 'text/plain' }
-                    });
+            return fetch(event.request)
+                .then((response) => {
+                    if (response?.status === 200 && response.type === 'basic') {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, responseToCache);
+                        });
+                    }
+                    return response;
+                })
+                .catch(() => {
+                    return new Response('', { status: 204 });
                 });
-            })
+        })
     );
 });

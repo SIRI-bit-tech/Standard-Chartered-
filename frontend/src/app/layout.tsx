@@ -72,6 +72,10 @@ export default function RootLayout({
                 window.addEventListener('load', function() {
                   // Delay registration for mobile stability
                   setTimeout(() => {
+                    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+                    if (isIOS) {
+                      return;
+                    }
                     navigator.serviceWorker.register('/sw.js').then(
                       function(registration) {
                         console.log('SW Registered');
