@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { SessionTimeoutModal } from '@/components/auth/session-timeout-modal'
 import { apiClient } from '@/lib/api-client'
+import { API_BASE_URL } from '@/constants'
 
 function decodeJwtExp(token: string | null): number | null {
   try {
@@ -49,7 +50,7 @@ export function SessionKeeper() {
       try {
         const refresh_token = localStorage.getItem('refresh_token')
         if (!refresh_token) return
-        const res = await fetch(`/api/v1/auth/refresh`, {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token }),
@@ -102,7 +103,7 @@ export function SessionKeeper() {
     try {
       const refresh_token = localStorage.getItem('refresh_token')
       if (!refresh_token) return logout()
-      const res = await fetch(`/api/v1/auth/refresh`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token }),

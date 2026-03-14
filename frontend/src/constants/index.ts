@@ -1,7 +1,19 @@
 // API Configuration
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
-// Force https for production Heroku/Vercel environments to prevent Mixed Content errors
-export const API_BASE_URL = rawApiUrl.includes('herokuapp.com') ? rawApiUrl.replace('http://', 'https://') : rawApiUrl
+let rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000').trim()
+
+// Standardize: Remove trailing slash to prevent double-slash issues in paths
+if (rawApiUrl.endsWith('/')) {
+  rawApiUrl = rawApiUrl.slice(0, -1)
+}
+
+// Identify local vs production environments
+const isLocal = rawApiUrl.includes('localhost') || rawApiUrl.includes('127.0.0.1')
+
+// Force https for ALL production environments (Heroku, Render, Vercel, etc.)
+// if it's not local and using http, upgrade it.
+export const API_BASE_URL = (!isLocal && rawApiUrl.startsWith('http://')) 
+  ? rawApiUrl.replace('http://', 'https://') 
+  : rawApiUrl
 
 if (typeof window !== 'undefined') {
   console.log("🔍 [DEBUG] Current API_BASE_URL:", API_BASE_URL)
