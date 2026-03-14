@@ -574,6 +574,8 @@ export interface NotificationStore {
   addNotification: (notification: Notification) => void
   removeNotification: (id: string) => void
   setUnreadCount: (count: number) => void
+  markAsRead: (id: string) => void
+  markAllRead: () => void
 }
 
 export interface LoadingStore {

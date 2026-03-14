@@ -22,7 +22,7 @@ export const useAuthStore = create<AuthStore>()(
       logout: () => {
         set({ user: null, isAuthenticated: false, token: null })
         // Clear localStorage
-        if (typeof window !== 'undefined') {
+        if (globalThis.window !== undefined) {
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
           localStorage.removeItem('user')
@@ -61,16 +61,40 @@ export const useAccountStore = create<AccountStore>((set) => ({
 export const useNotificationStore = create<NotificationStore>((set) => ({
   notifications: [],
   unreadCount: 0,
-  setNotifications: (notifications) => set({ notifications }),
+  setNotifications: (notifications) => set({ 
+    notifications, 
+    unreadCount: notifications.filter(n => n.status === 'unread').length 
+  }),
   addNotification: (notification) =>
     set((state) => ({
       notifications: [notification, ...state.notifications],
+      unreadCount: notification.status === 'unread' ? state.unreadCount + 1 : state.unreadCount
     })),
   removeNotification: (id) =>
-    set((state) => ({
-      notifications: state.notifications.filter((n) => n.id !== id),
-    })),
+    set((state) => {
+      const n = state.notifications.find(notif => notif.id === id)
+      return {
+        notifications: state.notifications.filter((n) => n.id !== id),
+        unreadCount: n?.status === 'unread' ? state.unreadCount - 1 : state.unreadCount
+      }
+    }),
   setUnreadCount: (count) => set({ unreadCount: count }),
+  markAsRead: (id) =>
+    set((state) => {
+      const n = state.notifications.find(notif => notif.id === id)
+      if (n?.status !== 'unread') return state
+      return {
+        notifications: state.notifications.map((n) =>
+          n.id === id ? { ...n, status: 'read' as const } : n
+        ),
+        unreadCount: Math.max(0, state.unreadCount - 1)
+      }
+    }),
+  markAllRead: () =>
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, status: 'read' as const })),
+      unreadCount: 0
+    })),
 }))
 
 export const useLoadingStore = create<LoadingStore>((set, get) => ({

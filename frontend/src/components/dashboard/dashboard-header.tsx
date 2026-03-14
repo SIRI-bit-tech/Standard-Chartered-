@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { Bell, HelpCircle, User, LogOut } from 'lucide-react'
+import { Bell, HelpCircle, User, LogOut, Check, CheckCheck } from 'lucide-react'
 import { useAuthStore, useNotificationStore } from '@/lib/store'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -23,8 +23,38 @@ import { apiClient } from '@/lib/api-client'
 export function DashboardHeader() {
   const router = useRouter()
   const { user, logout, setUser } = useAuthStore()
-  const { notifications, setNotifications, addNotification } = useNotificationStore()
-  const hasUnread = notifications.some((n) => n.status === 'unread')
+  const { notifications, setNotifications, addNotification, markAsRead, markAllRead, unreadCount } = useNotificationStore()
+  const hasUnread = unreadCount > 0
+
+  const handleMarkAllRead = async () => {
+    try {
+      await apiClient.put('/api/v1/notifications/read-all', {})
+      markAllRead()
+    } catch (err) {
+      console.error('Failed to mark all as read', err)
+      // Fallback update local state anyway
+      markAllRead()
+    }
+  }
+
+  const handleMarkRead = async (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    // Check if already read to avoid redundant calls
+    const n = notifications.find(notif => notif.id === id)
+    if (n?.status === 'read') return
+
+    try {
+      await apiClient.put(`/api/v1/notifications/${id}/read`, {})
+      markAsRead(id)
+    } catch (err) {
+      console.error('Failed to mark as read', err)
+      markAsRead(id)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -115,23 +145,27 @@ export function DashboardHeader() {
                 <Bell className="h-5 w-5" style={{ color: colors.textSecondary }} />
                 {hasUnread && (
                   <span
-                    className="absolute right-1 top-1 h-2 w-2 rounded-full"
+                    className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
                     style={{ backgroundColor: colors.error }}
-                  />
+                  >
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
                 )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80 p-0">
               <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: colors.border }}>
                 <span className="text-sm font-semibold" style={{ color: colors.textPrimary }}>Notifications</span>
-                {notifications.length > 0 && (
+                {notifications.length > 0 && hasUnread && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-auto px-2 text-xs"
-                    onClick={() => setNotifications([])}
+                    className="h-auto px-2 text-xs flex items-center gap-1"
+                    onClick={handleMarkAllRead}
+                    title="Mark all as read"
                   >
-                    Clear all
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    Read all
                   </Button>
                 )}
               </div>
@@ -143,15 +177,40 @@ export function DashboardHeader() {
                 ) : (
                   <div className="py-1">
                     {notifications.slice(0, 10).map((n: Notification) => (
-                      <div
+                      <button
                         key={n.id}
-                        className="border-b px-3 py-2.5 last:border-b-0"
+                        type="button"
+                        className={`group relative w-full border-b px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none ${n.status === 'unread' ? 'bg-blue-50/30' : ''}`}
                         style={{ borderColor: colors.border }}
+                        onClick={() => handleMarkRead(n.id)}
                       >
-                        <p className="text-sm font-medium" style={{ color: colors.textPrimary }}>{n.title}</p>
-                        <p className="mt-0.5 text-xs" style={{ color: colors.textSecondary }}>{n.message}</p>
-                        <p className="mt-1 text-xs" style={{ color: colors.gray500 }}>{formatDate(n.created_at)}</p>
-                      </div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              {n.status === 'unread' && (
+                                <span 
+                                  className="h-2 w-2 rounded-full shrink-0" 
+                                  style={{ backgroundColor: colors.primary }}
+                                  title="Unread"
+                                />
+                              )}
+                              <p className={`text-sm ${n.status === 'unread' ? 'font-semibold' : 'font-medium'}`} style={{ color: colors.textPrimary }}>
+                                {n.title}
+                              </p>
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed" style={{ color: colors.textSecondary }}>{n.message}</p>
+                            <p className="mt-1.5 text-[10px] font-medium uppercase tracking-wider" style={{ color: colors.gray500 }}>
+                              {formatDate(n.created_at)}
+                            </p>
+                          </div>
+                          
+                          {n.status === 'unread' && (
+                            <div className="flex h-6 w-6 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                              <Check className="h-4 w-4" style={{ color: colors.primary }} />
+                            </div>
+                          )}
+                        </div>
+                      </button>
                     ))}
                   </div>
                 )}
