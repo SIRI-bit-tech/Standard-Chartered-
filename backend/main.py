@@ -465,9 +465,24 @@ app = FastAPI(
     title="Standard Chartered Banking API",
     description="Production-ready banking platform REST API",
     version="1.0.0",
-    lifespan=lifespan,
-    redirect_slashes=False,
+    lifespan=lifespan
 )
+
+# Fix HTTPS scheme behind reverse proxies (Heroku, Render)
+# This ensures trailing-slash redirects use https:// instead of http://
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+
+class ForceHTTPSSchemeMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        # Trust the X-Forwarded-Proto header from the reverse proxy
+        if request.headers.get("x-forwarded-proto") == "https":
+            request.scope["scheme"] = "https"
+        response = await call_next(request)
+        return response
+
+app.add_middleware(ForceHTTPSSchemeMiddleware)
+
 
 # CORS middleware
 # Build a clean, deduplicated list of allowed origins
