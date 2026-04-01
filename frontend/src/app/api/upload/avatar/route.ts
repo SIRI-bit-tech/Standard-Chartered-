@@ -50,21 +50,25 @@ function validateFile(file: any) {
 
 async function performUpload(file: File): Promise<string | null> {
   const hasKey = Boolean(process.env.UPLOADTHING_TOKEN || process.env.UPLOADTHING_SECRET || process.env.UPLOADTHING_API_KEY)
-  if (!hasKey) return null
+  if (!hasKey) {
+    console.error('[Upload] No UploadThing API key found')
+    return null
+  }
 
   try {
-    const modulePath = process.env.UPLOADTHING_MODULE || 'uploadthing/server'
-    const mod = await (new Function('p', 'return import(p)'))(modulePath).catch(() => null)
-    if (!mod || !('UTApi' in mod)) return null
-
+    // Direct import instead of dynamic import for better Vercel compatibility
+    const { UTApi } = await import('uploadthing/server')
+    
     const key = process.env.UPLOADTHING_TOKEN || process.env.UPLOADTHING_SECRET || process.env.UPLOADTHING_API_KEY
-    const utapi = new (mod.UTApi)({ apiKey: key })
-    const result = await utapi.uploadFiles(file, { acl: 'public-read' } as any)
+    const utapi = new UTApi({ token: key })
+    
+    const result = await utapi.uploadFiles(file)
     
     const first = Array.isArray(result) ? result[0] : result
     const responseData = first?.data || first
-    return responseData?.ufsUrl || responseData?.url || null
-  } catch {
+    return responseData?.url || null
+  } catch (err: any) {
+    console.error('[Upload] UploadThing error:', err?.message || err)
     return null
   }
 }
