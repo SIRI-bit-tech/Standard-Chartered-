@@ -42,10 +42,6 @@ export function ReceiptModal({ open, onClose, data }: Props) {
     }
   }, [open, data?.id])
 
-  const printReceipt = () => {
-    window.print()
-  }
-
   const shareReceipt = async () => {
     try {
       // Use html2canvas to capture the receipt as an image
