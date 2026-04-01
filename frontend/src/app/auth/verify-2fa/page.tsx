@@ -60,6 +60,10 @@ export default function Verify2FA() {
         localStorage.setItem('access_token', res.token.access_token)
         localStorage.setItem('refresh_token', res.token.refresh_token)
         document.cookie = `accessToken=${res.token.access_token}; path=/; max-age=3600; secure; samesite=strict`
+        
+        // Set token in API client for subsequent requests
+        apiClient.setAuthToken(res.token.access_token)
+        
         const userData = {
           id: res.data.user_id || res.data.id || '',
           email: res.data.email || '',

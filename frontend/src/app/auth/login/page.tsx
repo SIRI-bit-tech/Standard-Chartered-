@@ -129,6 +129,9 @@ export default function LoginPage() {
             localStorage.setItem('access_token', tokens.access_token)
             localStorage.setItem('refresh_token', tokens.refresh_token)
             document.cookie = `accessToken=${tokens.access_token}; path=/; max-age=3600; secure; samesite=strict`
+            
+            // Set token in API client for subsequent requests
+            apiClient.setAuthToken(tokens.access_token)
 
             const userData: User = {
               id: data.user_id || data.id || '',
@@ -345,6 +348,9 @@ export default function LoginPage() {
                         localStorage.setItem('access_token', tokens.access_token)
                         localStorage.setItem('refresh_token', tokens.refresh_token)
                         document.cookie = `accessToken=${tokens.access_token}; path=/; max-age=3600; secure; samesite=strict`
+                        
+                        // Set token in API client for subsequent requests
+                        apiClient.setAuthToken(tokens.access_token)
 
                         const userData: User = {
                           id: data.user_id || data.id || '',
@@ -393,6 +399,9 @@ export default function LoginPage() {
                       localStorage.setItem('access_token', tokens.access_token)
                       localStorage.setItem('refresh_token', tokens.refresh_token)
                       document.cookie = `accessToken=${tokens.access_token}; path=/; max-age=3600; secure; samesite=strict`
+                      
+                      // Set token in API client for subsequent requests
+                      apiClient.setAuthToken(tokens.access_token)
 
                       const userData: any = {
                         id: data.user_id || data.id || '',
