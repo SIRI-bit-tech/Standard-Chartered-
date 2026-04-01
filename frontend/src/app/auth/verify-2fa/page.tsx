@@ -31,8 +31,8 @@ export default function Verify2FA() {
   }
 
   const params = useMemo(() => {
-    if (typeof globalThis === 'undefined') return new URLSearchParams()
-    return new URLSearchParams(globalThis.location.search)
+    if (typeof window === 'undefined') return new URLSearchParams()
+    return new URLSearchParams(window.location.search)
   }, [])
 
   const session = params.get('session') || ''

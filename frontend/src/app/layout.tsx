@@ -12,7 +12,6 @@ export const metadata: Metadata = {
   description: 'Standard Chartered is a leading international banking group connecting corporate, institutional and affluent clients, as well as individuals and SMEs, to a network offering sustainable growth opportunities across Asia, Africa and the Middle East.',
   keywords:
     'Standard Chartered, Standard Chartered Bank, global banking, international banking, corporate banking, institutional banking, retail banking, personal banking, private banking, priority banking, wealth management, sustainable finance, Asia banking, Africa banking, Middle East banking, cross-border banking',
-  manifest: '/manifest.json',
   openGraph: {
     title: 'Standard Chartered Banking Platform',
     description: 'Secure, professional online banking with multi-currency support',
@@ -52,14 +51,33 @@ export default function RootLayout({
         <meta charSet="utf-8" />
         {/* Force light color scheme — prevents phone dark mode from inverting the app */}
         <meta name="color-scheme" content="light" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="SC Banking" />
         <meta name="format-detection" content="telephone=no" />
-        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="msapplication-config" content="/none" />
         <meta name="msapplication-TileColor" content="#0073CF" />
         <meta name="msapplication-tap-highlight" content="no" />
+
+        {/* Conditionally load manifest only for non-iOS devices */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+                if (!isIOS) {
+                  const link = document.createElement('link');
+                  link.rel = 'manifest';
+                  link.href = '/manifest.json';
+                  document.head.appendChild(link);
+                  
+                  // Enable mobile web app for Android
+                  const meta = document.createElement('meta');
+                  meta.name = 'mobile-web-app-capable';
+                  meta.content = 'yes';
+                  document.head.appendChild(meta);
+                }
+              })();
+            `,
+          }}
+        />
 
         {/* Stytch Device Fingerprinting Script */}
         <script src="https://js.stytch.com/stytch.js" defer></script>

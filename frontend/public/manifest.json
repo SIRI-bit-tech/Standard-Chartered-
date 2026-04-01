@@ -3,7 +3,7 @@
   "name": "Standard Chartered Banking",
   "short_name": "SC Banking",
   "description": "Secure, professional global banking platform by Standard Chartered.",
-  "start_url": "/?utm_source=pwa",
+  "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#ffffff",

@@ -31,18 +31,8 @@ export function PWAInstaller() {
 
         const ONE_DAY = 24 * 60 * 60 * 1000
 
+        // Completely disable PWA prompts on iOS
         if (isIOS) {
-            const lastShown = localStorage.getItem('pwa-ios-prompt-last-shown')
-            const now = Date.now()
-
-            if (!isStandalone && (!lastShown || now - Number.parseInt(lastShown) > ONE_DAY)) {
-                toast('Add to Home Screen', {
-                    description: 'Tap Share, then Add to Home Screen to install.',
-                    duration: 10000,
-                    onAutoClose: () => localStorage.setItem('pwa-ios-prompt-last-shown', now.toString()),
-                    onDismiss: () => localStorage.setItem('pwa-ios-prompt-last-shown', now.toString()),
-                })
-            }
             return
         }
 
