@@ -4,14 +4,14 @@ import React, { useState } from "react"
 import Link from 'next/link'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useLoadingStore } from '@/lib/store'
-import { ShieldCheck, Monitor, Smartphone, Eye, EyeOff } from 'lucide-react'
+import { ShieldCheck, Monitor, Smartphone, Eye, EyeOff, Fingerprint } from 'lucide-react'
 import { stytchClient } from '@/lib/stytch-client'
 import { identifyUser, trackEvent } from '@/lib/analytics'
 import { parseApiError } from '@/utils/error-handler'
-import { Fingerprint } from 'lucide-react'
 import { encodeCredential, parseAuthenticationOptions } from '@/utils/webauthn'
 import { toast } from 'sonner'
 import type { User } from '@/types'
+import { BiometricSetupPrompt } from '@/components/auth/biometric-setup-prompt'
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
@@ -26,6 +26,34 @@ export default function LoginPage() {
   const [showTrustModal, setShowTrustModal] = useState(false)
   const [trustDeviceData, setTrustDeviceData] = useState<any>(null)
   const [isTrusting, setIsTrusting] = useState(false)
+
+  // Cross-device biometric setup prompt
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false)
+  const [postLoginRedirect, setPostLoginRedirect] = useState('/dashboard')
+
+  /**
+   * After login tokens/user are stored, decide whether to show the
+   * "Enable biometrics on this device?" prompt or go straight to dashboard.
+   *
+   * Conditions to show prompt:
+   *  1. User has biometrics enabled on at least one other device (biometric_enabled === true)
+   *  2. The current browser supports WebAuthn / Passkeys
+   *  3. This device_id hasn't been prompted before (localStorage flag)
+   */
+  const maybeShowBiometricPrompt = (biometricEnabled: boolean, deviceId: string | undefined, redirect = '/dashboard') => {
+    const supportsWebAuthn = typeof globalThis !== 'undefined' && !!globalThis.PublicKeyCredential
+    const promptKey = `biometric_prompted_${deviceId || 'unknown'}`
+    const alreadyPrompted = deviceId ? localStorage.getItem(promptKey) === '1' : false
+
+    if (biometricEnabled && supportsWebAuthn && !alreadyPrompted) {
+      // Mark this device as prompted so we don't ask again
+      if (deviceId) localStorage.setItem(promptKey, '1')
+      setPostLoginRedirect(redirect)
+      setShowBiometricPrompt(true)
+    } else {
+      globalThis.location.href = redirect
+    }
+  }
 
   const getDeviceInfo = () => {
     try {
@@ -83,7 +111,7 @@ export default function LoginPage() {
         params.set('session', response.data.session_token)
         params.set('device', device_id || '')
         params.set('name', device_name || '')
-        window.location.href = `/auth/verify-2fa?${params.toString()}`
+        globalThis.location.href = `/auth/verify-2fa?${params.toString()}`
         return
       }
 
@@ -130,7 +158,7 @@ export default function LoginPage() {
 
           setLoading(false)
           hide()
-          window.location.href = '/dashboard'
+          maybeShowBiometricPrompt(!!data.biometric_enabled, device_id)
         }
 
         if (data.is_new_device) {
@@ -230,7 +258,7 @@ export default function LoginPage() {
         setLoading(false)
         hide()
         toast.success("Welcome back! Signed in with Biometrics.")
-        window.location.href = '/dashboard'
+        globalThis.location.href = '/dashboard'
       } else {
         throw new Error('Authentication response invalid')
       }
@@ -245,6 +273,16 @@ export default function LoginPage() {
 
   return (
     <>
+      {/* Cross-device Biometric Setup Prompt */}
+      <BiometricSetupPrompt
+        isOpen={showBiometricPrompt}
+        onClose={() => setShowBiometricPrompt(false)}
+        onDone={() => {
+          setShowBiometricPrompt(false)
+          globalThis.location.href = postLoginRedirect
+        }}
+      />
+
       {/* Trust Device Modal */}
       {showTrustModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -333,7 +371,7 @@ export default function LoginPage() {
                         trackEvent('login_success', { device_trusted: true });
 
                       }
-                      window.location.href = '/dashboard';
+                      maybeShowBiometricPrompt(!!data.biometric_enabled, data.device_id || trustDeviceData?.data?.device_id);
                     }
                   }}
                   disabled={isTrusting}
@@ -381,7 +419,7 @@ export default function LoginPage() {
                       trackEvent('login_success', { device_trusted: false });
 
                     }
-                    window.location.href = '/dashboard'
+                    maybeShowBiometricPrompt(!!data.biometric_enabled, data.device_id || trustDeviceData?.data?.device_id)
                   }}
                   className="w-full py-3 px-4 bg-transparent text-gray-500 rounded-xl hover:bg-gray-50 transition-all font-medium"
                 >
@@ -405,10 +443,11 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="login-username" className="block text-sm font-medium text-gray-700 mb-1">
               Username
             </label>
             <input
+              id="login-username"
               type="text"
               name="username"
               autoComplete="username"
@@ -425,11 +464,12 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">
               Password
             </label>
             <div className="relative">
               <input
+                id="login-password"
                 type={showPassword ? "text" : "password"}
                 name="password"
                 autoComplete="current-password"
