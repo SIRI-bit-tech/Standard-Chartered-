@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
-import { X } from 'lucide-react'
+import { X, Share2, Download, FileText } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface Props {
   open: boolean
@@ -45,6 +46,116 @@ export function ReceiptModal({ open, onClose, data }: Props) {
     window.print()
   }
 
+  const shareReceipt = async () => {
+    try {
+      // Use html2canvas to capture the receipt as an image
+      const html2canvas = (await import('html2canvas')).default
+      const element = document.querySelector('.receipt-content') as HTMLElement
+      if (!element) {
+        toast.error('Unable to capture receipt')
+        return
+      }
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false
+      })
+
+      // Convert canvas to blob
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast.error('Failed to generate image')
+          return
+        }
+
+        const fileName = `receipt-${receipt?.reference_number || data.reference || Date.now()}.png`
+        const file = new File([blob], fileName, { type: 'image/png' })
+
+        const shareData = {
+          title: 'Transfer Receipt',
+          text: `Transfer of ${formatCurrency(data.amount, data.currency)} - Ref: ${receipt?.reference_number || data.reference || 'N/A'}`,
+          files: [file]
+        }
+
+        if (navigator.share && navigator.canShare?.(shareData)) {
+          try {
+            await navigator.share(shareData)
+            toast.success('Receipt shared successfully')
+          } catch (err: any) {
+            if (err.name !== 'AbortError') {
+              // Fallback: download the image
+              const url = URL.createObjectURL(blob)
+              const link = document.createElement('a')
+              link.href = url
+              link.download = fileName
+              link.click()
+              URL.revokeObjectURL(url)
+              toast.info('Receipt downloaded instead')
+            }
+          }
+        } else {
+          // Fallback: download the image
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = fileName
+          link.click()
+          URL.revokeObjectURL(url)
+          toast.success('Receipt downloaded')
+        }
+      })
+    } catch (err) {
+      console.error('Share receipt error:', err)
+      toast.error('Failed to share receipt')
+    }
+  }
+
+  const saveAsImage = async () => {
+    try {
+      // Use html2canvas to capture the receipt
+      const html2canvas = (await import('html2canvas')).default
+      const element = document.querySelector('.receipt-content') as HTMLElement
+      if (!element) {
+        toast.error('Unable to capture receipt')
+        return
+      }
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false
+      })
+
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          toast.error('Failed to generate image')
+          return
+        }
+
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `receipt-${receipt?.reference_number || data.reference || Date.now()}.png`
+        link.click()
+        URL.revokeObjectURL(url)
+        toast.success('Receipt saved as image')
+      })
+    } catch (err) {
+      console.error('Save as image error:', err)
+      toast.error('Failed to save receipt as image')
+    }
+  }
+
+  const downloadPDF = () => {
+    if (data.id) {
+      window.open(`/dashboard/transfers/receipt/${data.id}`, '_blank')
+      toast.success('Opening receipt in new tab')
+    } else {
+      window.print()
+    }
+  }
+
   if (!open) return null
 
   return (
@@ -64,7 +175,7 @@ export function ReceiptModal({ open, onClose, data }: Props) {
         ) : error ? (
           <p className="text-sm" style={{ color: colors.error }}>{error}</p>
         ) : (
-          <>
+          <div className="receipt-content">
             <div className="flex flex-col items-center gap-1.5 py-1">
               <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: `${colors.success}15` }}>
                 <span className="text-xl font-bold" style={{ color: colors.success }}>✓</span>
@@ -148,17 +259,21 @@ export function ReceiptModal({ open, onClose, data }: Props) {
                 </div>
               </div>
             </div>
-            <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Button variant="outline" onClick={printReceipt}>PDF</Button>
-              <Button variant="outline" onClick={printReceipt}>Email</Button>
-              <Button variant="outline" onClick={printReceipt}>Print</Button>
-              {data.id ? (
-                <Button onClick={() => { window.location.href = `/dashboard/transfers/receipt/${data.id}` }}>Open Full Receipt</Button>
-              ) : (
-                <Button onClick={onClose}>Close</Button>
-              )}
+            <div className="mt-6 grid grid-cols-3 gap-2">
+              <Button variant="outline" onClick={shareReceipt} className="flex items-center gap-2">
+                <Share2 className="h-4 w-4" />
+                Share
+              </Button>
+              <Button variant="outline" onClick={saveAsImage} className="flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Save Image
+              </Button>
+              <Button variant="outline" onClick={downloadPDF} className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                PDF
+              </Button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

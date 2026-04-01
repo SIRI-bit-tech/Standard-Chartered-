@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { colors, type TransferReceipt } from '@/types'
+import Image from 'next/image'
 
 export default function TransferReceiptPage() {
   const params = useParams<{ id: string }>()
@@ -42,8 +43,60 @@ export default function TransferReceiptPage() {
   }, [data])
 
   return (
-    <div className="mx-auto max-w-lg p-4 sm:p-6">
-      <div className="rounded-2xl border p-6 shadow-sm" style={{ borderColor: colors.border, background: colors.white }}>
+    <>
+      <style jsx global>{`
+        @media print {
+          /* Hide everything except the receipt */
+          body > *:not(#__next) {
+            display: none !important;
+          }
+          
+          /* Hide navigation, header, and buttons */
+          nav, header, .no-print, button {
+            display: none !important;
+          }
+          
+          /* Show only the receipt content */
+          .print-only {
+            display: block !important;
+          }
+          
+          /* Remove padding and center content */
+          body {
+            margin: 0;
+            padding: 20px;
+          }
+          
+          /* Ensure receipt takes full width */
+          .receipt-container {
+            max-width: 100% !important;
+            margin: 0 auto;
+            box-shadow: none !important;
+          }
+        }
+        
+        .print-only {
+          display: none;
+        }
+      `}</style>
+      
+      <div className="mx-auto max-w-lg p-4 sm:p-6">
+        {/* Logo - only visible when printing */}
+        <div className="print-only text-center mb-8">
+          <Image 
+            src="/logo.png" 
+            alt="Standard Chartered" 
+            width={200} 
+            height={60}
+            className="mx-auto"
+            priority
+          />
+          <h1 className="text-2xl font-bold mt-4" style={{ color: colors.primary }}>
+            Transfer Receipt
+          </h1>
+        </div>
+
+        <div className="receipt-container rounded-2xl border p-6 shadow-sm" style={{ borderColor: colors.border, background: colors.white }}>
         {loading ? (
           <p style={{ color: colors.textSecondary }}>Loading receipt…</p>
         ) : error ? (
@@ -137,15 +190,16 @@ export default function TransferReceiptPage() {
             <div className="mt-6 text-[11px]" style={{ color: colors.textSecondary }}>This is a computer-generated receipt and requires no signature.</div>
           </>
         ) : null}
-      </div>
-      {data ? (
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Button variant="outline" onClick={printPage}>PDF</Button>
-          <Button variant="outline" onClick={printPage}>Email</Button>
-          <Button variant="outline" onClick={printPage}>Print</Button>
-          <Button onClick={() => { window.location.href = '/dashboard/transfers' }}>+ New</Button>
         </div>
-      ) : null}
-    </div>
+        {data ? (
+          <div className="no-print mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Button variant="outline" onClick={printPage}>PDF</Button>
+            <Button variant="outline" onClick={printPage}>Email</Button>
+            <Button variant="outline" onClick={printPage}>Print</Button>
+            <Button onClick={() => { window.location.href = '/dashboard/transfers' }}>+ New</Button>
+          </div>
+        ) : null}
+      </div>
+    </>
   )
 }
