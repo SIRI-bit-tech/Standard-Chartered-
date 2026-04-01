@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
-import { X, Share2, Download, FileText } from 'lucide-react'
+import { X, Share2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Props {
@@ -143,15 +143,6 @@ export function ReceiptModal({ open, onClose, data }: Props) {
     }
   }
 
-  const downloadPDF = () => {
-    if (data.id) {
-      window.open(`/dashboard/transfers/receipt/${data.id}`, '_blank')
-      toast.success('Opening receipt in new tab')
-    } else {
-      window.print()
-    }
-  }
-
   if (!open) return null
 
   return (
@@ -171,8 +162,9 @@ export function ReceiptModal({ open, onClose, data }: Props) {
         ) : error ? (
           <p className="text-sm" style={{ color: colors.error }}>{error}</p>
         ) : (
-          <div className="receipt-content">
-            <div className="flex flex-col items-center gap-1.5 py-1">
+          <>
+            <div className="receipt-content">
+              <div className="flex flex-col items-center gap-1.5 py-1">
               <div className="flex h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: `${colors.success}15` }}>
                 <span className="text-xl font-bold" style={{ color: colors.success }}>✓</span>
               </div>
@@ -255,7 +247,8 @@ export function ReceiptModal({ open, onClose, data }: Props) {
                 </div>
               </div>
             </div>
-            <div className="mt-6 grid grid-cols-3 gap-2">
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={shareReceipt} className="flex items-center gap-2">
                 <Share2 className="h-4 w-4" />
                 Share
@@ -264,12 +257,8 @@ export function ReceiptModal({ open, onClose, data }: Props) {
                 <Download className="h-4 w-4" />
                 Save Image
               </Button>
-              <Button variant="outline" onClick={downloadPDF} className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                PDF
-              </Button>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>

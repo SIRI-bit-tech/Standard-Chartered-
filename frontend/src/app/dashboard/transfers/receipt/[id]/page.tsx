@@ -6,6 +6,8 @@ import { apiClient } from '@/lib/api-client'
 import { Button } from '@/components/ui/button'
 import { colors, type TransferReceipt } from '@/types'
 import Image from 'next/image'
+import { Share2, Download } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function TransferReceiptPage() {
   const params = useParams<{ id: string }>()
@@ -30,44 +32,135 @@ export default function TransferReceiptPage() {
     return () => { cancelled = true }
   }, [id])
 
-  const printPage = () => window.print()
   const amountText = useMemo(() => {
     if (!data) return ''
     const amt = Number(data.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     return `${data.currency} ${amt}`
   }, [data])
+  
   const totalText = useMemo(() => {
     if (!data) return ''
     const amt = Number(data.total_amount || data.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     return `${data.currency} ${amt}`
   }, [data])
 
+  const shareReceipt = async () => {
+    try {
+      const html2canvas = (await import('html2canvas')).default
+      const element = document.querySelector('.receipt-content') as HTMLElement
+      if (!element) {
+        toast.error('Unable to capture receipt')
+        return
+      }
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false
+      })
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          toast.error('Failed to generate image')
+          return
+        }
+
+        const fileName = `receipt-${data?.reference_number || Date.now()}.png`
+        const file = new File([blob], fileName, { type: 'image/png' })
+
+        const shareData = {
+          title: 'Transfer Receipt',
+          text: `Transfer of ${amountText} - Ref: ${data?.reference_number || 'N/A'}`,
+          files: [file]
+        }
+
+        if (navigator.share && navigator.canShare?.(shareData)) {
+          try {
+            await navigator.share(shareData)
+            toast.success('Receipt shared successfully')
+          } catch (err: any) {
+            if (err.name !== 'AbortError') {
+              const url = URL.createObjectURL(blob)
+              const link = document.createElement('a')
+              link.href = url
+              link.download = fileName
+              link.click()
+              URL.revokeObjectURL(url)
+              toast.info('Receipt downloaded instead')
+            }
+          }
+        } else {
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = fileName
+          link.click()
+          URL.revokeObjectURL(url)
+          toast.success('Receipt downloaded')
+        }
+      })
+    } catch (err) {
+      console.error('Share receipt error:', err)
+      toast.error('Failed to share receipt')
+    }
+  }
+
+  const saveAsImage = async () => {
+    try {
+      const html2canvas = (await import('html2canvas')).default
+      const element = document.querySelector('.receipt-content') as HTMLElement
+      if (!element) {
+        toast.error('Unable to capture receipt')
+        return
+      }
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false
+      })
+
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          toast.error('Failed to generate image')
+          return
+        }
+
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `receipt-${data?.reference_number || Date.now()}.png`
+        link.click()
+        URL.revokeObjectURL(url)
+        toast.success('Receipt saved as image')
+      })
+    } catch (err) {
+      console.error('Save as image error:', err)
+      toast.error('Failed to save receipt as image')
+    }
+  }
+
   return (
     <>
       <style jsx global>{`
         @media print {
-          /* Hide everything except the receipt */
           body > *:not(#__next) {
             display: none !important;
           }
           
-          /* Hide navigation, header, and buttons */
           nav, header, .no-print, button {
             display: none !important;
           }
           
-          /* Show only the receipt content */
           .print-only {
             display: block !important;
           }
           
-          /* Remove padding and center content */
           body {
             margin: 0;
             padding: 20px;
           }
           
-          /* Ensure receipt takes full width */
           .receipt-container {
             max-width: 100% !important;
             margin: 0 auto;
@@ -78,10 +171,14 @@ export default function TransferReceiptPage() {
         .print-only {
           display: none;
         }
+        
+        /* Hide bottom navigation on receipt page */
+        nav[class*="bottom"] {
+          display: none !important;
+        }
       `}</style>
       
-      <div className="mx-auto max-w-lg p-4 sm:p-6">
-        {/* Logo - only visible when printing */}
+      <div className="mx-auto max-w-lg p-4 sm:p-6 pb-24">
         <div className="print-only text-center mb-8">
           <Image 
             src="/logo.png" 
@@ -96,7 +193,7 @@ export default function TransferReceiptPage() {
           </h1>
         </div>
 
-        <div className="receipt-container rounded-2xl border p-6 shadow-sm" style={{ borderColor: colors.border, background: colors.white }}>
+        <div className="receipt-content receipt-container rounded-2xl border p-6 shadow-sm" style={{ borderColor: colors.border, background: colors.white }}>
         {loading ? (
           <p style={{ color: colors.textSecondary }}>Loading receipt…</p>
         ) : error ? (
@@ -191,12 +288,17 @@ export default function TransferReceiptPage() {
           </>
         ) : null}
         </div>
+        
         {data ? (
-          <div className="no-print mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Button variant="outline" onClick={printPage}>PDF</Button>
-            <Button variant="outline" onClick={printPage}>Email</Button>
-            <Button variant="outline" onClick={printPage}>Print</Button>
-            <Button onClick={() => { window.location.href = '/dashboard/transfers' }}>+ New</Button>
+          <div className="no-print mt-4 grid grid-cols-2 gap-3 fixed bottom-20 left-0 right-0 px-4 max-w-lg mx-auto">
+            <Button onClick={shareReceipt} className="flex items-center justify-center gap-2 h-12 shadow-lg">
+              <Share2 className="h-5 w-5" />
+              Share
+            </Button>
+            <Button onClick={saveAsImage} variant="outline" className="flex items-center justify-center gap-2 h-12 shadow-lg">
+              <Download className="h-5 w-5" />
+              Save Image
+            </Button>
           </div>
         ) : null}
       </div>
