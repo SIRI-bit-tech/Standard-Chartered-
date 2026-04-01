@@ -21,8 +21,8 @@ export default function Verify2FA() {
     const promptKey = `biometric_prompted_${deviceId || 'unknown'}`
     const alreadyPrompted = deviceId ? localStorage.getItem(promptKey) === '1' : false
 
+    // Show prompt if user has biometrics enabled on another device and hasn't been prompted on this device
     if (biometricEnabled && supportsWebAuthn && !alreadyPrompted) {
-      if (deviceId) localStorage.setItem(promptKey, '1')
       setPostLoginRedirect(redirect)
       setShowBiometricPrompt(true)
     } else {

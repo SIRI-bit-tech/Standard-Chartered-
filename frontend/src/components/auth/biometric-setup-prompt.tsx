@@ -47,6 +47,11 @@ export function BiometricSetupPrompt({ isOpen, onClose, onDone }: BiometricSetup
 
       if (finishRes.success) {
         setSuccess(true)
+        // Mark device as prompted successfully
+        const deviceId = localStorage.getItem('device_id')
+        if (deviceId) {
+          localStorage.setItem(`biometric_prompted_${deviceId}`, '1')
+        }
         // Auto-close after showing success for 1.8 seconds
         setTimeout(() => {
           onDone()
@@ -58,6 +63,11 @@ export function BiometricSetupPrompt({ isOpen, onClose, onDone }: BiometricSetup
       const msg = err?.response?.data?.detail || err?.message || ''
       if (msg.toLowerCase().includes('cancel') || err?.name === 'NotAllowedError') {
         toast.error('Biometric setup was cancelled.')
+        // Mark as prompted even on cancel so we don't keep asking
+        const deviceId = localStorage.getItem('device_id')
+        if (deviceId) {
+          localStorage.setItem(`biometric_prompted_${deviceId}`, '1')
+        }
       } else {
         toast.error(msg || 'Failed to enable biometrics. Please try again from Settings.')
       }
@@ -66,6 +76,11 @@ export function BiometricSetupPrompt({ isOpen, onClose, onDone }: BiometricSetup
   }
 
   const handleSkip = () => {
+    // Mark device as prompted when user skips
+    const deviceId = localStorage.getItem('device_id')
+    if (deviceId) {
+      localStorage.setItem(`biometric_prompted_${deviceId}`, '1')
+    }
     onClose()
     onDone()
   }

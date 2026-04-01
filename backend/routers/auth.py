@@ -510,6 +510,7 @@ async def login(
             "country": user.country,
             "primary_currency": user.primary_currency,
             "tier": user.tier,
+            "biometric_enabled": getattr(user, "biometric_enabled", False),
             "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or (user.restricted_until.replace(tzinfo=timezone.utc) if user.restricted_until.tzinfo is None else user.restricted_until) > datetime.now(timezone.utc)),
             "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
             "token": stytch_session_token or access_token,

@@ -42,12 +42,17 @@ export default function LoginPage() {
    */
   const maybeShowBiometricPrompt = (biometricEnabled: boolean, deviceId: string | undefined, redirect = '/dashboard') => {
     const supportsWebAuthn = typeof globalThis !== 'undefined' && !!globalThis.PublicKeyCredential
+    
+    // Only check if already prompted if biometrics are NOT enabled yet
+    // If user dismissed before, they can still enable from Settings later
     const promptKey = `biometric_prompted_${deviceId || 'unknown'}`
     const alreadyPrompted = deviceId ? localStorage.getItem(promptKey) === '1' : false
 
+    // Show prompt if:
+    // 1. User has biometrics enabled on another device
+    // 2. Browser supports WebAuthn
+    // 3. Haven't prompted this device before
     if (biometricEnabled && supportsWebAuthn && !alreadyPrompted) {
-      // Mark this device as prompted so we don't ask again
-      if (deviceId) localStorage.setItem(promptKey, '1')
       setPostLoginRedirect(redirect)
       setShowBiometricPrompt(true)
     } else {
