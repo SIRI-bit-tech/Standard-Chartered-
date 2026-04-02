@@ -55,7 +55,9 @@ export function ReceiptModal({ open, onClose, data }: Props) {
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
         scale: 2,
-        logging: false
+        logging: false,
+        useCORS: true,
+        allowTaint: true
       })
 
       // Convert canvas to blob
@@ -101,9 +103,9 @@ export function ReceiptModal({ open, onClose, data }: Props) {
           toast.success('Receipt downloaded')
         }
       })
-    } catch (err) {
+    } catch (err: any) {
       console.error('Share receipt error:', err)
-      toast.error('Failed to share receipt')
+      toast.error(err?.message || 'Failed to share receipt')
     }
   }
 
@@ -120,7 +122,9 @@ export function ReceiptModal({ open, onClose, data }: Props) {
       const canvas = await html2canvas(element, {
         backgroundColor: '#ffffff',
         scale: 2,
-        logging: false
+        logging: false,
+        useCORS: true,
+        allowTaint: true
       })
 
       canvas.toBlob((blob) => {
@@ -137,9 +141,9 @@ export function ReceiptModal({ open, onClose, data }: Props) {
         URL.revokeObjectURL(url)
         toast.success('Receipt saved as image')
       })
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save as image error:', err)
-      toast.error('Failed to save receipt as image')
+      toast.error(err?.message || 'Failed to save receipt as image')
     }
   }
 
@@ -247,17 +251,17 @@ export function ReceiptModal({ open, onClose, data }: Props) {
                 </div>
               </div>
             </div>
-            </div>
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              <Button variant="outline" onClick={shareReceipt} className="flex items-center gap-2">
-                <Share2 className="h-4 w-4" />
-                Share
-              </Button>
-              <Button variant="outline" onClick={saveAsImage} className="flex items-center gap-2">
-                <Download className="h-4 w-4" />
-                Save Image
-              </Button>
-            </div>
+          </div>
+          <div className="mt-6 grid grid-cols-2 gap-3 sticky bottom-0 bg-white pt-4 pb-2">
+            <Button onClick={shareReceipt} className="flex items-center justify-center gap-2 h-12">
+              <Share2 className="h-5 w-5" />
+              Share
+            </Button>
+            <Button onClick={saveAsImage} variant="outline" className="flex items-center justify-center gap-2 h-12">
+              <Download className="h-5 w-5" />
+              Save Image
+            </Button>
+          </div>
           </>
         )}
       </div>
