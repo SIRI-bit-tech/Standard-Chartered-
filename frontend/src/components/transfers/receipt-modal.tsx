@@ -44,65 +44,60 @@ export function ReceiptModal({ open, onClose, data }: Props) {
 
   const shareReceipt = async () => {
     try {
-      // Use html2canvas to capture the receipt as an image
-      const html2canvas = (await import('html2canvas')).default
+      // Use html-to-image with toJpeg for better compatibility
+      const { toJpeg } = await import('html-to-image')
       const element = document.querySelector('.receipt-content') as HTMLElement
       if (!element) {
         toast.error('Unable to capture receipt')
         return
       }
 
-      const canvas = await html2canvas(element, {
+      const dataUrl = await toJpeg(element, {
+        quality: 0.95,
+        pixelRatio: 2,
         backgroundColor: '#ffffff',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true
+        skipFonts: false
       })
 
-      // Convert canvas to blob
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          toast.error('Failed to generate image')
-          return
-        }
+      // Convert data URL to blob
+      const response = await fetch(dataUrl)
+      const blob = await response.blob()
 
-        const fileName = `receipt-${receipt?.reference_number || data.reference || Date.now()}.png`
-        const file = new File([blob], fileName, { type: 'image/png' })
+      const fileName = `receipt-${receipt?.reference_number || data.reference || Date.now()}.jpg`
+      const file = new File([blob], fileName, { type: 'image/jpeg' })
 
-        const shareData = {
-          title: 'Transfer Receipt',
-          text: `Transfer of ${formatCurrency(data.amount, data.currency)} - Ref: ${receipt?.reference_number || data.reference || 'N/A'}`,
-          files: [file]
-        }
+      const shareData = {
+        title: 'Transfer Receipt',
+        text: `Transfer of ${formatCurrency(data.amount, data.currency)} - Ref: ${receipt?.reference_number || data.reference || 'N/A'}`,
+        files: [file]
+      }
 
-        if (navigator.share && navigator.canShare?.(shareData)) {
-          try {
-            await navigator.share(shareData)
-            toast.success('Receipt shared successfully')
-          } catch (err: any) {
-            if (err.name !== 'AbortError') {
-              // Fallback: download the image
-              const url = URL.createObjectURL(blob)
-              const link = document.createElement('a')
-              link.href = url
-              link.download = fileName
-              link.click()
-              URL.revokeObjectURL(url)
-              toast.info('Receipt downloaded instead')
-            }
+      if (navigator.share && navigator.canShare?.(shareData)) {
+        try {
+          await navigator.share(shareData)
+          toast.success('Receipt shared successfully')
+        } catch (err: any) {
+          if (err.name !== 'AbortError') {
+            // Fallback: download the image
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = fileName
+            link.click()
+            URL.revokeObjectURL(url)
+            toast.info('Receipt downloaded instead')
           }
-        } else {
-          // Fallback: download the image
-          const url = URL.createObjectURL(blob)
-          const link = document.createElement('a')
-          link.href = url
-          link.download = fileName
-          link.click()
-          URL.revokeObjectURL(url)
-          toast.success('Receipt downloaded')
         }
-      })
+      } else {
+        // Fallback: download the image
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = fileName
+        link.click()
+        URL.revokeObjectURL(url)
+        toast.success('Receipt downloaded')
+      }
     } catch (err: any) {
       console.error('Share receipt error:', err)
       toast.error(err?.message || 'Failed to share receipt')
@@ -111,36 +106,32 @@ export function ReceiptModal({ open, onClose, data }: Props) {
 
   const saveAsImage = async () => {
     try {
-      // Use html2canvas to capture the receipt
-      const html2canvas = (await import('html2canvas')).default
+      // Use html-to-image with toJpeg for better compatibility
+      const { toJpeg } = await import('html-to-image')
       const element = document.querySelector('.receipt-content') as HTMLElement
       if (!element) {
         toast.error('Unable to capture receipt')
         return
       }
 
-      const canvas = await html2canvas(element, {
+      const dataUrl = await toJpeg(element, {
+        quality: 0.95,
+        pixelRatio: 2,
         backgroundColor: '#ffffff',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true
+        skipFonts: false
       })
 
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          toast.error('Failed to generate image')
-          return
-        }
-
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `receipt-${receipt?.reference_number || data.reference || Date.now()}.png`
-        link.click()
-        URL.revokeObjectURL(url)
-        toast.success('Receipt saved as image')
-      })
+      // Convert data URL to blob and download
+      const response = await fetch(dataUrl)
+      const blob = await response.blob()
+      
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `receipt-${receipt?.reference_number || data.reference || Date.now()}.jpg`
+      link.click()
+      URL.revokeObjectURL(url)
+      toast.success('Receipt saved as image')
     } catch (err: any) {
       console.error('Save as image error:', err)
       toast.error(err?.message || 'Failed to save receipt as image')

@@ -15,9 +15,6 @@ export const API_BASE_URL = (!isLocal && rawApiUrl.startsWith('http://'))
   ? rawApiUrl.replace('http://', 'https://') 
   : rawApiUrl
 
-if (typeof window !== 'undefined') {
-  console.log("🔍 [DEBUG] Current API_BASE_URL:", API_BASE_URL)
-}
 export const API_VERSION = 'v1'
 export const API_ENDPOINTS = {
   // Auth
