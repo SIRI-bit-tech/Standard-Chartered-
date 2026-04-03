@@ -221,3 +221,91 @@ async def send_login_alert(email: str, first_name: str, device_name: str, ip_add
         logger.info(f"Login alert sent to {mask_email(email)}")
     except Exception as e:
         logger.error(f"Failed to send login alert to {mask_email(email)}: {e}")
+
+
+async def send_statement_email(email: str, first_name: str, statement_url: str, start_date, end_date) -> None:
+    """Send monthly account statement to user"""
+    try:
+        from datetime import datetime
+        escaped_first_name = html.escape(first_name or "Valued Customer")
+        safe_display_name = (first_name or "Valued Customer").replace('\r', '').replace('\n', '').strip()
+        brand_primary = "#0073CF"
+        brand_light = "#E6F2FF"
+        text_primary = "#2C2C2C"
+        text_secondary = "#6B6B6B"
+        
+        # Format dates
+        if isinstance(start_date, str):
+            start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if isinstance(end_date, str):
+            end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        
+        period_text = f"{start_date.strftime('%B %d, %Y')} - {end_date.strftime('%B %d, %Y')}"
+        month_year = start_date.strftime('%B %Y')
+        
+        html_content = f"""
+        <html>
+          <body style="margin:0;padding:0;background:#F8F9FA;font-family:Arial,sans-serif;">
+            <div style="max-width:640px;margin:20px auto;background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+              <div style="background:{brand_primary};padding:24px;text-align:center;color:#FFFFFF;">
+                <h1 style="margin:0;font-size:24px;">Your Account Statement is Ready</h1>
+              </div>
+              <div style="padding:32px;color:{text_primary};">
+                <p style="font-size:16px;">Hello {escaped_first_name},</p>
+                <p style="line-height:1.6;">Your account statement for <strong>{month_year}</strong> is now available.</p>
+                
+                <div style="background:{brand_light};padding:20px;border-radius:8px;margin:24px 0;text-align:center;">
+                  <p style="margin:0 0 8px 0;color:{text_secondary};font-size:14px;">Statement Period</p>
+                  <p style="margin:0;font-size:18px;font-weight:bold;color:{brand_primary};">{period_text}</p>
+                </div>
+                
+                <div style="text-align:center;margin:32px 0;">
+                  <a href="{statement_url}" style="display:inline-block;background:{brand_primary};color:#FFFFFF;padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:16px;">Download Statement</a>
+                </div>
+                
+                <div style="background:#F3F4F6;padding:20px;border-radius:8px;margin:24px 0;">
+                  <p style="margin:0 0 12px 0;font-weight:bold;color:{text_primary};">What's included:</p>
+                  <ul style="margin:0;padding-left:20px;color:{text_secondary};line-height:1.8;">
+                    <li>All account balances (Checking, Savings, Crypto)</li>
+                    <li>Complete transaction history</li>
+                    <li>Opening and closing balances</li>
+                    <li>Total credits and debits</li>
+                  </ul>
+                </div>
+                
+                <p style="line-height:1.6;color:{text_secondary};font-size:14px;">
+                  <strong>Important:</strong> Please review your statement carefully. If you notice any discrepancies or unauthorized transactions, contact us immediately through your dashboard or call our support line.
+                </p>
+                
+                <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E5E7EB;color:{text_secondary};font-size:14px;">
+                  <p><strong>Need help?</strong></p>
+                  <p>Visit the Support section in your dashboard or contact us at support@standardchartered.com</p>
+                </div>
+              </div>
+              <div style="padding:16px;text-align:center;color:#9CA3AF;font-size:12px;background:#F9FAFB;">
+                © 2026 Standard Chartered Bank. All rights reserved.<br/>
+                This statement is confidential and intended for the account holder only.
+              </div>
+            </div>
+          </body>
+        </html>
+        """
+        
+        subject = f"Your {month_year} Account Statement"
+
+        # Try API delivery first
+        success = await asyncio.to_thread(_send_email_via_api, email, subject, html_content)
+        if success:
+            return
+
+        # Fallback to SMTP
+        msg = MIMEMultipart()
+        msg['From'] = formataddr(("Standard Chartered Bank", settings.SMTP_FROM))
+        msg['To'] = formataddr((safe_display_name, email))
+        msg['Subject'] = subject
+        msg.attach(MIMEText(html_content, 'html'))
+        
+        await asyncio.to_thread(_send_blocking_email, msg)
+        logger.info(f"Statement email sent to {mask_email(email)}")
+    except Exception as e:
+        logger.error(f"Failed to send statement email to {mask_email(email)}: {e}")

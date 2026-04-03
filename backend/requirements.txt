@@ -21,3 +21,4 @@ httpx
 pytesseract
 Pillow
 stytch
+reportlab

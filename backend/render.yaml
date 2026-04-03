@@ -54,3 +54,44 @@ services:
     plan: free
     region: ohio
     ipAllowList: [] # Only allow internal connections
+
+  # Monthly Statement Generation Cron Job
+  - type: cron
+    name: monthly-statements
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    schedule: "0 0 1 * *"  # Runs at midnight on the 1st of every month
+    region: ohio
+    plan: free
+    dockerCommand: python jobs/generate_monthly_statements.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false # Set in Render dashboard
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: sc-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: SMTP_SERVER
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

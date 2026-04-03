@@ -86,14 +86,31 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  // Delay registration for mobile stability
-                  setTimeout(() => {
-                    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-                    if (isIOS) {
-                      return;
+              // Detect iOS
+              const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+              
+              if (isIOS && 'serviceWorker' in navigator) {
+                // Unregister ALL service workers on iOS
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for(let registration of registrations) {
+                    registration.unregister().then(function(success) {
+                      console.log('iOS: Service worker unregistered', success);
+                    });
+                  }
+                });
+                
+                // Clear all caches on iOS
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    for (let name of names) {
+                      caches.delete(name);
                     }
+                  });
+                }
+              } else if ('serviceWorker' in navigator && !isIOS) {
+                // Only register service worker on non-iOS devices
+                window.addEventListener('load', function() {
+                  setTimeout(() => {
                     navigator.serviceWorker.register('/sw.js').then(
                       function(registration) {
                         console.log('SW Registered');

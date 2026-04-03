@@ -1,6 +1,5 @@
-const CACHE_NAME = 'sc-banking-v4';
+const CACHE_NAME = 'sc-banking-v5';
 const ASSETS_TO_CACHE = [
-    '/manifest.json',
     '/standardcharted.png',
     '/logo.png',
     '/favicon.ico',
