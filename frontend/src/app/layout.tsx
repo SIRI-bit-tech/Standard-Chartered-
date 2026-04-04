@@ -56,8 +56,22 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#0073CF" />
         <meta name="msapplication-tap-highlight" content="no" />
 
-        {/* Stytch Device Fingerprinting Script */}
-        <script src="https://js.stytch.com/stytch.js" defer></script>
+        {/* Conditionally load Stytch only on non-iOS */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+                if (!isIOS) {
+                  const script = document.createElement('script');
+                  script.src = 'https://js.stytch.com/stytch.js';
+                  script.defer = true;
+                  document.head.appendChild(script);
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body className="bg-background text-foreground antialiased" style={{ colorScheme: 'light' }}>
         <script
