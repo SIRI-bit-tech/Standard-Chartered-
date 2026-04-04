@@ -56,29 +56,6 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#0073CF" />
         <meta name="msapplication-tap-highlight" content="no" />
 
-        {/* Conditionally load manifest only for non-iOS devices */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-                if (!isIOS) {
-                  const link = document.createElement('link');
-                  link.rel = 'manifest';
-                  link.href = '/manifest.json';
-                  document.head.appendChild(link);
-                  
-                  // Enable mobile web app for Android
-                  const meta = document.createElement('meta');
-                  meta.name = 'mobile-web-app-capable';
-                  meta.content = 'yes';
-                  document.head.appendChild(meta);
-                }
-              })();
-            `,
-          }}
-        />
-
         {/* Stytch Device Fingerprinting Script */}
         <script src="https://js.stytch.com/stytch.js" defer></script>
       </head>
@@ -86,41 +63,35 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // Detect iOS
-              const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-              
-              if (isIOS && 'serviceWorker' in navigator) {
-                // Unregister ALL service workers on iOS
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  for(let registration of registrations) {
-                    registration.unregister().then(function(success) {
-                      console.log('iOS: Service worker unregistered', success);
+              (function() {
+                const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+                
+                if (isIOS) {
+                  // Silently unregister service workers on iOS without reloading
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                      registrations.forEach(function(registration) {
+                        registration.unregister();
+                      });
                     });
                   }
-                });
-                
-                // Clear all caches on iOS
-                if ('caches' in window) {
-                  caches.keys().then(function(names) {
-                    for (let name of names) {
-                      caches.delete(name);
-                    }
+                  // Clear caches
+                  if ('caches' in window) {
+                    caches.keys().then(function(names) {
+                      names.forEach(function(name) {
+                        caches.delete(name);
+                      });
+                    });
+                  }
+                } else if ('serviceWorker' in navigator) {
+                  // Register service worker only on non-iOS
+                  window.addEventListener('load', function() {
+                    setTimeout(function() {
+                      navigator.serviceWorker.register('/sw.js').catch(function() {});
+                    }, 3000);
                   });
                 }
-              } else if ('serviceWorker' in navigator && !isIOS) {
-                // Only register service worker on non-iOS devices
-                window.addEventListener('load', function() {
-                  setTimeout(() => {
-                    navigator.serviceWorker.register('/sw.js').then(
-                      function(registration) {
-                        console.log('SW Registered');
-                      }
-                    ).catch(err => {
-                      console.log('SW Registration Failed', err);
-                    });
-                  }, 3000);
-                });
-              }
+              })();
             `,
           }}
         />
