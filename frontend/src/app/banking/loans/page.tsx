@@ -1,8 +1,15 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/landing/header'
 import { Footer } from '@/components/landing/footer'
 import { Card } from '@/components/ui/card'
 import { Landmark, Calculator, Receipt, ShieldCheck, ArrowRight, Clock, Percent } from 'lucide-react'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Personal & Business Loans - Competitive Rates | Standard Chartered',
+  description: 'Apply for personal loans, business loans, and specialized financing with Standard Chartered. Get instant approval, flexible repayment terms, and competitive interest rates from 3.88% p.a.',
+  keywords: 'personal loans, business loans, loan application, instant approval, competitive rates, flexible loans, unsecured loans, working capital loans, education loans, renovation loans, loan calculator',
+}
 
 export default function LoansPage() {
     return (

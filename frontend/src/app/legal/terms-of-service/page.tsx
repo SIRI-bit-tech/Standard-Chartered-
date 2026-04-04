@@ -1,7 +1,14 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/landing/header'
 import { Footer } from '@/components/landing/footer'
 import { Card } from '@/components/ui/card'
 import { FileText, ShieldAlert, Scale, CreditCard, Laptop, AlertCircle } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Terms of Service - Banking Terms & Conditions | Standard Chartered',
+  description: 'Read Standard Chartered terms of service and general banking conditions. Understand your rights, responsibilities, and the legal terms governing your banking relationship with us.',
+  keywords: 'terms of service, terms and conditions, banking terms, legal terms, user agreement, service agreement, banking conditions, account terms, regulatory compliance, banking agreement',
+}
 
 export default function TermsOfServicePage() {
   return (

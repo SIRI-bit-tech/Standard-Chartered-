@@ -9,12 +9,12 @@ import { CSPostHogProvider } from '@/providers/posthog-provider'
 
 export const metadata: Metadata = {
   title: 'Standard Chartered Bank - Personal, Business & Corporate Banking',
-  description: 'Standard Chartered is a leading international banking group connecting corporate, institutional and affluent clients, as well as individuals and SMEs, to a network offering sustainable growth opportunities across Asia, Africa and the Middle East.',
+  description: 'Leading international bank serving clients across Asia, Africa and the Middle East. Wealth management, corporate banking, investment banking, trade finance, and cross-border banking solutions for individuals, SMEs, and multinational corporations.',
   keywords:
-    'Standard Chartered, Standard Chartered Bank, global banking, international banking, corporate banking, institutional banking, retail banking, personal banking, private banking, priority banking, wealth management, sustainable finance, Asia banking, Africa banking, Middle East banking, cross-border banking',
+    'Standard Chartered, Standard Chartered Bank, international banking, cross-border banking, wealth management, corporate banking, investment banking, private banking, priority banking, retail banking, personal banking, business banking, SME banking, trade finance, foreign exchange, FX trading, cash management, transaction banking, emerging markets, frontier markets, Asia banking, Africa banking, Middle East banking, multinational banking, institutional banking, treasury services, corporate finance, sustainable finance, Islamic banking, Shariah-compliant banking, digital banking, online banking, mobile banking',
   openGraph: {
-    title: 'Standard Chartered Banking Platform',
-    description: 'Secure, professional online banking with multi-currency support',
+    title: 'Standard Chartered - International Banking Solutions',
+    description: 'Leading international bank connecting businesses and individuals across Asia, Africa and the Middle East with comprehensive banking and financial services',
     type: 'website',
     url: 'https://www.standardchartered.com',
   },

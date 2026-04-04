@@ -1,8 +1,15 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/landing/header'
 import { Footer } from '@/components/landing/footer'
 import { Card } from '@/components/ui/card'
 import { Landmark, ShieldCheck, Key, Calculator, Sun } from 'lucide-react'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Home Loans & Mortgages - International Property Financing | Standard Chartered',
+  description: 'Finance your dream home with Standard Chartered mortgages. First-time home buyer programs, international mortgages, sustainable home loans, and competitive rates for properties worldwide.',
+  keywords: 'home loans, mortgages, property financing, first-time home buyer, international mortgages, cross-border mortgages, sustainable home loans, mortgage calculator, home financing, property loans',
+}
 
 export default function MortgagesPage() {
     return (

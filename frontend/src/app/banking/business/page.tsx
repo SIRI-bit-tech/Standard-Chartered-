@@ -1,8 +1,15 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/landing/header'
 import { Footer } from '@/components/landing/footer'
 import { Card } from '@/components/ui/card'
 import { Briefcase, Globe, BarChart3, TrendingUp, ArrowRight, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Business Banking - SME Banking, Trade Finance & Cash Management | Standard Chartered',
+  description: 'Empower your business with Standard Chartered business banking solutions. Access SME banking, trade finance, cash management, working capital loans, and corporate banking services for international trade.',
+  keywords: 'business banking, SME banking, trade finance, cash management, corporate banking, business loans, working capital, transaction banking, foreign exchange, FX trading, international trade, business account',
+}
 
 export default function BusinessBankingPage() {
     return (

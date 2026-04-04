@@ -1,7 +1,14 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/landing/header'
 import { Footer } from '@/components/landing/footer'
 import { Card } from '@/components/ui/card'
 import { Shield, Lock, Globe, FileText, UserCheck, Trash2 } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy - Data Protection & GDPR Compliance | Standard Chartered',
+  description: 'Standard Chartered privacy policy explains how we collect, use, and protect your personal data. Learn about GDPR compliance, data rights, and our commitment to privacy across global operations.',
+  keywords: 'privacy policy, data protection, GDPR, personal data, data privacy, information security, data rights, privacy compliance, data processing, confidentiality, data retention',
+}
 
 export default function PrivacyPolicyPage() {
   return (

@@ -1,7 +1,14 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/landing/header'
 import { Footer } from '@/components/landing/footer'
 import { Card } from '@/components/ui/card'
 import { ShieldCheck, Lock, Smartphone, Globe, AlertTriangle, ShieldAlert, Cpu } from 'lucide-react'
+
+export const metadata: Metadata = {
+  title: 'Security & Fraud Protection - Bank-Grade Encryption | Standard Chartered',
+  description: 'Learn about Standard Chartered security measures, fraud protection, encryption, biometric authentication, and how we protect your money and data with multi-layered defense systems.',
+  keywords: 'bank security, fraud protection, encryption, cybersecurity, online banking security, biometric authentication, 2FA, two-factor authentication, secure banking, fraud prevention, data security',
+}
 
 export default function SecurityCompliancePage() {
     return (

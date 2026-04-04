@@ -1,8 +1,15 @@
+import type { Metadata } from 'next'
 import { Header } from '@/components/landing/header'
 import { Footer } from '@/components/landing/footer'
 import { Card } from '@/components/ui/card'
 import { ShieldCheck, ArrowRight, User, PieChart, Sparkles } from 'lucide-react'
 import Link from 'next/link'
+
+export const metadata: Metadata = {
+  title: 'Personal Banking - Savings, Current Accounts & Wealth Management | Standard Chartered',
+  description: 'Manage your daily finances with Standard Chartered personal banking. Access savings accounts, current accounts, wealth management, priority banking, and digital banking services across Asia, Africa, and the Middle East.',
+  keywords: 'personal banking, savings account, current account, wealth management, priority banking, retail banking, personal finance, online banking, mobile banking, multi-currency account, international banking',
+}
 
 export default function PersonalBankingPage() {
     return (
