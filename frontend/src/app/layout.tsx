@@ -3,7 +3,6 @@ import type { Metadata, Viewport } from 'next'
 import '../styles/globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from 'sonner'
-import { PWAInstaller } from '@/components/support/PWAInstaller'
 import { StytchClientProvider } from '@/providers/stytch-provider'
 import { CSPostHogProvider } from '@/providers/posthog-provider'
 
@@ -55,54 +54,35 @@ export default function RootLayout({
         <meta name="msapplication-config" content="/none" />
         <meta name="msapplication-TileColor" content="#0073CF" />
         <meta name="msapplication-tap-highlight" content="no" />
+        
+        {/* Explicitly disable PWA features on all devices */}
+        <meta name="mobile-web-app-capable" content="no" />
+        <meta name="apple-mobile-web-app-capable" content="no" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-        {/* Conditionally load Stytch only on non-iOS */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-                if (!isIOS) {
-                  const script = document.createElement('script');
-                  script.src = 'https://js.stytch.com/stytch.js';
-                  script.defer = true;
-                  document.head.appendChild(script);
-                }
-              })();
-            `,
-          }}
-        />
+        {/* Load Stytch script */}
+        <script src="https://js.stytch.com/stytch.js" defer />
       </head>
       <body className="bg-background text-foreground antialiased" style={{ colorScheme: 'light' }}>
+        {/* Cleanup any existing service workers and caches */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-                
-                if (isIOS) {
-                  // Silently unregister service workers on iOS without reloading
-                  if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                      registrations.forEach(function(registration) {
-                        registration.unregister();
-                      });
+                // Unregister all service workers
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    registrations.forEach(function(registration) {
+                      registration.unregister();
                     });
-                  }
-                  // Clear caches
-                  if ('caches' in window) {
-                    caches.keys().then(function(names) {
-                      names.forEach(function(name) {
-                        caches.delete(name);
-                      });
+                  });
+                }
+                // Clear all caches
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    names.forEach(function(name) {
+                      caches.delete(name);
                     });
-                  }
-                } else if ('serviceWorker' in navigator) {
-                  // Register service worker only on non-iOS
-                  window.addEventListener('load', function() {
-                    setTimeout(function() {
-                      navigator.serviceWorker.register('/sw.js').catch(function() {});
-                    }, 3000);
                   });
                 }
               })();
@@ -118,7 +98,6 @@ export default function RootLayout({
               forcedTheme="light"
               disableTransitionOnChange
             >
-              <PWAInstaller />
               {children}
               <Toaster position="top-center" richColors />
             </ThemeProvider>
