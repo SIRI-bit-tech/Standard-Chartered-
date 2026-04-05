@@ -5,7 +5,7 @@ import { Services } from '@/components/landing/services'
 import { CTA } from '@/components/landing/cta'
 import { LeadershipSection } from '@/components/landing/LeadershipSection'
 import { Footer } from '@/components/landing/footer'
-import { ChatLoader } from '@/components/support/ChatLoader'
+// import { ChatLoader } from '@/components/support/ChatLoader'
 
 export default function HomePage() {
   return (
@@ -16,7 +16,7 @@ export default function HomePage() {
       <Services />
       <CTA />
       <LeadershipSection />
-      <ChatLoader />
+      {/* <ChatLoader /> */}
       <Footer />
     </div>
   )
