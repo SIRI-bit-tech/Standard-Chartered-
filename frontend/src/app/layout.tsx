@@ -64,31 +64,6 @@ export default function RootLayout({
         <script src="https://js.stytch.com/stytch.js" defer />
       </head>
       <body className="bg-background text-foreground antialiased" style={{ colorScheme: 'light' }}>
-        {/* Cleanup any existing service workers and caches */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                // Unregister all service workers
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                    registrations.forEach(function(registration) {
-                      registration.unregister();
-                    });
-                  });
-                }
-                // Clear all caches
-                if ('caches' in window) {
-                  caches.keys().then(function(names) {
-                    names.forEach(function(name) {
-                      caches.delete(name);
-                    });
-                  });
-                }
-              })();
-            `,
-          }}
-        />
         <StytchClientProvider>
           <CSPostHogProvider>
             <ThemeProvider
