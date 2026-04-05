@@ -1,104 +1,70 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
-import { KenBurnsCarousel } from '@/components/ui/ken-burns-carousel'
+import Image from 'next/image'
 import { colors } from '@/types'
 
-interface HeroSlide {
-  image: string
-  tag: string
-  title: string
-  description: string
-}
-
-const heroSlides: HeroSlide[] = [
-  {
-    image: '/hero-1.jpg',
-    tag: 'GLOBAL BANKING EXCELLENCE',
-    title: 'Empowering Your Global Financial Future',
-    description: 'Secure, worldwide banking at your fingertips. Manage wealth, transfer funds, and grow assets with a partner that spans across 60 markets.'
-  },
-  {
-    image: '/hero-2.jpg',
-    tag: 'DIGITAL BANKING SOLUTIONS',
-    title: 'Innovation Meets Tradition',
-    description: 'Experience the perfect blend of cutting-edge technology and time-tested banking principles. Your financial journey, reimagined.'
-  },
-  {
-    image: '/hero-3.jpg',
-    tag: 'WEALTH MANAGEMENT EXPERTISE',
-    title: 'Build Your Legacy With Confidence',
-    description: 'Strategic financial planning and investment solutions designed to secure your future and maximize your potential.'
-  }
-]
-
 export function Hero() {
-  const [currentIndex, setCurrentIndex] = useState(0)
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % heroSlides.length)
-    }, 6000)
-
-    return () => clearInterval(timer)
-  }, [])
-
-  const currentSlide = heroSlides[currentIndex]
-
   return (
     <section className="relative h-screen -mt-16">
-      <KenBurnsCarousel 
-        images={heroSlides.map(slide => slide.image)} 
-        currentIndex={currentIndex}
-        className="pt-16"
-      >
-        <div className="flex items-center justify-center h-full pt-20">
-          <div className="text-center text-white px-4 max-w-4xl mx-auto">
-            {/* Tag */}
-            <div className="mb-4">
-              <span 
-                className="px-4 py-2 rounded-full text-sm font-semibold uppercase tracking-wide"
-                style={{ backgroundColor: colors.success }}
+      {/* Static background image - no animations */}
+      <div className="absolute inset-0 pt-16">
+        <Image
+          src="/hero-1.jpg"
+          alt="Hero Background"
+          fill
+          className="object-cover"
+          priority
+          sizes="100vw"
+        />
+      </div>
+
+      {/* Content overlay */}
+      <div className="relative z-10 flex items-center justify-center h-full pt-20">
+        <div className="text-center text-white px-4 max-w-4xl mx-auto">
+          {/* Tag */}
+          <div className="mb-4">
+            <span 
+              className="px-4 py-2 rounded-full text-sm font-semibold uppercase tracking-wide"
+              style={{ backgroundColor: colors.success }}
+            >
+              GLOBAL BANKING EXCELLENCE
+            </span>
+          </div>
+
+          {/* Main Heading */}
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+            Empowering Your Global Financial Future
+          </h1>
+
+          {/* Description */}
+          <p className="text-lg md:text-xl mb-8 text-gray-200 max-w-2xl mx-auto leading-relaxed">
+            Secure, worldwide banking at your fingertips. Manage wealth, transfer funds, and grow assets with a partner that spans across 60 markets.
+          </p>
+
+          {/* CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/auth/register">
+              <button 
+                className="px-8 py-4 rounded-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg"
+                style={{ backgroundColor: colors.primary }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.primaryDark}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.primary}
               >
-                {currentSlide.tag}
-              </span>
-            </div>
-
-            {/* Main Heading */}
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              {currentSlide.title}
-            </h1>
-
-            {/* Description */}
-            <p className="text-lg md:text-xl mb-8 text-gray-200 max-w-2xl mx-auto leading-relaxed">
-              {currentSlide.description}
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/register">
-                <button 
-                  className="px-8 py-4 rounded-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg"
-                  style={{ backgroundColor: colors.primary }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = colors.primaryDark}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = colors.primary}
-                >
-                  Get Started Now
-                </button>
-              </Link>
-              <Link href="#features">
-                <button 
-                  className="px-8 py-4 rounded-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg border-2 border-white hover:bg-white hover:text-gray-900"
-                  style={{ backgroundColor: 'transparent' }}
-                >
-                  View Wealth Solutions
-                </button>
-              </Link>
-            </div>
+                Get Started Now
+              </button>
+            </Link>
+            <Link href="#features">
+              <button 
+                className="px-8 py-4 rounded-lg font-semibold text-white transition-all transform hover:scale-105 shadow-lg border-2 border-white hover:bg-white hover:text-gray-900"
+                style={{ backgroundColor: 'transparent' }}
+              >
+                View Wealth Solutions
+              </button>
+            </Link>
           </div>
         </div>
-      </KenBurnsCarousel>
+      </div>
     </section>
   )
 }
