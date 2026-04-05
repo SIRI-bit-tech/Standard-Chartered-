@@ -4,7 +4,7 @@ import '../styles/globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from 'sonner'
 import { StytchClientProvider } from '@/providers/stytch-provider'
-import { CSPostHogProvider } from '@/providers/posthog-provider'
+// import { CSPostHogProvider } from '@/providers/posthog-provider'
 
 export const metadata: Metadata = {
   title: 'Standard Chartered Bank - Personal, Business & Corporate Banking',
@@ -65,7 +65,7 @@ export default function RootLayout({
       </head>
       <body className="bg-background text-foreground antialiased" style={{ colorScheme: 'light' }}>
         <StytchClientProvider>
-          <CSPostHogProvider>
+          {/* <CSPostHogProvider> */}
             <ThemeProvider
               attribute="class"
               defaultTheme="light"
@@ -76,7 +76,7 @@ export default function RootLayout({
               {children}
               <Toaster position="top-center" richColors />
             </ThemeProvider>
-          </CSPostHogProvider>
+          {/* </CSPostHogProvider> */}
         </StytchClientProvider>
       </body>
     </html>
