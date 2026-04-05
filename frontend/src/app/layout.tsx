@@ -60,8 +60,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="no" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-        {/* Load Stytch script */}
-        <script src="https://js.stytch.com/stytch.js" defer />
+        {/* Load Stytch script - disabled for testing */}
+        {/* <script src="https://js.stytch.com/stytch.js" defer /> */}
       </head>
       <body className="bg-background text-foreground antialiased" style={{ colorScheme: 'light' }}>
         <StytchClientProvider>
