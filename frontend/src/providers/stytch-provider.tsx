@@ -1,18 +1,16 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React from 'react'
 import { StytchProvider } from '@stytch/nextjs'
-import { createStytchClient } from '@/lib/stytch-client'
+import { stytchClient } from '@/lib/stytch-client'
 
 export function StytchClientProvider({ children }: { children: React.ReactNode }) {
-    const client = useMemo(() => createStytchClient(), [])
-
-    if (!client) {
+    if (!stytchClient) {
         return <>{children}</>
     }
 
     return (
-        <StytchProvider stytch={client as any}>
+        <StytchProvider stytch={stytchClient}>
             {children}
         </StytchProvider>
     )

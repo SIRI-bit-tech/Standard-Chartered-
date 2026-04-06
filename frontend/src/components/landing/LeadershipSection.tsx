@@ -48,13 +48,13 @@ export function LeadershipSection() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {leaders.map((leader, index) => (
-                        <div key={index} className="flex flex-col group transition-all duration-500 hover:-translate-y-2">
+                        <div key={index} className="flex flex-col">
                             <div className="aspect-[4/3] bg-white flex items-end justify-center relative overflow-hidden rounded-t-[2.5rem]">
                                 <Image
                                     src={leader.image}
                                     alt={leader.name}
                                     fill
-                                    className="object-contain z-10 transition-transform duration-700 group-hover:scale-105"
+                                    className="object-contain"
                                     loading="lazy"
                                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                 />

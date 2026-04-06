@@ -26,24 +26,17 @@ export function KenBurnsCarousel({
             'absolute inset-0 transition-opacity duration-1000',
             index === currentIndex ? 'opacity-100 z-0' : 'opacity-0 -z-10'
           )}
+          style={{ display: index === currentIndex ? 'block' : 'none' }}
         >
-          <div
-            className={cn(
-              'absolute inset-0 transition-transform duration-[10s] ease-in-out',
-              index === currentIndex
-                ? 'scale-100'
-                : 'scale-110'
-            )}
-          >
-            <Image
-              src={image}
-              alt={`Hero Slide ${index + 1}`}
-              fill
-              className="object-cover"
-              priority={index === 0}
-              sizes="100vw"
-            />
-          </div>
+          <Image
+            src={image}
+            alt={`Hero Slide ${index + 1}`}
+            fill
+            className="object-cover"
+            priority={index === 0}
+            sizes="100vw"
+            quality={85}
+          />
         </div>
       ))}
       <div className="relative z-10 h-full">
