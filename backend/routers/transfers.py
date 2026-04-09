@@ -709,9 +709,10 @@ async def get_transfer_history(
                                           "metrics": {"sent_monthly": 0.0, "sent_count": 0, "received_monthly": 0.0, "received_count": 0, "pending_amount": 0.0, "pending_count": 0}},
                 "message": "Transfer history retrieved"}
     
-    # Fetch transactions for these accounts
+    # Fetch transactions for these accounts with proper sorting
+    sort_order = Transaction.created_at.desc() if sort == "desc" else Transaction.created_at.asc()
     tx_result = await db.execute(
-        select(Transaction).where(Transaction.account_id.in_(list(accounts.keys())))
+        select(Transaction).where(Transaction.account_id.in_(list(accounts.keys()))).order_by(sort_order)
     )
     transactions = list(tx_result.scalars().all())
     
@@ -744,8 +745,6 @@ async def get_transfer_history(
                 safe_filtered.append(t)
         transactions = safe_filtered
     
-    # Sort AFTER all filtering to maintain correct order
-    transactions.sort(key=lambda t: t.created_at, reverse=(sort == "desc"))
     
     total = len(transactions)
     start = (page - 1) * page_size
