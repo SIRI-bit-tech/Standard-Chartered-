@@ -714,7 +714,6 @@ async def get_transfer_history(
         select(Transaction).where(Transaction.account_id.in_(list(accounts.keys())))
     )
     transactions = list(tx_result.scalars().all())
-    transactions.sort(key=lambda t: t.created_at, reverse=(sort == "desc"))
     
     # Apply in-memory filters (sufficient for demo and small datasets)
     q_lower = q.strip().lower()
@@ -745,20 +744,21 @@ async def get_transfer_history(
                 safe_filtered.append(t)
         transactions = safe_filtered
     
+    # Sort AFTER all filtering to maintain correct order
+    transactions.sort(key=lambda t: t.created_at, reverse=(sort == "desc"))
+    
     total = len(transactions)
     start = (page - 1) * page_size
     end = start + page_size
     page_items = transactions[start:end]
     
-    # Metrics for current month
-    first_day_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    month_txs = [t for t in transactions if t.created_at >= first_day_month]
+    # Metrics for all transactions (cumulative, not monthly)
     def is_debit(t: Transaction) -> bool:
         return t.type in (TxType.DEBIT, TxType.WITHDRAWAL, TxType.FEE, TxType.PAYMENT, TxType.TRANSFER) and t.amount > 0
     def is_credit(t: Transaction) -> bool:
         return t.type in (TxType.CREDIT, TxType.DEPOSIT, TxType.INTEREST) and t.amount > 0
-    sent_monthly = sum(t.amount for t in month_txs if is_debit(t))
-    received_monthly = sum(t.amount for t in month_txs if is_credit(t))
+    sent_total = sum(t.amount for t in transactions if is_debit(t))
+    received_total = sum(t.amount for t in transactions if is_credit(t))
     pending_amount = sum(t.amount for t in transactions if t.status in (TxStatus.PENDING, TxStatus.PROCESSING))
     
     def mask_account(acc: Account) -> str:
@@ -922,10 +922,10 @@ async def get_transfer_history(
             "page": page,
             "page_size": page_size,
             "metrics": {
-                "sent_monthly": sent_monthly,
-                "sent_count": len([t for t in month_txs if is_debit(t)]),
-                "received_monthly": received_monthly,
-                "received_count": len([t for t in month_txs if is_credit(t)]),
+                "sent_total": sent_total,
+                "sent_count": len([t for t in transactions if is_debit(t)]),
+                "received_total": received_total,
+                "received_count": len([t for t in transactions if is_credit(t)]),
                 "pending_amount": pending_amount,
                 "pending_count": len([t for t in transactions if t.status in (TxStatus.PENDING, TxStatus.PROCESSING)]),
             }

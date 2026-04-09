@@ -134,7 +134,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold" style={{ color: colors.textPrimary }}>
             Recent Transactions
           </h2>
-          <Link href="/dashboard/accounts" className="text-sm font-medium" style={{ color: colors.primary }}>
+          <Link href="/dashboard/transfers?tab=history" className="text-sm font-medium" style={{ color: colors.primary }}>
             View all
           </Link>
         </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
 import { TRANSFER_FEES } from '@/constants'
@@ -91,6 +92,7 @@ type SelectedRecipient = RecipientSearchResponse['data'][0] & {
 }
 
 export default function TransfersPage() {
+  const searchParams = useSearchParams()
   const { user } = useAuthStore()
   const { setAccounts } = useAccountStore()
   const { toast } = useToast()
@@ -182,6 +184,13 @@ export default function TransfersPage() {
   const [routingErrorMsg, setRoutingErrorMsg] = useState<string>('')
   const [receiptOpen, setReceiptOpen] = useState(false)
   const [receiptData, setReceiptData] = useState<any | null>(null)
+
+  // Deep link: /dashboard/transfers?tab=history opens Transfer History tab
+  useEffect(() => {
+    if (searchParams.get('tab') === 'history') {
+      setActiveTab('history')
+    }
+  }, [searchParams])
 
   // Load accounts and optionally hydrate account store
   useEffect(() => {

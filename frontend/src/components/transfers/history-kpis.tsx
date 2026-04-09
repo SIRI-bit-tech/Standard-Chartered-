@@ -5,10 +5,10 @@ export function HistoryKpis({ metrics, currency = 'USD' }: { metrics: TransferHi
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div className="rounded-xl border p-4" style={{ borderColor: colors.border, backgroundColor: colors.white }}>
-        <p className="text-xs font-medium" style={{ color: colors.textSecondary }}>TOTAL SENT (MONTHLY)</p>
+        <p className="text-xs font-medium" style={{ color: colors.textSecondary }}>TOTAL SENT</p>
         <div className="mt-1 flex items-end justify-between">
           <p className="text-2xl font-semibold" style={{ color: colors.error }}>
-            -{formatCurrency(metrics.sent_monthly, currency)}
+            -{formatCurrency(metrics.sent_total, currency)}
           </p>
           <span className="text-xs" style={{ color: colors.textSecondary }}>
             {metrics.sent_count} Transactions
@@ -16,10 +16,10 @@ export function HistoryKpis({ metrics, currency = 'USD' }: { metrics: TransferHi
         </div>
       </div>
       <div className="rounded-xl border p-4" style={{ borderColor: colors.border, backgroundColor: colors.white }}>
-        <p className="text-xs font-medium" style={{ color: colors.textSecondary }}>TOTAL RECEIVED (MONTHLY)</p>
+        <p className="text-xs font-medium" style={{ color: colors.textSecondary }}>TOTAL RECEIVED</p>
         <div className="mt-1 flex items-end justify-between">
           <p className="text-2xl font-semibold" style={{ color: colors.success }}>
-            +{formatCurrency(metrics.received_monthly, currency)}
+            +{formatCurrency(metrics.received_total, currency)}
           </p>
           <span className="text-xs" style={{ color: colors.textSecondary }}>
             {metrics.received_count} Transactions

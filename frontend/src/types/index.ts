@@ -83,9 +83,9 @@ export interface TransferHistoryItem {
 }
 
 export interface TransferHistoryMetrics {
-  sent_monthly: number
+  sent_total: number
   sent_count: number
-  received_monthly: number
+  received_total: number
   received_count: number
   pending_amount: number
   pending_count: number
