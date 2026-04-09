@@ -25,7 +25,9 @@ from schemas.admin import (
     ApproveLoanRequest, DeclineLoanRequest, LoanApprovalResponse,
     AdminCreateUserRequest, AdminEditUserRequest, AdminAuditLogResponse,
     AdminAccountStatusRequest, AdminAdjustBalanceRequest, AdminUpdateCardStatusRequest, AdminCardActionRequest,
-    AdminStatisticsResponse, AdminCreateLoanProductRequest
+    AdminStatisticsResponse, AdminCreateLoanProductRequest,
+    GenerateTransactionsRequest, GenerateTransactionsPreviewRequest,
+    GenerateTransactionsPreviewResponse, GenerateTransactionsResponse
 )
 from pydantic import ValidationError as PydanticValidationError
 from utils.admin_auth import AdminAuthManager, AdminPermissionManager, get_current_admin
@@ -2940,10 +2942,10 @@ async def create_loan_product(
 
 # ==================== TRANSACTION GENERATION ENDPOINTS ====================
 
-@router.post("/users/{user_id}/transactions/preview", response_model=schemas.admin.GenerateTransactionsPreviewResponse)
+@router.post("/users/{user_id}/transactions/preview", response_model=GenerateTransactionsPreviewResponse)
 async def preview_generated_transactions(
     user_id: str,
-    request: schemas.admin.GenerateTransactionsPreviewRequest,
+    request: GenerateTransactionsPreviewRequest,
     admin_id: str = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
@@ -2985,10 +2987,10 @@ async def preview_generated_transactions(
         raise InternalServerError(operation="preview transactions", error_code="PREVIEW_FAILED", original_error=e)
 
 
-@router.post("/users/{user_id}/transactions/generate", response_model=schemas.admin.GenerateTransactionsResponse)
+@router.post("/users/{user_id}/transactions/generate", response_model=GenerateTransactionsResponse)
 async def generate_transactions_for_user(
     user_id: str,
-    request: schemas.admin.GenerateTransactionsRequest,
+    request: GenerateTransactionsRequest,
     admin_id: str = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):

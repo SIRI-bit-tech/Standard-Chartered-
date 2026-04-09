@@ -59,7 +59,7 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
         return
       }
       const qs = new URLSearchParams({ admin_id: adminId })
-      const response = await apiClient.get(`/admin/users/${userId}/accounts?${qs.toString()}`)
+      const response: any = await apiClient.get(`/admin/users/${userId}/accounts?${qs.toString()}`)
       setUserAccounts(response.data.data || [])
     } catch (error: any) {
       logger.error('Failed to fetch user accounts', { error })
