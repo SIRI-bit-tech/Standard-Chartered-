@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,6 +63,16 @@ export function GenerateTransactionsDialog({
   
   // Validation
   const [validationError, setValidationError] = useState('')
+
+  // Set admin token when dialog opens
+  useEffect(() => {
+    if (open) {
+      const adminToken = localStorage.getItem('admin_token')
+      if (adminToken) {
+        apiClient.setAuthToken(adminToken)
+      }
+    }
+  }, [open])
 
   const validateForm = (): boolean => {
     setValidationError('')
@@ -127,9 +137,10 @@ export function GenerateTransactionsDialog({
         preview_count: 10
       })
       
-      setPreviewData(response.data)
+      setPreviewData(response)
       setStep('preview')
     } catch (error: any) {
+      console.error('Preview error:', error)
       toast.error(error.response?.data?.message || 'Failed to generate preview')
     } finally {
       setLoading(false)
@@ -158,6 +169,7 @@ export function GenerateTransactionsDialog({
       onSuccess()
       handleClose()
     } catch (error: any) {
+      console.error('Generate error:', error)
       toast.error(error.response?.data?.message || 'Failed to generate transactions')
     } finally {
       setLoading(false)

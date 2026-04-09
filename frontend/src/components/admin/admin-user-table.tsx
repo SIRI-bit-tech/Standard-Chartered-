@@ -53,6 +53,16 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
   
   const handleGenerateTransactions = async (userId: string) => {
     setSelectedUserId(userId)
+    
+    // Set admin token before making request
+    const adminToken = localStorage.getItem('admin_token')
+    if (!adminToken) {
+      toast.error('Admin session expired. Please log in again.')
+      window.location.href = '/admin/auth/login'
+      return
+    }
+    apiClient.setAuthToken(adminToken)
+    
     try {
       const adminId = localStorage.getItem('admin_id')
       if (!adminId) {
@@ -61,7 +71,8 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
       }
       const qs = new URLSearchParams({ admin_id: adminId })
       const response: any = await apiClient.get(`/admin/users/${userId}/accounts?${qs.toString()}`)
-      setUserAccounts(response.data.data || [])
+      const accountsData = response.data || []
+      setUserAccounts(accountsData)
       setGenerateTxDialogOpen(true)
     } catch (error: any) {
       logger.error('Failed to fetch user accounts', { error })

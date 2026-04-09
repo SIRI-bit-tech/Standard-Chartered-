@@ -2996,7 +2996,7 @@ async def create_loan_product(
 async def preview_generated_transactions(
     user_id: str,
     request: GenerateTransactionsPreviewRequest,
-    admin_id: str = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -3041,7 +3041,7 @@ async def preview_generated_transactions(
 async def generate_transactions_for_user(
     user_id: str,
     request: GenerateTransactionsRequest,
-    admin_id: str = Depends(get_current_admin),
+    admin: AdminUser = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -3119,7 +3119,8 @@ async def generate_transactions_for_user(
         # Create audit log
         audit_log = AdminAuditLog(
             id=str(uuid.uuid4()),
-            admin_id=admin_id,
+            admin_id=admin.id,
+            admin_email=admin.email,
             action="generate_transactions",
             resource_type="transaction",
             resource_id=request.account_id,
@@ -3140,7 +3141,7 @@ async def generate_transactions_for_user(
         await db.commit()
         await db.refresh(account)
         
-        logger.info(f"Admin {admin_id} generated {created_count} transactions for user {user_id}, account {request.account_id}")
+        logger.info(f"Admin {admin.id} generated {created_count} transactions for user {user_id}, account {request.account_id}")
         
         return {
             "success": True,
