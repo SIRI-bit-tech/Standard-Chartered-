@@ -74,65 +74,104 @@ AMERICAN_LAST_NAMES = [
     "Soto", "Weaver", "Ryan", "Gardner", "Payne", "Grant", "Dunn", "Kelley", "Spencer", "Hawkins"
 ]
 
-# Real American Merchants and Businesses
-AMERICAN_MERCHANTS = [
-    # Retail Stores
-    "Walmart", "Target", "Costco Wholesale", "Best Buy", "Home Depot", "Lowe's", "Macy's", "Kohl's",
-    "Nordstrom", "JCPenney", "Sears", "Dick's Sporting Goods", "REI", "Bed Bath & Beyond", "TJ Maxx",
-    "Ross Dress for Less", "Burlington", "Marshalls", "Old Navy", "Gap", "Banana Republic",
+# Real American Merchants and Businesses - Categorized by typical transaction amounts
+
+# LOW AMOUNT MERCHANTS ($5 - $200) - Fast food, subscriptions, small purchases
+LOW_AMOUNT_MERCHANTS = [
+    # Fast Food & Coffee (limited - only 2-3 per generation)
+    "McDonald's", "Starbucks", "Subway", "Taco Bell", "Wendy's", "Burger King", 
+    "Dunkin'", "Chipotle Mexican Grill",
     
-    # Grocery Stores
-    "Whole Foods Market", "Trader Joe's", "Safeway", "Kroger", "Publix", "Albertsons", "Food Lion",
-    "Stop & Shop", "Giant Eagle", "Wegmans", "H-E-B", "Aldi", "Sprouts Farmers Market", "Fresh Market",
+    # Subscriptions & Streaming
+    "Netflix", "Spotify", "Amazon Prime", "Apple Music", "Hulu", "Disney+", "HBO Max", 
+    "YouTube Premium", "Dropbox", "iCloud Storage",
     
-    # Restaurants & Fast Food
-    "McDonald's", "Starbucks", "Subway", "Chipotle Mexican Grill", "Panera Bread", "Chick-fil-A",
-    "Taco Bell", "Wendy's", "Burger King", "KFC", "Pizza Hut", "Domino's Pizza", "Papa John's",
-    "Olive Garden", "Red Lobster", "Applebee's", "Chili's", "Outback Steakhouse", "Texas Roadhouse",
-    "The Cheesecake Factory", "Buffalo Wild Wings", "Five Guys", "In-N-Out Burger", "Shake Shack",
+    # Gas Stations (fuel only)
+    "Shell", "Chevron", "BP", "ExxonMobil", "Mobil", "Texaco", "Sunoco", "Marathon", 
+    "Speedway", "Circle K", "7-Eleven", "Wawa", "QuikTrip", "RaceTrac", "Sheetz",
     
-    # Gas Stations
-    "Shell", "Chevron", "BP", "ExxonMobil", "Mobil", "Texaco", "Sunoco", "Marathon", "Speedway",
-    "Circle K", "7-Eleven", "Wawa", "QuikTrip", "RaceTrac", "Sheetz",
-    
-    # Pharmacies
+    # Pharmacies (small purchases)
     "CVS Pharmacy", "Walgreens", "Rite Aid", "Duane Reade",
+]
+
+# MEDIUM AMOUNT MERCHANTS ($200 - $2,000) - Groceries, casual dining, utilities
+MEDIUM_AMOUNT_MERCHANTS = [
+    # Grocery Stores
+    "Whole Foods Market", "Trader Joe's", "Safeway", "Kroger", "Publix", "Albertsons", 
+    "Food Lion", "Stop & Shop", "Giant Eagle", "Wegmans", "H-E-B", "Aldi", 
+    "Sprouts Farmers Market", "Fresh Market",
     
-    # Online/Tech
-    "Amazon.com", "Apple Store", "Microsoft Store", "eBay", "Etsy",
-    
-    # Services & Subscriptions
-    "Netflix", "Spotify", "Amazon Prime", "Apple Music", "Hulu", "Disney+", "HBO Max", "YouTube Premium",
-    "Adobe Creative Cloud", "Microsoft 365", "Dropbox", "iCloud Storage",
+    # Casual Dining
+    "Olive Garden", "Red Lobster", "Applebee's", "Chili's", "Outback Steakhouse", 
+    "Texas Roadhouse", "The Cheesecake Factory", "Buffalo Wild Wings",
     
     # Utilities & Bills
-    "AT&T", "Verizon Wireless", "T-Mobile", "Sprint", "Comcast Xfinity", "Spectrum", "Cox Communications",
-    "CenturyLink", "Frontier Communications", "Con Edison", "PG&E", "Duke Energy", "Southern California Edison",
+    "AT&T", "Verizon Wireless", "T-Mobile", "Sprint", "Comcast Xfinity", "Spectrum", 
+    "Cox Communications", "CenturyLink", "Frontier Communications", "Con Edison", 
+    "PG&E", "Duke Energy", "Southern California Edison",
     
-    # Department Stores
-    "Bloomingdale's", "Dillard's", "Neiman Marcus", "Saks Fifth Avenue",
-    
-    # Home Improvement
-    "Ace Hardware", "True Value", "Menards", "Harbor Freight Tools",
-    
-    # Automotive
-    "AutoZone", "O'Reilly Auto Parts", "Advance Auto Parts", "NAPA Auto Parts", "Jiffy Lube", "Valvoline",
-    
-    # Pet Supplies
-    "PetSmart", "Petco", "Chewy.com",
+    # Fitness
+    "Planet Fitness", "LA Fitness", "24 Hour Fitness", "Gold's Gym", "Equinox",
     
     # Office Supplies
     "Staples", "Office Depot", "OfficeMax",
     
+    # Pet Supplies
+    "PetSmart", "Petco", "Chewy.com",
+    
     # Bookstores
     "Barnes & Noble", "Books-A-Million",
     
-    # Electronics
-    "GameStop", "Micro Center", "Fry's Electronics",
+    # Retail Stores (moderate purchases)
+    "Walmart", "Target", "Costco Wholesale", "Best Buy", "Macy's", "Kohl's",
+    "Nordstrom", "JCPenney", "TJ Maxx", "Ross Dress for Less", "Burlington", 
+    "Marshalls", "Old Navy", "Gap", "Banana Republic",
     
-    # Fitness
-    "Planet Fitness", "LA Fitness", "24 Hour Fitness", "Gold's Gym", "Equinox"
+    # Department Stores
+    "Bloomingdale's", "Dillard's",
 ]
+
+# HIGH AMOUNT MERCHANTS ($2,000 - $50,000) - Professional equipment, industrial supplies
+HIGH_AMOUNT_MERCHANTS = [
+    # Industrial & Professional Equipment Suppliers
+    "Grainger Industrial Supply", "MSC Industrial Supply", "Fastenal Company", 
+    "Motion Industries", "Applied Industrial Technologies", "Kaman Industrial Technologies",
+    "Bearing Distributors Inc", "Global Industrial Equipment", "Zoro Tools",
+    
+    # Electrical & Power Equipment
+    "Graybar Electric Company", "Rexel USA", "WESCO Distribution", "Crescent Electric Supply",
+    "Platt Electric Supply", "Steiner Electric Company", "Border States Electric",
+    
+    # HVAC & Mechanical Equipment
+    "Ferguson Enterprises", "Johnstone Supply", "United Refrigeration", "Baker Distributing",
+    "Watsco Inc", "Thermal Equipment Sales",
+    
+    # Safety & Industrial Supplies
+    "Airgas USA", "Praxair Distribution", "Brenntag North America", "Univar Solutions",
+    
+    # Heavy Equipment & Machinery
+    "Caterpillar Equipment", "John Deere Industrial", "Komatsu America", 
+    "Bobcat Company", "JLG Industries", "Genie Industries",
+    
+    # Tools & Equipment
+    "Snap-on Tools", "Mac Tools", "Matco Tools", "Milwaukee Tool", "DeWalt Industrial",
+    "Hilti Corporation", "Bosch Power Tools",
+    
+    # Automotive & Fleet Equipment
+    "NAPA Commercial", "Advance Auto Parts Commercial", "AutoZone Commercial",
+    "O'Reilly Auto Parts Commercial",
+    
+    # Building Materials & Construction
+    "Home Depot Pro", "Lowe's Commercial", "84 Lumber", "Builders FirstSource",
+    "ABC Supply Company", "US LBM",
+    
+    # Specialty Equipment
+    "McMaster-Carr Supply", "W.W. Grainger", "Uline Shipping Supplies",
+    "Northern Tool + Equipment", "Harbor Freight Tools",
+]
+
+# Keep original list for backward compatibility
+AMERICAN_MERCHANTS = LOW_AMOUNT_MERCHANTS + MEDIUM_AMOUNT_MERCHANTS + HIGH_AMOUNT_MERCHANTS
 
 # Transaction descriptions for person-to-person transfers
 P2P_DESCRIPTIONS = [
@@ -154,20 +193,39 @@ P2P_DESCRIPTIONS = [
     "PayPal to {name}"
 ]
 
-# Salary/Income descriptions
-INCOME_DESCRIPTIONS = [
+# Salary/Income descriptions - Categorized by amount
+
+# LOW INCOME ($100 - $2,000) - Small payments, reimbursements
+LOW_INCOME_DESCRIPTIONS = [
+    "Reimbursement",
+    "Interest Payment",
+    "Cashback Reward",
+    "Referral Bonus",
+    "Gift Deposit"
+]
+
+# HIGH INCOME ($10,000 - $50,000) - Major income sources
+HIGH_INCOME_DESCRIPTIONS = [
     "Salary Deposit",
     "Payroll Direct Deposit",
     "Bonus Payment",
     "Commission Payment",
-    "Freelance Payment",
-    "Consulting Fee",
     "Contract Payment",
-    "Dividend Payment",
-    "Interest Payment",
+    "Consulting Fee",
     "Tax Refund",
     "Insurance Claim",
     "Investment Return",
+    "Crypto Investment Deposit",
+    "Bitcoin Sale Proceeds",
+    "Ethereum Sale Proceeds",
+    "Cryptocurrency Withdrawal",
+    "Stock Dividend Payment",
     "Rental Income",
-    "Reimbursement"
+    "Business Income",
+    "Settlement Payment",
+    "Legal Settlement",
+    "Loan Disbursement"
 ]
+
+# Keep original for backward compatibility
+INCOME_DESCRIPTIONS = LOW_INCOME_DESCRIPTIONS + HIGH_INCOME_DESCRIPTIONS

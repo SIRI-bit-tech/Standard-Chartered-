@@ -3098,6 +3098,10 @@ async def generate_transactions_for_user(
         # Insert transactions into database
         created_count = 0
         for txn_data in transactions_data:
+            # Parse datetime and remove timezone info for database
+            created_at = datetime.fromisoformat(txn_data["created_at"]).replace(tzinfo=None)
+            posted_date = datetime.fromisoformat(txn_data["posted_date"]).replace(tzinfo=None)
+            
             transaction = Transaction(
                 id=str(uuid.uuid4()),
                 account_id=txn_data["account_id"],
@@ -3106,8 +3110,8 @@ async def generate_transactions_for_user(
                 currency=txn_data["currency"],
                 description=txn_data["description"],
                 status=TransactionStatus(txn_data["status"]),
-                created_at=datetime.fromisoformat(txn_data["created_at"]),
-                posted_date=datetime.fromisoformat(txn_data["posted_date"])
+                created_at=created_at,
+                posted_date=posted_date
             )
             db.add(transaction)
             created_count += 1

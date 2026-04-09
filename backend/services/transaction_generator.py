@@ -6,17 +6,28 @@ from data.names_database import (
     AMERICAN_MALE_FIRST_NAMES,
     AMERICAN_FEMALE_FIRST_NAMES,
     AMERICAN_LAST_NAMES,
-    AMERICAN_MERCHANTS,
+    LOW_AMOUNT_MERCHANTS,
+    MEDIUM_AMOUNT_MERCHANTS,
+    HIGH_AMOUNT_MERCHANTS,
     P2P_DESCRIPTIONS,
-    INCOME_DESCRIPTIONS
+    LOW_INCOME_DESCRIPTIONS,
+    HIGH_INCOME_DESCRIPTIONS
 )
 
 
 class TransactionGenerator:
     """Generate realistic transaction history with high amounts"""
     
+    # Fast food merchants for limiting
+    FAST_FOOD_MERCHANTS = [
+        "McDonald's", "Starbucks", "Subway", "Taco Bell", "Wendy's", 
+        "Burger King", "Dunkin'", "Chipotle Mexican Grill"
+    ]
+    
     def __init__(self):
         self.used_names = set()  # Track used names to ensure uniqueness
+        self.fast_food_count = 0  # Track fast food transactions
+        self.max_fast_food = 3  # Maximum fast food transactions per generation
     
     def get_unique_person_name(self) -> str:
         """Generate a unique person name (no duplicates)"""
@@ -43,9 +54,44 @@ class TransactionGenerator:
         self.used_names.add(full_name)
         return full_name
     
+    def get_merchant_with_amount(self, target_amount: Decimal) -> Tuple[str, Decimal]:
+        """
+        Get a merchant name appropriate for the target amount
+        Returns: (merchant_name, realistic_amount)
+        """
+        amount_float = float(target_amount)
+        
+        # Categorize by amount and select appropriate merchant
+        if amount_float < 200:
+            # Low amount: fast food (limited), subscriptions, gas
+            # Check if we've hit fast food limit
+            available_merchants = [m for m in LOW_AMOUNT_MERCHANTS if m not in self.FAST_FOOD_MERCHANTS]
+            
+            # 20% chance of fast food if under limit, otherwise non-food
+            if self.fast_food_count < self.max_fast_food and random.random() < 0.2:
+                merchant = random.choice(self.FAST_FOOD_MERCHANTS)
+                self.fast_food_count += 1
+            else:
+                merchant = random.choice(available_merchants)
+            
+            # Generate realistic amount for this category
+            amount = Decimal(str(round(random.uniform(5, 200), 2)))
+        elif amount_float < 2000:
+            # Medium amount: groceries, utilities, casual dining
+            merchant = random.choice(MEDIUM_AMOUNT_MERCHANTS)
+            amount = Decimal(str(round(random.uniform(200, 2000), 2)))
+        else:
+            # High amount: professional equipment, industrial supplies
+            merchant = random.choice(HIGH_AMOUNT_MERCHANTS)
+            amount = Decimal(str(round(random.uniform(2000, min(50000, amount_float * 1.2)), 2)))
+        
+        return merchant, amount
+    
     def get_merchant_name(self) -> str:
-        """Get a random merchant name"""
-        return random.choice(AMERICAN_MERCHANTS)
+        """Get a random merchant name (deprecated - use get_merchant_with_amount)"""
+        # Randomly select from all categories
+        all_merchants = LOW_AMOUNT_MERCHANTS + MEDIUM_AMOUNT_MERCHANTS + HIGH_AMOUNT_MERCHANTS
+        return random.choice(all_merchants)
     
     def generate_high_amount(self, min_amount: float = 100, max_amount: float = 50000) -> Decimal:
         """
@@ -161,18 +207,22 @@ class TransactionGenerator:
         balance_change = closing_balance - starting_balance
         
         # Determine ratio of debits to credits
+        # Both credits and debits should have high amounts
         if balance_change > 0:
             # Need more credits than debits
-            credit_ratio = 0.6  # 60% credits
+            credit_ratio = 0.65  # 65% credits (more incoming money)
         elif balance_change < 0:
             # Need more debits than credits
-            credit_ratio = 0.4  # 40% credits
+            credit_ratio = 0.35  # 35% credits
         else:
             # Equal debits and credits
             credit_ratio = 0.5
         
         # Generate timestamps
         timestamps = self.distribute_timestamps(start_date, end_date, transaction_count)
+        
+        # Reset fast food counter for this generation
+        self.fast_food_count = 0
         
         # Generate transactions
         transactions = []
@@ -202,34 +252,65 @@ class TransactionGenerator:
             # Determine transaction type and description
             if is_credit:
                 transaction_type = "credit"
-                # 50% chance of person-to-person, 50% income/deposit
-                if random.choice([True, False]):
+                # Credits should be high amounts: person-to-person transfers, income, etc.
+                # 50% person-to-person (high amounts), 50% income/business (high amounts $10k+)
+                if random.random() < 0.5:
                     person_name = self.get_unique_person_name()
                     description = random.choice([
                         f"Transfer from {person_name}",
                         f"Payment from {person_name}",
                         f"Zelle from {person_name}",
-                        f"Wire transfer from {person_name}"
+                        f"Wire transfer from {person_name}",
+                        f"Check deposit from {person_name}"
                     ])
                 else:
-                    description = random.choice(INCOME_DESCRIPTIONS)
+                    # Use high-value income sources
+                    description = random.choice(HIGH_INCOME_DESCRIPTIONS)
+                    # Ensure amount is at least $10,000 for income
+                    if not is_last and amount < Decimal('10000'):
+                        amount = Decimal(str(round(random.uniform(10000, 50000), 2)))
                 
                 current_balance += amount
                 remaining_change -= amount
             else:
                 transaction_type = "debit"
-                # 70% chance of merchant, 30% person-to-person
+                # Debits: Mostly equipment purchases (high amounts) with some small purchases
+                # 70% equipment/professional purchases (high amounts), 30% small purchases
                 if random.random() < 0.7:
-                    merchant = self.get_merchant_name()
+                    # Professional equipment purchase - use high amounts
+                    if is_last:
+                        amount = abs(remaining_change)
+                        # Pick merchant appropriate for this amount
+                        merchant, _ = self.get_merchant_with_amount(amount)
+                    else:
+                        # Generate high amount for equipment
+                        amount = self.generate_high_amount(min_amount=2000, max_amount=50000)
+                        merchant = random.choice(HIGH_AMOUNT_MERCHANTS)
+                    
                     description = f"{merchant} Purchase"
                 else:
-                    person_name = self.get_unique_person_name()
-                    description = random.choice([
-                        f"Transfer to {person_name}",
-                        f"Payment to {person_name}",
-                        f"Zelle to {person_name}",
-                        f"Wire transfer to {person_name}"
-                    ])
+                    # Small purchase or person-to-person transfer
+                    if random.random() < 0.5:
+                        # Small merchant purchase with realistic amount
+                        merchant, realistic_amount = self.get_merchant_with_amount(amount)
+                        
+                        if is_last:
+                            amount = abs(remaining_change)
+                            merchant, _ = self.get_merchant_with_amount(amount)
+                        else:
+                            amount = realistic_amount
+                        
+                        description = f"{merchant} Purchase"
+                    else:
+                        # Person-to-person transfer (can be high amounts)
+                        person_name = self.get_unique_person_name()
+                        description = random.choice([
+                            f"Transfer to {person_name}",
+                            f"Payment to {person_name}",
+                            f"Zelle to {person_name}",
+                            f"Wire transfer to {person_name}",
+                            f"Check payment to {person_name}"
+                        ])
                 
                 current_balance -= amount
                 remaining_change += amount
