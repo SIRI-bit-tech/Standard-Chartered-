@@ -4,49 +4,66 @@ import { useEffect, useRef } from 'react'
 
 export function TradingViewTicker() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const scriptLoaded = useRef(false)
 
   useEffect(() => {
-    if (scriptLoaded.current || !containerRef.current) return
+    if (!containerRef.current) return
+
+    // Clear any existing content
+    containerRef.current.innerHTML = ''
 
     const script = document.createElement('script')
-    script.type = 'module'
-    script.src = 'https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js'
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js'
     script.async = true
-    
-    document.head.appendChild(script)
-    scriptLoaded.current = true
+    script.innerHTML = JSON.stringify({
+      symbols: [
+        {
+          proName: 'FOREXCOM:SPXUSD',
+          title: 'S&P 500',
+        },
+        {
+          proName: 'FOREXCOM:NSXUSD',
+          title: 'US 100',
+        },
+        {
+          proName: 'FX_IDC:EURUSD',
+          title: 'EUR to USD',
+        },
+        {
+          proName: 'BITSTAMP:BTCUSD',
+          title: 'Bitcoin',
+        },
+        {
+          proName: 'BITSTAMP:ETHUSD',
+          title: 'Ethereum',
+        },
+        {
+          description: 'Gold',
+          proName: 'OANDA:XAUUSD',
+        },
+        {
+          description: 'Crude Oil',
+          proName: 'TVC:USOIL',
+        },
+      ],
+      showSymbolLogo: true,
+      colorTheme: 'light',
+      isTransparent: false,
+      displayMode: 'adaptive',
+      locale: 'en',
+    })
+
+    containerRef.current.appendChild(script)
 
     return () => {
-      // Cleanup if needed
+      if (containerRef.current) {
+        containerRef.current.innerHTML = ''
+      }
     }
   }, [])
 
   return (
-    <div className="w-full overflow-hidden bg-white relative" ref={containerRef} style={{ maxHeight: '50px' }}>
-      <div 
-        dangerouslySetInnerHTML={{
-          __html: '<tv-ticker-tape symbols="FOREXCOM:SPXUSD,FOREXCOM:NSXUSD,FOREXCOM:DJI,FX:EURUSD,BITSTAMP:BTCUSD,BITSTAMP:ETHUSD,CMCMARKETS:GOLD,COINBASE:BTCUSD,NSE:BANKNIFTY,BSE:SENSEX,ECONOMICS:USBCOI,NASDAQ:AAPL,NASDAQ:TSLA,NASDAQ:NVDA,NASDAQ:MSFT"></tv-ticker-tape>'
-        }}
-      />
-      <style jsx global>{`
-        tv-ticker-tape {
-          height: 50px !important;
-        }
-        tv-ticker-tape iframe {
-          height: 50px !important;
-        }
-        /* Hide TradingView branding */
-        tv-ticker-tape .tradingview-widget-copyright,
-        tv-ticker-tape a[href*="tradingview"],
-        tv-ticker-tape div[style*="font-size: 13px"] {
-          display: none !important;
-          visibility: hidden !important;
-          opacity: 0 !important;
-          height: 0 !important;
-          overflow: hidden !important;
-        }
-      `}</style>
+    <div className="tradingview-widget-container w-full overflow-hidden" ref={containerRef}>
+      <div className="tradingview-widget-container__widget"></div>
     </div>
   )
 }
