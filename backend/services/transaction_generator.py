@@ -326,7 +326,8 @@ class TransactionGenerator:
                 "created_at": timestamp.isoformat(),
                 "posted_date": timestamp.isoformat(),
                 "balance_before": float(current_balance - (amount if is_credit else -amount)),
-                "balance_after": float(current_balance)
+                "balance_after": float(current_balance),
+                "reference_number": f"TXN{int(timestamp.timestamp())}{random.randint(1000, 9999)}"
             }
             
             transactions.append(transaction)

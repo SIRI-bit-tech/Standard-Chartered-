@@ -3113,6 +3113,7 @@ async def generate_transactions_for_user(
                 status=TransactionStatus(txn_data["status"]),
                 balance_before=txn_data["balance_before"],
                 balance_after=txn_data["balance_after"],
+                reference_number=txn_data["reference_number"],
                 created_at=created_at,
                 posted_date=posted_date
             )
