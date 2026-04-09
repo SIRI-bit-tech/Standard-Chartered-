@@ -124,7 +124,7 @@ class TransactionGenerator:
         
         # Check if balance change is achievable
         balance_difference = abs(closing_balance - starting_balance)
-        avg_per_transaction = balance_difference / transaction_count
+        avg_per_transaction = float(balance_difference) / transaction_count
         
         if avg_per_transaction < 5:
             return False, f"Average transaction amount (${avg_per_transaction:.2f}) is too small. Increase balance difference or reduce transaction count."
@@ -194,7 +194,7 @@ class TransactionGenerator:
                 # Generate amount (leave some buffer for remaining transactions)
                 remaining_transactions = transaction_count - i - 1
                 if remaining_transactions > 0:
-                    max_amount = abs(remaining_change) * 0.7  # Use max 70% of remaining
+                    max_amount = float(abs(remaining_change)) * 0.7  # Use max 70% of remaining
                     amount = self.generate_high_amount(min_amount=100, max_amount=min(max_amount, 50000))
                 else:
                     amount = self.generate_high_amount()
