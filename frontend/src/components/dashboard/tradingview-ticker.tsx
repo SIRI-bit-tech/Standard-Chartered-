@@ -2,21 +2,12 @@
 
 import { useEffect, useRef } from 'react'
 
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      'tv-ticker-tape': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
-        symbols?: string
-      }
-    }
-  }
-}
-
 export function TradingViewTicker() {
+  const containerRef = useRef<HTMLDivElement>(null)
   const scriptLoaded = useRef(false)
 
   useEffect(() => {
-    if (scriptLoaded.current) return
+    if (scriptLoaded.current || !containerRef.current) return
 
     const script = document.createElement('script')
     script.type = 'module'
@@ -32,10 +23,12 @@ export function TradingViewTicker() {
   }, [])
 
   return (
-    <div className="w-full overflow-hidden bg-white">
-      <tv-ticker-tape 
-        symbols="FOREXCOM:SPXUSD,FOREXCOM:NSXUSD,FOREXCOM:DJI,FX:EURUSD,BITSTAMP:BTCUSD,BITSTAMP:ETHUSD,CMCMARKETS:GOLD,COINBASE:BTCUSD,NSE:BANKNIFTY,BSE:SENSEX,ECONOMICS:USBCOI,NASDAQ:AAPL,NASDAQ:TSLA,NASDAQ:NVDA,NASDAQ:MSFT"
-      ></tv-ticker-tape>
+    <div className="w-full overflow-hidden bg-white" ref={containerRef}>
+      <div 
+        dangerouslySetInnerHTML={{
+          __html: '<tv-ticker-tape symbols="FOREXCOM:SPXUSD,FOREXCOM:NSXUSD,FOREXCOM:DJI,FX:EURUSD,BITSTAMP:BTCUSD,BITSTAMP:ETHUSD,CMCMARKETS:GOLD,COINBASE:BTCUSD,NSE:BANKNIFTY,BSE:SENSEX,ECONOMICS:USBCOI,NASDAQ:AAPL,NASDAQ:TSLA,NASDAQ:NVDA,NASDAQ:MSFT"></tv-ticker-tape>'
+        }}
+      />
     </div>
   )
 }

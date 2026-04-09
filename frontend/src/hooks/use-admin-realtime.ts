@@ -20,8 +20,15 @@ export function useAdminRealtime(channelName: string, onUpdate: (payload: any) =
         const enabled = json?.success && json.data?.real_time_enabled
         if (!enabled || cancelled) return
 
+        // Get admin token from localStorage
+        const token = localStorage.getItem('admin_token')
+        if (!token) return
+
         const client = new Ably.Realtime({
           authUrl: `${API_BASE_URL}/admin/realtime/token?admin_id=${adminId}`,
+          authHeaders: {
+            'Authorization': `Bearer ${token}`,
+          },
         })
         clientRef.current = client
 

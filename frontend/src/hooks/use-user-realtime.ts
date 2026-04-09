@@ -14,10 +14,20 @@ export function useUserRealtime(channelName: string, onUpdate: (payload: any) =>
 
     const connect = async () => {
       try {
+        // Get the access token from localStorage
+        const token = localStorage.getItem('access_token')
+        if (!token) {
+          sessionStorage.setItem('realtimeDisabled', '1')
+          return
+        }
+
         // Pre-check the auth endpoint to avoid repeated Ably logs when backend is not configured
         try {
           const probe = await fetch(`${API_BASE_URL}/api/v1/profile/realtime/token`, {
             credentials: 'include',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
           })
           if (!probe.ok) {
             sessionStorage.setItem('realtimeDisabled', '1')
@@ -30,6 +40,9 @@ export function useUserRealtime(channelName: string, onUpdate: (payload: any) =>
 
         const client = new Ably.Realtime({
           authUrl: `${API_BASE_URL}/api/v1/profile/realtime/token`,
+          authHeaders: {
+            'Authorization': `Bearer ${token}`,
+          },
         })
         clientRef.current = client
 
