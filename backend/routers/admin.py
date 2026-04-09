@@ -2512,6 +2512,56 @@ async def admin_get_user_detail(
         logger.error("Get user detail failed", error=e)
         raise InternalServerError(operation="get user detail", error_code="GET_USER_DETAIL_FAILED", original_error=e)
 
+@router.get("/users/{user_id}/accounts")
+async def admin_get_user_accounts(
+    user_id: str,
+    admin_id: str = Query(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all accounts for a specific user"""
+    try:
+        # Verify admin
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin or not AdminPermissionManager.has_permission(admin.role, "users:read"):
+            raise UnauthorizedError(message="You don't have permission to view user accounts", error_code="PERMISSION_DENIED")
+        
+        # Verify user exists
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise NotFoundError(resource="User", error_code="USER_NOT_FOUND")
+        
+        # Fetch user's accounts
+        accounts_result = await db.execute(
+            select(Account).where(Account.user_id == user_id)
+        )
+        accounts = accounts_result.scalars().all()
+        
+        # Format response
+        accounts_data = []
+        for account in accounts:
+            accounts_data.append({
+                "id": account.id,
+                "account_number": account.account_number,
+                "account_type": account.account_type.value if hasattr(account.account_type, "value") else str(account.account_type),
+                "currency": account.currency,
+                "balance": float(account.balance),
+                "status": account.status.value if hasattr(account.status, "value") else str(account.status),
+                "is_primary": account.is_primary,
+                "created_at": account.created_at.isoformat() if account.created_at else None,
+            })
+        
+        return {
+            "success": True,
+            "data": accounts_data
+        }
+    except (UnauthorizedError, NotFoundError):
+        raise
+    except Exception as e:
+        logger.error("Get user accounts failed", error=e)
+        raise InternalServerError(operation="get user accounts", error_code="GET_USER_ACCOUNTS_FAILED", original_error=e)
+
 @router.put("/accounts/status")
 async def admin_update_account_status(
     admin_id: str,
