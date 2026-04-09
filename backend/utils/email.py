@@ -279,7 +279,7 @@ async def send_statement_email(email: str, first_name: str, statement_url: str, 
                 
                 <div style="margin-top:32px;padding-top:24px;border-top:1px solid #E5E7EB;color:{text_secondary};font-size:14px;">
                   <p><strong>Need help?</strong></p>
-                  <p>Visit the Support section in your dashboard or contact us at support@standardchartered.com</p>
+                  <p>Visit the Support section in your dashboard or contact us at support@standardcharteredibank.com</p>
                 </div>
               </div>
               <div style="padding:16px;text-align:center;color:#9CA3AF;font-size:12px;background:#F9FAFB;">

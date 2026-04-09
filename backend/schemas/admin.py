@@ -233,3 +233,61 @@ class AdminCreateLoanProductRequest(BaseModel):
     available_to_standard: bool = True
     available_to_priority: bool = True
     available_to_premium: bool = True
+
+
+# Transaction Generation Schemas
+class GenerateTransactionsRequest(BaseModel):
+    """Request to generate transaction history"""
+    account_id: str = Field(..., description="Account ID to generate transactions for")
+    start_date: datetime = Field(..., description="Start date for transaction history")
+    end_date: datetime = Field(..., description="End date for transaction history")
+    starting_balance: float = Field(..., ge=0, description="Starting account balance")
+    closing_balance: float = Field(..., ge=0, description="Closing account balance")
+    transaction_count: int = Field(..., ge=1, le=1000, description="Number of transactions to generate")
+    currency: str = Field(default="USD", description="Currency code")
+
+
+class GenerateTransactionsPreviewRequest(BaseModel):
+    """Request to preview generated transactions"""
+    start_date: datetime = Field(..., description="Start date for transaction history")
+    end_date: datetime = Field(..., description="End date for transaction history")
+    starting_balance: float = Field(..., ge=0, description="Starting account balance")
+    closing_balance: float = Field(..., ge=0, description="Closing account balance")
+    transaction_count: int = Field(..., ge=1, le=1000, description="Number of transactions to generate")
+    preview_count: int = Field(default=10, ge=1, le=50, description="Number of sample transactions to show")
+
+
+class TransactionPreviewItem(BaseModel):
+    """Preview of a single transaction"""
+    type: str
+    amount: float
+    description: str
+    created_at: str
+    running_balance: Optional[float] = None
+
+
+class TransactionGenerationSummary(BaseModel):
+    """Summary statistics for generated transactions"""
+    total_transactions: int
+    debit_count: int
+    credit_count: int
+    total_debits: float
+    total_credits: float
+    starting_balance: float
+    closing_balance: float
+    net_change: float
+
+
+class GenerateTransactionsPreviewResponse(BaseModel):
+    """Response with transaction preview"""
+    sample_transactions: List[TransactionPreviewItem]
+    summary: TransactionGenerationSummary
+
+
+class GenerateTransactionsResponse(BaseModel):
+    """Response after generating transactions"""
+    success: bool
+    message: str
+    transactions_created: int
+    account_id: str
+    new_balance: float

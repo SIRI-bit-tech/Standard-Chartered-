@@ -2935,3 +2935,172 @@ async def create_loan_product(
     except Exception as e:
         logger.error("Failed to create loan product", error=e)
         raise InternalServerError(operation="create loan product", error_code="CREATE_FAILED", original_error=e)
+
+
+
+# ==================== TRANSACTION GENERATION ENDPOINTS ====================
+
+@router.post("/users/{user_id}/transactions/preview", response_model=schemas.admin.GenerateTransactionsPreviewResponse)
+async def preview_generated_transactions(
+    user_id: str,
+    request: schemas.admin.GenerateTransactionsPreviewRequest,
+    admin_id: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Preview generated transactions before creating them
+    
+    This endpoint allows admins to see a sample of what transactions will be generated
+    before actually creating them in the database.
+    """
+    try:
+        from services.transaction_generator import TransactionGenerator
+        from decimal import Decimal
+        
+        # Verify user exists
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise NotFoundError(resource="User", identifier=user_id)
+        
+        # Create generator instance
+        generator = TransactionGenerator()
+        
+        # Generate preview
+        preview_data = generator.generate_preview(
+            start_date=request.start_date,
+            end_date=request.end_date,
+            starting_balance=Decimal(str(request.starting_balance)),
+            closing_balance=Decimal(str(request.closing_balance)),
+            transaction_count=request.transaction_count,
+            preview_count=request.preview_count
+        )
+        
+        return preview_data
+        
+    except ValueError as e:
+        raise ValidationError(field="generation_params", message=str(e))
+    except Exception as e:
+        logger.error(f"Error previewing transactions: {str(e)}")
+        raise InternalServerError(operation="preview transactions", error_code="PREVIEW_FAILED", original_error=e)
+
+
+@router.post("/users/{user_id}/transactions/generate", response_model=schemas.admin.GenerateTransactionsResponse)
+async def generate_transactions_for_user(
+    user_id: str,
+    request: schemas.admin.GenerateTransactionsRequest,
+    admin_id: str = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate realistic transaction history for a user
+    
+    This endpoint creates actual transaction records in the database with:
+    - Real merchant and person names (no AI-generated names)
+    - High transaction amounts ($100 - $50,000)
+    - Realistic distribution of debits and credits
+    - Chronologically distributed timestamps
+    
+    The generated transactions will:
+    - Appear in the user's transaction history
+    - Be included in statement downloads
+    - Update the account balance to match closing_balance
+    """
+    try:
+        from services.transaction_generator import TransactionGenerator
+        from decimal import Decimal
+        
+        # Verify user exists
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise NotFoundError(resource="User", identifier=user_id)
+        
+        # Verify account exists and belongs to user
+        account_result = await db.execute(
+            select(Account).where(
+                and_(
+                    Account.id == request.account_id,
+                    Account.user_id == user_id
+                )
+            )
+        )
+        account = account_result.scalar_one_or_none()
+        if not account:
+            raise NotFoundError(resource="Account", identifier=request.account_id)
+        
+        # Create generator instance
+        generator = TransactionGenerator()
+        
+        # Generate transactions
+        transactions_data = generator.generate_transactions(
+            start_date=request.start_date,
+            end_date=request.end_date,
+            starting_balance=Decimal(str(request.starting_balance)),
+            closing_balance=Decimal(str(request.closing_balance)),
+            transaction_count=request.transaction_count,
+            account_id=request.account_id,
+            currency=request.currency
+        )
+        
+        # Insert transactions into database
+        created_count = 0
+        for txn_data in transactions_data:
+            transaction = Transaction(
+                id=str(uuid.uuid4()),
+                account_id=txn_data["account_id"],
+                type=TransactionType(txn_data["type"]),
+                amount=txn_data["amount"],
+                currency=txn_data["currency"],
+                description=txn_data["description"],
+                status=TransactionStatus(txn_data["status"]),
+                created_at=datetime.fromisoformat(txn_data["created_at"]),
+                posted_date=datetime.fromisoformat(txn_data["posted_date"])
+            )
+            db.add(transaction)
+            created_count += 1
+        
+        # Update account balance to closing balance
+        account.balance = float(request.closing_balance)
+        account.available_balance = float(request.closing_balance)
+        
+        # Create audit log
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin_id,
+            action="generate_transactions",
+            resource_type="transaction",
+            resource_id=request.account_id,
+            details=json.dumps({
+                "user_id": user_id,
+                "account_id": request.account_id,
+                "transaction_count": created_count,
+                "start_date": request.start_date.isoformat(),
+                "end_date": request.end_date.isoformat(),
+                "starting_balance": request.starting_balance,
+                "closing_balance": request.closing_balance
+            }),
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(audit_log)
+        
+        # Commit all changes
+        await db.commit()
+        await db.refresh(account)
+        
+        logger.info(f"Admin {admin_id} generated {created_count} transactions for user {user_id}, account {request.account_id}")
+        
+        return {
+            "success": True,
+            "message": f"Successfully generated {created_count} transactions",
+            "transactions_created": created_count,
+            "account_id": request.account_id,
+            "new_balance": account.balance
+        }
+        
+    except ValueError as e:
+        raise ValidationError(field="generation_params", message=str(e))
+    except Exception as e:
+        logger.error(f"Error generating transactions: {str(e)}")
+        await db.rollback()
+        raise InternalServerError(operation="generate transactions", error_code="GENERATION_FAILED", original_error=e)

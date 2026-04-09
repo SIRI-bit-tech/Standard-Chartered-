@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     title: 'Standard Chartered - International Banking Solutions',
     description: 'Leading international bank connecting businesses and individuals across Asia, Africa and the Middle East with comprehensive banking and financial services',
     type: 'website',
-    url: 'https://www.standardchartered.com',
+    url: 'https://www.standardcharteredibank.com',
   },
   robots: 'index, follow',
   icons: {

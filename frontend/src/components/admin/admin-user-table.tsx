@@ -12,15 +12,17 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { MoreHorizontal, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { colors } from '@/types'
-import type { AdminUserRow } from '@/types'
+import type { AdminUserRow, Account } from '@/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { apiClient } from '@/lib/api-client'
 import { logger } from '@/lib/logger'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { getInitials } from '@/lib/utils'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AdminEditUserDialog } from '@/components/admin/admin-edit-user-dialog'
+import { GenerateTransactionsDialog } from '@/components/admin/GenerateTransactionsDialog'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { toast } from 'sonner'
 
 function statusBadge(status: AdminUserRow['status']) {
   if (status === 'active') return { bg: `${colors.success}20`, fg: colors.success, label: 'Active' }
@@ -32,6 +34,9 @@ function statusBadge(status: AdminUserRow['status']) {
 export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [generateTxDialogOpen, setGenerateTxDialogOpen] = useState(false)
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [userAccounts, setUserAccounts] = useState<Account[]>([])
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean
     title: string
@@ -45,6 +50,28 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
     description: '',
     action: () => { },
   })
+  
+  const fetchUserAccounts = async (userId: string) => {
+    try {
+      const adminId = localStorage.getItem('admin_id')
+      if (!adminId) {
+        window.location.href = '/admin/auth/login'
+        return
+      }
+      const qs = new URLSearchParams({ admin_id: adminId })
+      const response = await apiClient.get(`/admin/users/${userId}/accounts?${qs.toString()}`)
+      setUserAccounts(response.data.data || [])
+    } catch (error: any) {
+      logger.error('Failed to fetch user accounts', { error })
+      toast.error('Failed to load user accounts')
+    }
+  }
+  
+  const handleGenerateTransactions = async (userId: string) => {
+    setSelectedUserId(userId)
+    await fetchUserAccounts(userId)
+    setGenerateTxDialogOpen(true)
+  }
   return (
     <div className="rounded-xl border bg-white" style={{ borderColor: colors.border }}>
       <Table>
@@ -120,6 +147,11 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
                         Edit User
                       </DropdownMenuItem>
                       <DropdownMenuItem
+                        onClick={() => handleGenerateTransactions(u.id)}
+                      >
+                        Auto-Generate Transactions
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
                         onClick={() => {
                           setConfirmConfig({
                             isOpen: true,
@@ -189,6 +221,16 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
         onOpenChange={(v) => setDialogOpen(v)}
         userId={editingId}
         onSaved={() => {
+          window.location.reload()
+        }}
+      />
+      <GenerateTransactionsDialog
+        open={generateTxDialogOpen}
+        onOpenChange={setGenerateTxDialogOpen}
+        userId={selectedUserId || ''}
+        accounts={userAccounts}
+        onSuccess={() => {
+          toast.success('Transactions generated successfully')
           window.location.reload()
         }}
       />

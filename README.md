@@ -375,7 +375,7 @@ This project is proprietary and confidential to Standard Chartered Bank.
 
 ## 📞 Support
 
-For support, email support@standardchartered.com or create a support ticket in the application.
+For support, email support@standardcharteredibank.com or create a support ticket in the application.
 
 ## ✨ Features Summary
 
