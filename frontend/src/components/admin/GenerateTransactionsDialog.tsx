@@ -53,7 +53,6 @@ export function GenerateTransactionsDialog({
   const [loading, setLoading] = useState(false)
   
   // Form state
-  const [accountId, setAccountId] = useState('')
   const [startDate, setStartDate] = useState<Date>()
   const [endDate, setEndDate] = useState<Date>(new Date())
   const [startingBalance, setStartingBalance] = useState('')
@@ -68,11 +67,6 @@ export function GenerateTransactionsDialog({
 
   const validateForm = (): boolean => {
     setValidationError('')
-    
-    if (!accountId) {
-      setValidationError('Please select an account')
-      return false
-    }
     
     if (!startDate || !endDate) {
       setValidationError('Please select both start and end dates')
@@ -146,17 +140,22 @@ export function GenerateTransactionsDialog({
   const handleGenerate = async () => {
     setLoading(true)
     try {
-      const response: any = await apiClient.post(`/admin/users/${userId}/transactions/generate`, {
-        account_id: accountId,
-        start_date: startDate?.toISOString(),
-        end_date: endDate?.toISOString(),
-        starting_balance: parseFloat(startingBalance),
-        closing_balance: parseFloat(closingBalance),
-        transaction_count: parseInt(transactionCount),
-        currency: 'USD'
-      })
+      // Generate transactions for all accounts
+      const promises = accounts.map(account => 
+        apiClient.post(`/admin/users/${userId}/transactions/generate`, {
+          account_id: account.id,
+          start_date: startDate?.toISOString(),
+          end_date: endDate?.toISOString(),
+          starting_balance: parseFloat(startingBalance),
+          closing_balance: parseFloat(closingBalance),
+          transaction_count: parseInt(transactionCount),
+          currency: account.currency || 'USD'
+        })
+      )
       
-      toast.success(response.data.message)
+      await Promise.all(promises)
+      
+      toast.success(`Successfully generated transactions for ${accounts.length} account(s)`)
       onSuccess()
       handleClose()
     } catch (error: any) {
@@ -168,7 +167,6 @@ export function GenerateTransactionsDialog({
 
   const handleClose = () => {
     setStep('form')
-    setAccountId('')
     setStartDate(undefined)
     setEndDate(new Date())
     setStartingBalance('')
@@ -194,21 +192,11 @@ export function GenerateTransactionsDialog({
             </DialogHeader>
             
             <div className="space-y-4 py-4">
-              {/* Account Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="account">Account</Label>
-                <Select value={accountId} onValueChange={setAccountId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select account" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.type.charAt(0).toUpperCase() + account.type.slice(1)} - {account.account_number} (${account.balance.toLocaleString()})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Info message */}
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-sm text-blue-800">
+                  Transactions will be generated for all {accounts.length} account(s) belonging to this user.
+                </p>
               </div>
 
               {/* Date Range */}
