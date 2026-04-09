@@ -3105,6 +3105,7 @@ async def generate_transactions_for_user(
             transaction = Transaction(
                 id=str(uuid.uuid4()),
                 account_id=txn_data["account_id"],
+                user_id=user_id,  # Add user_id to satisfy NOT NULL constraint
                 type=TransactionType(txn_data["type"]),
                 amount=txn_data["amount"],
                 currency=txn_data["currency"],
