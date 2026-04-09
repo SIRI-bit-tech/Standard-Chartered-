@@ -51,22 +51,6 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
     action: () => { },
   })
   
-  const fetchUserAccounts = async (userId: string) => {
-    try {
-      const adminId = localStorage.getItem('admin_id')
-      if (!adminId) {
-        window.location.href = '/admin/auth/login'
-        return
-      }
-      const qs = new URLSearchParams({ admin_id: adminId })
-      const response: any = await apiClient.get(`/admin/users/${userId}/accounts?${qs.toString()}`)
-      setUserAccounts(response.data.data || [])
-    } catch (error: any) {
-      logger.error('Failed to fetch user accounts', { error })
-      toast.error('Failed to load user accounts')
-    }
-  }
-  
   const handleGenerateTransactions = async (userId: string) => {
     setSelectedUserId(userId)
     try {
