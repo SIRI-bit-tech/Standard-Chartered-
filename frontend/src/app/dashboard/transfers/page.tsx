@@ -138,7 +138,7 @@ export default function TransfersPage() {
   const [historyPageSize] = useState(10)
   const [filters, setFilters] = useState<HistoryFilterState>({
     q: '',
-    period: '30',
+    period: 'all',
     type: 'all',
     status: 'all',
   })
@@ -218,6 +218,7 @@ export default function TransfersPage() {
       period: filters.period,
       type: filters.type,
       status: filters.status,
+      sort: 'asc',
       page: String(historyPage),
       page_size: String(historyPageSize),
     })

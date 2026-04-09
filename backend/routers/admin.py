@@ -12,7 +12,7 @@ from models.user import User
 from models.account import Account, AccountStatus
 from models.transaction import Transaction, TransactionType, TransactionStatus
 from models.notification import Notification, NotificationType
-from models.transfer import Transfer, TransferStatus
+from models.transfer import Transfer, TransferStatus, TransferType
 from models.deposit import Deposit, DepositStatus
 from models.virtual_card import VirtualCard, VirtualCardStatus
 from models.loan import Loan, LoanStatus, LoanApplication, LoanApplicationStatus, LoanProduct, LoanType
@@ -3095,12 +3095,33 @@ async def generate_transactions_for_user(
             currency=request.currency
         )
         
-        # Insert transactions into database
+        # Insert transactions into database and create linked transfer receipts
         created_count = 0
         for txn_data in transactions_data:
             # Parse datetime and remove timezone info for database
             created_at = datetime.fromisoformat(txn_data["created_at"]).replace(tzinfo=None)
             posted_date = datetime.fromisoformat(txn_data["posted_date"]).replace(tzinfo=None)
+            transfer_id = str(uuid.uuid4())
+            transfer_reference = f"GEN-{uuid.uuid4().hex[:12].upper()}"
+
+            # Create a synthetic completed transfer so generated history has receipt links
+            transfer = Transfer(
+                id=transfer_id,
+                from_account_id=request.account_id,
+                from_user_id=user_id,
+                to_account_id=request.account_id if txn_data["type"] == "credit" else None,
+                type=TransferType.DOMESTIC,
+                status=TransferStatus.COMPLETED,
+                amount=txn_data["amount"],
+                currency=txn_data["currency"],
+                fee_amount=0.0,
+                total_amount=txn_data["amount"],
+                description=txn_data["description"],
+                reference_number=transfer_reference,
+                created_at=created_at,
+                processed_at=posted_date,
+            )
+            db.add(transfer)
             
             transaction = Transaction(
                 id=str(uuid.uuid4()),
@@ -3114,15 +3135,12 @@ async def generate_transactions_for_user(
                 balance_before=txn_data["balance_before"],
                 balance_after=txn_data["balance_after"],
                 reference_number=txn_data["reference_number"],
+                transfer_id=transfer_id,
                 created_at=created_at,
                 posted_date=posted_date
             )
             db.add(transaction)
             created_count += 1
-        
-        # Update account balance to closing balance
-        account.balance = float(request.closing_balance)
-        account.available_balance = float(request.closing_balance)
         
         # Create audit log
         audit_log = AdminAuditLog(

@@ -69,7 +69,7 @@ export default function DashboardPage() {
 
         // Load unified recent transfer history for consistent display
         const hx: TransferHistoryResponse = await apiClient.get<TransferHistoryResponse>(
-          `/api/v1/transfers/history?page=1&page_size=5`,
+          `/api/v1/transfers/history?period=all&sort=desc&page=1&page_size=5`,
         )
         if (hx.success) setRecentItems(hx.data.items)
       }

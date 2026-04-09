@@ -694,6 +694,7 @@ async def get_transfer_history(
     period: str = Query("30", pattern="^(30|90|all)$"),
     type: str = Query("all"),
     status: str = Query("all"),
+    sort: str = Query("desc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=5, le=50),
     db: AsyncSession = Depends(get_db),
@@ -710,9 +711,10 @@ async def get_transfer_history(
     
     # Fetch transactions for these accounts
     tx_result = await db.execute(
-        select(Transaction).where(Transaction.account_id.in_(list(accounts.keys()))).order_by(Transaction.created_at.desc())
+        select(Transaction).where(Transaction.account_id.in_(list(accounts.keys())))
     )
     transactions = list(tx_result.scalars().all())
+    transactions.sort(key=lambda t: t.created_at, reverse=(sort == "desc"))
     
     # Apply in-memory filters (sufficient for demo and small datasets)
     q_lower = q.strip().lower()
