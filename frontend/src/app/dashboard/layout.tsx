@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { DashboardSidebar } from '@/components/dashboard/dashboard-sidebar'
+import { TradingViewTicker } from '@/components/dashboard/tradingview-ticker'
 import BottomNavbar from '@/components/navigation/bottom-navbar'
 import { apiClient } from '@/lib/api-client'
 import { SessionKeeper } from '@/hooks/use-session-keeper'
@@ -35,6 +36,7 @@ export default function DashboardLayout({
         <DashboardSidebar />
         <div className="flex flex-1 flex-col min-w-0 xl:pb-0 pb-20 overflow-hidden">
           <DashboardHeader />
+          <TradingViewTicker />
           <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
             {children}
           </main>
