@@ -315,7 +315,7 @@ class TransactionGenerator:
                 current_balance -= amount
                 remaining_change += amount
             
-            # Create transaction record
+            # Create transaction record with balance tracking
             transaction = {
                 "account_id": account_id,
                 "type": transaction_type,
@@ -324,7 +324,9 @@ class TransactionGenerator:
                 "description": description,
                 "status": "completed",
                 "created_at": timestamp.isoformat(),
-                "posted_date": timestamp.isoformat()
+                "posted_date": timestamp.isoformat(),
+                "balance_before": float(current_balance - (amount if is_credit else -amount)),
+                "balance_after": float(current_balance)
             }
             
             transactions.append(transaction)

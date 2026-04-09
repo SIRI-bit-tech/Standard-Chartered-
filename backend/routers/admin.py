@@ -3111,6 +3111,8 @@ async def generate_transactions_for_user(
                 currency=txn_data["currency"],
                 description=txn_data["description"],
                 status=TransactionStatus(txn_data["status"]),
+                balance_before=txn_data["balance_before"],
+                balance_after=txn_data["balance_after"],
                 created_at=created_at,
                 posted_date=posted_date
             )
