@@ -69,8 +69,20 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
   
   const handleGenerateTransactions = async (userId: string) => {
     setSelectedUserId(userId)
-    await fetchUserAccounts(userId)
-    setGenerateTxDialogOpen(true)
+    try {
+      const adminId = localStorage.getItem('admin_id')
+      if (!adminId) {
+        window.location.href = '/admin/auth/login'
+        return
+      }
+      const qs = new URLSearchParams({ admin_id: adminId })
+      const response: any = await apiClient.get(`/admin/users/${userId}/accounts?${qs.toString()}`)
+      setUserAccounts(response.data.data || [])
+      setGenerateTxDialogOpen(true)
+    } catch (error: any) {
+      logger.error('Failed to fetch user accounts', { error })
+      toast.error('Failed to load user accounts')
+    }
   }
   return (
     <div className="rounded-xl border bg-white" style={{ borderColor: colors.border }}>
