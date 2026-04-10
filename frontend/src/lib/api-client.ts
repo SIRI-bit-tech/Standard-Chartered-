@@ -58,9 +58,17 @@ class ApiClient {
           } catch { }
         }
 
-        if (this.inMemoryToken) {
+        // Check if this is an admin request and use admin token
+        const isAdminRequest = typeof cfg.url === 'string' && cfg.url.startsWith('/admin')
+        let tokenToUse = this.inMemoryToken
+
+        if (isAdminRequest && typeof window !== 'undefined') {
+          tokenToUse = localStorage.getItem('admin_token')
+        }
+
+        if (tokenToUse) {
           cfg.headers = cfg.headers || {}
-            ; (cfg.headers as any)['Authorization'] = `Bearer ${this.inMemoryToken}`
+            ; (cfg.headers as any)['Authorization'] = `Bearer ${tokenToUse}`
         }
       } catch {
         // no-op

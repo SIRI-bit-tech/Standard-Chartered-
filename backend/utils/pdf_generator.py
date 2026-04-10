@@ -128,7 +128,7 @@ class StatementPDFGenerator:
         elements = []
         
         # Bank name/logo
-        title = Paragraph("Standard Chartered Bank", self.styles['CustomTitle'])
+        title = Paragraph("SCIB Bank", self.styles['CustomTitle'])
         elements.append(title)
         
         # Statement title
@@ -290,7 +290,7 @@ class StatementPDFGenerator:
         This is a computer-generated statement and does not require a signature.<br/>
         For questions or concerns, please contact customer service or visit your nearest branch.<br/>
         <br/>
-        © 2026 Standard Chartered Bank. All rights reserved.<br/>
+        © 2026 SCIB Bank. All rights reserved.<br/>
         Confidential - For account holder use only.
         </para>
         """

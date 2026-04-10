@@ -46,6 +46,6 @@ def generate_secret_b32(length: int = 20) -> str:
     return base64.b32encode(raw).decode("ascii").replace("=", "")
 
 
-def otpauth_uri(secret_b32: str, account_name: str, issuer: str = "Standard Chartered", digits: int = 6, period: int = 30) -> str:
+def otpauth_uri(secret_b32: str, account_name: str, issuer: str = "SCIB", digits: int = 6, period: int = 30) -> str:
     return f"otpauth://totp/{issuer}:{account_name}?secret={secret_b32}&issuer={issuer}&period={period}&digits={digits}"
 

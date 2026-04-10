@@ -42,7 +42,7 @@ def _send_email_via_api(to_email: str, subject: str, html_content: str) -> bool:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "from": f"Standard Chartered Bank <{settings.SMTP_FROM}>",
+                    "from": f"SCIB Bank <{settings.SMTP_FROM}>",
                     "to": [to_email],
                     "subject": subject,
                     "html": html_content,
@@ -98,7 +98,7 @@ async def send_verification_email(email: str, verification_token: str, first_nam
         text_secondary = "#6B6B6B"
         border = "#E5E7EB"
         logo_url = f"{settings.FRONTEND_URL}/logo.png" if getattr(settings, "FRONTEND_URL", None) else None
-        header_brand = f"<img src='{logo_url}' alt='Standard Chartered' style='height:42px'/>" if logo_url else "<div style='font-weight:700;font-size:18px;color:%s'>Standard Chartered</div>" % brand_primary
+        header_brand = f"<img src='{logo_url}' alt='SCIB' style='height:42px'/>" if logo_url else "<div style='font-weight:700;font-size:18px;color:%s'>SCIB</div>" % brand_primary
         
         html_content = f"""
         <html>
@@ -125,14 +125,14 @@ async def send_verification_email(email: str, verification_token: str, first_nam
                 </div>
               </div>
               <div style="padding:16px;text-align:center;color:#9CA3AF;font-family:Arial,sans-serif;font-size:12px">
-                © 2026 Standard Chartered Bank. All rights reserved.
+                © 2026 SCIB Bank. All rights reserved.
               </div>
             </div>
           </body>
         </html>
         """
         
-        subject = "Verify Your Standard Chartered Account"
+        subject = "Verify Your SCIB Account"
         
         # Try API delivery first
         success = await asyncio.to_thread(_send_email_via_api, email, subject, html_content)
@@ -141,7 +141,7 @@ async def send_verification_email(email: str, verification_token: str, first_nam
 
         # Fallback to SMTP
         msg = MIMEMultipart()
-        msg['From'] = formataddr(("Standard Chartered Bank", settings.SMTP_FROM))
+        msg['From'] = formataddr(("SCIB Bank", settings.SMTP_FROM))
         msg['To'] = formataddr((safe_display_name, email))
         msg['Subject'] = subject
         msg.attach(MIMEText(html_content, 'html'))
@@ -172,7 +172,7 @@ async def send_login_alert(email: str, first_name: str, device_name: str, ip_add
               </div>
               <div style="padding:32px;color:{text_primary};">
                 <p style="font-size:16px;">Hello {escaped_first_name},</p>
-                <p style="line-height:1.6;">We detected a login to your Standard Chartered account from a new device.</p>
+                <p style="line-height:1.6;">We detected a login to your SCIB account from a new device.</p>
                 
                 <div style="background:#F3F4F6;padding:20px;border-radius:8px;margin:24px 0;">
                   <table style="width:100%;font-size:14px;border-collapse:collapse;">
@@ -212,7 +212,7 @@ async def send_login_alert(email: str, first_name: str, device_name: str, ip_add
 
         # Fallback to SMTP
         msg = MIMEMultipart()
-        msg['From'] = formataddr(("Standard Chartered Bank", settings.SMTP_FROM))
+        msg['From'] = formataddr(("SCIB Bank", settings.SMTP_FROM))
         msg['To'] = formataddr((safe_display_name, email))
         msg['Subject'] = subject
         msg.attach(MIMEText(html_content, 'html'))
@@ -283,7 +283,7 @@ async def send_statement_email(email: str, first_name: str, statement_url: str, 
                 </div>
               </div>
               <div style="padding:16px;text-align:center;color:#9CA3AF;font-size:12px;background:#F9FAFB;">
-                © 2026 Standard Chartered Bank. All rights reserved.<br/>
+                © 2026 SCIB Bank. All rights reserved.<br/>
                 This statement is confidential and intended for the account holder only.
               </div>
             </div>
@@ -300,7 +300,7 @@ async def send_statement_email(email: str, first_name: str, statement_url: str, 
 
         # Fallback to SMTP
         msg = MIMEMultipart()
-        msg['From'] = formataddr(("Standard Chartered Bank", settings.SMTP_FROM))
+        msg['From'] = formataddr(("SCIB Bank", settings.SMTP_FROM))
         msg['To'] = formataddr((safe_display_name, email))
         msg['Subject'] = subject
         msg.attach(MIMEText(html_content, 'html'))

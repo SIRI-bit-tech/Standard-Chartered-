@@ -194,7 +194,7 @@ async def register(
                 AblyRealtimeManager.publish_notification(
                     new_user.id,
                     "account_creation",
-                    "Welcome to Standard Chartered",
+                    "Welcome to SCIB",
                     "Your account has been created. Please verify your email."
                 )
         except Exception as e:

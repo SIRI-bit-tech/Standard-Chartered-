@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { colors } from '@/types'
-import { apiClient } from '@/lib/api-client'
 
 interface AdminHeaderProps {
   onOpenMobileMenu: () => void
@@ -21,7 +20,6 @@ function getInitials(name: string) {
 
 export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
   const [adminName, setAdminName] = useState('Admin')
-  const [notificationCount, setNotificationCount] = useState(0)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -32,23 +30,6 @@ export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
     } else if (email) {
       setAdminName(email)
     }
-
-    // Fetch real notifications count for the current admin (if any).
-    ;(async () => {
-      try {
-        const hasToken =
-          !!(localStorage.getItem('admin_token') || document.cookie.includes('adminToken='))
-        if (!hasToken) return
-        const res = await apiClient.get<{ success: boolean; data: { id: string }[] }>(
-          '/api/v1/notifications?limit=10',
-        )
-        if (res.success && Array.isArray(res.data)) {
-          setNotificationCount(res.data.length)
-        }
-      } catch {
-        // If notifications fail, leave count at 0.
-      }
-    })()
   }, [])
 
   const initials = useMemo(() => getInitials(adminName), [adminName])
@@ -73,16 +54,8 @@ export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <Button variant="ghost" size="icon" aria-label="Notifications" className="relative">
+          <Button variant="ghost" size="icon" aria-label="Notifications">
             <Bell className="h-5 w-5" />
-            {notificationCount > 0 && (
-              <span
-                className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold text-white"
-                style={{ backgroundColor: colors.error }}
-              >
-                {notificationCount}
-              </span>
-            )}
           </Button>
           <Button variant="ghost" size="icon" aria-label="Help">
             <HelpCircle className="h-5 w-5" />

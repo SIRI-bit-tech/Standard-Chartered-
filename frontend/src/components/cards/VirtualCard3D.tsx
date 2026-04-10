@@ -118,7 +118,7 @@ export function VirtualCard3D({ card }: Props) {
           <div className="flex h-full flex-col justify-between p-4 text-white">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <img src="/logo.png" alt="Bank" className="h-7 w-auto" style={{ filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.35))' }} />
+                <img src="/SCIB logo.svg" alt="SCIB" className="h-7 w-auto" style={{ filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.35))' }} />
                 <span className="text-xs uppercase tracking-wide">{card.card_type}</span>
               </div>
               <div className="flex items-center gap-3">
