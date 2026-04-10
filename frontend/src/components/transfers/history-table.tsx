@@ -150,23 +150,23 @@ export function HistoryTable({
         </span>
         <div className="flex items-center gap-2">
           <button
-            className="rounded border px-3 py-1 text-sm"
+            className="rounded border px-3 py-1 text-sm transition-colors hover:bg-muted/50"
             style={{ borderColor: colors.border, color: colors.textPrimary }}
             disabled={page <= 1}
             onClick={() => onPageChange(Math.max(1, page - 1))}
           >
-            Next
+            Prev
           </button>
           <span className="text-sm" style={{ color: colors.textSecondary }}>
             {page} / {totalPages}
           </span>
           <button
-            className="rounded border px-3 py-1 text-sm"
+            className="rounded border px-3 py-1 text-sm transition-colors hover:bg-muted/50"
             style={{ borderColor: colors.border, color: colors.textPrimary }}
             disabled={page >= totalPages}
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           >
-            Previous
+            Next
           </button>
         </div>
       </div>
