@@ -339,10 +339,12 @@ def _send_contact_email(request: ContactFormRequest):
     try:
         # Build email content
         subject = f"Contact Form: {request.subject}"
+        phone_info = f"<p><strong>Phone:</strong> {request.phone}</p>" if request.phone else ""
         body = f"""
           <p>You have received a new message from the public contact form:</p>
           <div style="margin:16px 0;padding:16px;border:1px solid #E5E7EB;border-radius:8px;background:#F9FAFB;">
             <p><strong>From:</strong> {request.fullName} ({request.email})</p>
+            {phone_info}
             <p><strong>Subject:</strong> {request.subject}</p>
             <p><strong>Message:</strong></p>
             <p style="white-space: pre-wrap;">{request.message}</p>

@@ -95,5 +95,6 @@ class ContactFormRequest(BaseModel):
     """Public contact form request"""
     fullName: str = Field(..., min_length=2, max_length=100)
     email: str = Field(..., min_length=5, max_length=100)
+    phone: Optional[str] = Field(None, max_length=20)
     subject: str = Field(..., min_length=2, max_length=200)
     message: str = Field(..., min_length=10, max_length=5000)
