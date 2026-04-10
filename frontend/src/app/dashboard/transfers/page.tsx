@@ -226,7 +226,7 @@ export default function TransfersPage() {
       period: filters.period,
       type: filters.type,
       status: filters.status,
-      sort: 'asc',
+      sort: 'desc',
       page: String(historyPage),
       page_size: String(historyPageSize),
     })
