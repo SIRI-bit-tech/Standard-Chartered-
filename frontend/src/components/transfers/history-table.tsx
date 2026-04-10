@@ -155,7 +155,7 @@ export function HistoryTable({
             disabled={page <= 1}
             onClick={() => onPageChange(Math.max(1, page - 1))}
           >
-            Previous
+            Next
           </button>
           <span className="text-sm" style={{ color: colors.textSecondary }}>
             {page} / {totalPages}
@@ -166,7 +166,7 @@ export function HistoryTable({
             disabled={page >= totalPages}
             onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           >
-            Next
+            Previous
           </button>
         </div>
       </div>
