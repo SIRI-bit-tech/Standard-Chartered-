@@ -52,9 +52,9 @@ class EmailService:
                 continue
     
     def _wrap_html(self, title: str, inner_html: str) -> str:
-        header_brand = "<div style='font-weight:700;font-size:18px;color:%s;'>Standard Chartered</div>" % self.brand_primary
+        header_brand = "<div style='font-weight:700;font-size:18px;color:%s;'>SCIB</div>" % self.brand_primary
         if self.logo_file_path:
-            header_brand = f"<img src='cid:{self.logo_cid}' alt='Standard Chartered' style='height:40px;display:block'/>"
+            header_brand = f"<img src='cid:{self.logo_cid}' alt='SCIB' style='height:40px;display:block'/>"
         elif self.logo_url:
             header_brand = f"<img src='{self.logo_url}' alt='Standard Chartered' style='height:40px;display:block'/>"
         return f"""
@@ -72,7 +72,7 @@ class EmailService:
                   </div>
                 </div>
                 <div style="padding:16px 20px;border-top:1px solid {self.border};text-align:center;color:#9CA3AF;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:12px;background:#FCFCFD;">
-                  © 2026 Standard Chartered Bank. All rights reserved.
+                  © 2026 SCIB Bank. All rights reserved.
                 </div>
               </div>
             </div>
@@ -87,7 +87,7 @@ class EmailService:
         html_part = MIMEText(html_content, 'html')
         alt.attach(html_part)
         root['Subject'] = subject
-        root['From'] = f"Standard Chartered Bank <{self.from_email}>"
+        root['From'] = f"SCIB Bank <{self.from_email}>"
         root['To'] = to_email
         if self.logo_file_path:
             try:
@@ -114,10 +114,10 @@ class EmailService:
     def send_verification_email(self, to_email: str, verification_code: str) -> bool:
         """Send verification code email"""
         try:
-            subject = "Standard Chartered - Email Verification"
+            subject = "SCIB - Email Verification"
             code_html = f"""
               <p>Hello,</p>
-              <p>Thank you for registering with Standard Chartered Bank. Use the verification code below to verify your email address and complete your setup:</p>
+              <p>Thank you for registering with SCIB Bank. Use the verification code below to verify your email address and complete your setup:</p>
               <div style="margin:16px 0;padding:16px;border:1px solid {self.border};background:{self.brand_light};border-radius:8px;text-align:center">
                 <span style="font-size:24px;font-weight:700;letter-spacing:3px;color:{self.brand_primary}">{verification_code}</span>
               </div>
@@ -151,7 +151,7 @@ class EmailService:
     def send_pin_reset_email(self, to_email: str, reset_code: str) -> bool:
         """Send transfer PIN reset code email"""
         try:
-            subject = "Standard Chartered - Transfer PIN Reset Code"
+            subject = "SCIB - Transfer PIN Reset Code"
             body = f"""
               <p>Hello,</p>
               <p>We received a request to reset your transfer PIN. Use the 6‑digit code below to continue:</p>
@@ -181,13 +181,14 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send PIN reset email to {to_email}: {e}")
             return False
+    
     def send_welcome_email(self, to_email: str, user_name: str) -> bool:
         """Send welcome email after successful verification"""
         try:
-            subject = "Welcome to Standard Chartered Bank"
+            subject = "Welcome to SCIB Bank"
             body = f"""
               <p>Hello {user_name},</p>
-              <p>Welcome to Standard Chartered. Your account is now active and ready to use.</p>
+              <p>Welcome to SCIB. Your account is now active and ready to use.</p>
               <p style="margin:0 0 8px 0;"><strong>Get started</strong></p>
               <ul style="margin:0 0 12px 18px;color:{self.text_primary}">
                 <li>View your balances and recent activity in Accounts.</li>
@@ -389,7 +390,7 @@ class EmailService:
                 <p>Hello,</p>
                 {message}
                 <a href="{settings.FRONTEND_URL}/dashboard/loans" style="display:inline-block;background:{self.brand_primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">View Loan Details</a>
-                <p style="margin-top:16px">Thank you for choosing Standard Chartered Bank.</p>
+                <p style="margin-top:16px">Thank you for choosing SCIB Bank.</p>
             """
             
             html_content = self._wrap_html(title, body)

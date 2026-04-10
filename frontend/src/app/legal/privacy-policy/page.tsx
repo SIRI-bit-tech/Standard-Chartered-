@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/card'
 import { Shield, Lock, Globe, FileText, UserCheck, Trash2 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy - Data Protection & GDPR Compliance | Standard Chartered',
-  description: 'Standard Chartered privacy policy explains how we collect, use, and protect your personal data. Learn about GDPR compliance, data rights, and our commitment to privacy across global operations.',
+  title: 'Privacy Policy - Data Protection & GDPR Compliance | SCIB',
+  description: 'SCIB privacy policy explains how we collect, use, and protect your personal data. Learn about GDPR compliance, data rights, and our commitment to privacy across global operations.',
   keywords: 'privacy policy, data protection, GDPR, personal data, data privacy, information security, data rights, privacy compliance, data processing, confidentiality, data retention',
 }
 
@@ -22,7 +22,7 @@ export default function PrivacyPolicyPage() {
                 <Shield className="w-3.5 h-3.5" /> GLOBAL PRIVACY STANDARDS
               </div>
               <h1 className="text-4xl md:text-5xl font-black mb-4 text-gray-900 leading-tight">Privacy Policy</h1>
-              <p className="text-lg text-gray-500 font-medium">Standard Chartered Bank Group</p>
+              <p className="text-lg text-gray-500 font-medium">SCIB Bank Group</p>
               <div className="flex flex-wrap gap-4 mt-6 text-sm text-gray-400 font-bold uppercase tracking-wider">
                 <span>Last Updated: February 2026</span>
                 <span className="text-gray-200">|</span>
@@ -40,7 +40,7 @@ export default function PrivacyPolicyPage() {
                   <h2 className="text-2xl font-bold text-gray-900 m-0">1. Introduction</h2>
                 </div>
                 <p className="text-gray-600 leading-relaxed font-medium">
-                  Standard Chartered Bank ("we", "us" or "the Bank") is committed to protecting your privacy. This Global Privacy Policy explains how we collect, use, share, and protect your personal data across our footprint in Asia, Africa, and the Middle East.
+                  SCIB Bank ("we", "us" or "the Bank") is committed to protecting your privacy. This Global Privacy Policy explains how we collect, use, share, and protect your personal data across our footprint in Asia, Africa, and the Middle East.
                 </p>
                 <p className="text-gray-600 leading-relaxed font-medium">
                   This policy applies to all clients, employees, and third-party partners. By using our Platform or any of our banking services, you acknowledge the processing of your data as described herein.
@@ -110,7 +110,7 @@ export default function PrivacyPolicyPage() {
                   <h2 className="text-2xl font-bold text-gray-900 m-0">4. Sharing and Cross-Border Transfers</h2>
                 </div>
                 <p className="text-gray-600 leading-relaxed font-medium mb-4">
-                  As a global institution, your data may be shared within the Standard Chartered Group and with trusted service providers. This may involve transferring data to jurisdictions outside your country of residence.
+                  As a global institution, your data may be shared within the SCIB Group and with trusted service providers. This may involve transferring data to jurisdictions outside your country of residence.
                 </p>
                 <div className="p-6 bg-[#0066CC]/5 rounded-3xl border border-[#0066CC]/10">
                   <p className="text-sm text-[#0066CC] font-bold leading-relaxed m-0">

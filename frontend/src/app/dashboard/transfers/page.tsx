@@ -9,7 +9,6 @@ import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { trackEvent } from '@/lib/analytics'
 import {
   Select,
   SelectContent,
@@ -386,10 +385,6 @@ export default function TransfersPage() {
             memo: '',
           })
           setSelectedRecipient(null)
-          trackEvent('transfer_initiated', {
-            type: 'domestic',
-            status: 'success'
-          });
 
         }
       } else if (transferType === 'international') {
@@ -432,10 +427,6 @@ export default function TransfersPage() {
             amount: 0,
             purpose: '',
           })
-          trackEvent('transfer_initiated', {
-            type: 'international',
-            status: 'success'
-          });
 
         }
       } else {
@@ -473,10 +464,6 @@ export default function TransfersPage() {
             amount: 0,
             description: '',
           })
-          trackEvent('transfer_initiated', {
-            type: 'ach',
-            status: 'success'
-          });
 
         }
       }
@@ -492,10 +479,6 @@ export default function TransfersPage() {
         error: message,
       })
       setReceiptOpen(true)
-      trackEvent('transfer_failed', {
-        type: transferType,
-        error_code: 'TRANSFER_ERROR'
-      });
 
       throw err
     } finally {

@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { RestrictionModal } from './RestrictionModal';
-import { trackEvent } from '@/lib/analytics';
 
 interface RestrictionContextType {
     isRestricted: boolean;
@@ -76,13 +75,7 @@ export const RestrictionProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 e.preventDefault();
                 e.stopPropagation();
 
-                // Track blocked action in PostHog
-                const elementLabel = target.textContent?.trim().slice(0, 50) || target.tagName;
-                trackEvent('restricted_action_blocked', {
-                    target_element: elementLabel,
-                    url: window.location.pathname,
-                    target_href: href || undefined
-                });
+                // Blocked action - no tracking
 
                 showRestrictionModal();
             }

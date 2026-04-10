@@ -6,8 +6,8 @@ import { Briefcase, Globe, BarChart3, TrendingUp, ArrowRight, ShieldCheck } from
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Business Banking - SME Banking, Trade Finance & Cash Management | Standard Chartered',
-  description: 'Empower your business with Standard Chartered business banking solutions. Access SME banking, trade finance, cash management, working capital loans, and corporate banking services for international trade.',
+  title: 'Business Banking - SME Banking, Trade Finance & Cash Management | SCIB',
+  description: 'Empower your business with SCIB business banking solutions. Access SME banking, trade finance, cash management, working capital loans, and corporate banking services for international trade.',
   keywords: 'business banking, SME banking, trade finance, cash management, corporate banking, business loans, working capital, transaction banking, foreign exchange, FX trading, international trade, business account',
 }
 
@@ -76,7 +76,7 @@ export default function BusinessBankingPage() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
                         <div className="bg-white p-10 rounded-3xl shadow-sm border border-gray-100">
                             <h2 className="text-2xl font-bold mb-6">International Network</h2>
-                            <p className="text-gray-600 mb-6 font-medium">Standard Chartered is uniquely positioned to help you expand overseas.</p>
+                            <p className="text-gray-600 mb-6 font-medium">SCIB is uniquely positioned to help you expand overseas.</p>
                             <ul className="space-y-4">
                                 {[
                                     "Global footprint across 60+ markets",

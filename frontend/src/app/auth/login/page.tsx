@@ -6,7 +6,6 @@ import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useLoadingStore } from '@/lib/store'
 import { ShieldCheck, Monitor, Smartphone, Eye, EyeOff, Fingerprint } from 'lucide-react'
 import { stytchClient } from '@/lib/stytch-client'
-import { identifyUser, trackEvent } from '@/lib/analytics'
 import { parseApiError } from '@/utils/error-handler'
 import { encodeCredential, parseAuthenticationOptions } from '@/utils/webauthn'
 import { toast } from 'sonner'
@@ -155,12 +154,6 @@ export default function LoginPage() {
             setUser(userData)
             setToken(tokens.access_token)
 
-            // Identify user – only non-PII attributes, only with consent
-            identifyUser(userData.id, {
-              country: userData.country,
-              tier: userData.tier,
-            });
-            trackEvent('login_success');
 
           }
 
@@ -257,11 +250,6 @@ export default function LoginPage() {
         setUser(userData)
         setToken(tokens.access_token)
 
-        identifyUser(userData.id, {
-          country: userData.country,
-          tier: userData.tier,
-        })
-        trackEvent('login_success', { method: 'biometric' })
 
         setLoading(false)
         hide()
@@ -374,12 +362,6 @@ export default function LoginPage() {
                         setUser(userData)
                         setToken(tokens.access_token)
 
-                        // Identify user – only non-PII attributes, only with consent
-                        identifyUser(userData.id, {
-                          country: userData.country,
-                          tier: userData.tier,
-                        });
-                        trackEvent('login_success', { device_trusted: true });
 
                       }
                       maybeShowBiometricPrompt(!!data.biometric_enabled, data.device_id || trustDeviceData?.data?.device_id);
@@ -425,12 +407,6 @@ export default function LoginPage() {
                       setUser(userData)
                       setToken(tokens.access_token)
 
-                      // Identify user – only non-PII attributes, only with consent
-                      identifyUser(userData.id, {
-                        country: userData.country,
-                        tier: userData.tier,
-                      });
-                      trackEvent('login_success', { device_trusted: false });
 
                     }
                     maybeShowBiometricPrompt(!!data.biometric_enabled, data.device_id || trustDeviceData?.data?.device_id)
@@ -447,7 +423,7 @@ export default function LoginPage() {
 
       <div className="bg-white p-8 rounded-2xl shadow-lg border border-border">
         <h1 className="text-3xl font-bold text-foreground mb-2">Welcome Back</h1>
-        <p className="text-muted-foreground mb-8">Sign in to your Standard Chartered account</p>
+        <p className="text-muted-foreground mb-8">Sign in to your SCIB account</p>
 
         {error && (
           <div className="mb-6 p-4 bg-error/10 text-error rounded-lg text-sm">

@@ -34,7 +34,7 @@ export default function CareersPage() {
                 <div className="max-w-7xl mx-auto px-4 py-24">
                     {/* Why SC Section */}
                     <div className="text-center mb-20">
-                        <h2 className="text-4xl font-bold mb-4">Why Standard Chartered?</h2>
+                        <h2 className="text-4xl font-bold mb-4">Why SCIB?</h2>
                         <p className="text-gray-500 max-w-2xl mx-auto font-medium">We offer more than just a job. We provide a platform for growth, impact, and belonging.</p>
                     </div>
 

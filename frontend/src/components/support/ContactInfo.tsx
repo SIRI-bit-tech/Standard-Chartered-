@@ -7,9 +7,10 @@ export function ContactInfo({ branches }: { branches: BranchOffice[] }) {
       <div className="grid md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <div className="text-sm font-semibold">Contact Info</div>
-          <div className="text-sm">Email: support@standardchartered.example</div>
-          <div className="text-sm">Phone: +1 (800) 555-0102</div>
-          <div className="text-sm">Hours: 24/7 for premium members</div>
+          <div className="text-sm">Email: support@standardcharteredibank.com</div>
+          <div className="text-sm">Info: info@standardcharteredibank.com</div>
+          <div className="text-sm">Phone: +1 (800)</div>
+          <div className="text-sm">Hours: 24/7 </div>
         </div>
         <div>
           <div className="text-sm font-semibold mb-2">Global Branches</div>

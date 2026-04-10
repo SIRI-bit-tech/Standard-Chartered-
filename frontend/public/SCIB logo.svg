@@ -1,0 +1,46 @@
+<svg width="100%" viewBox="0 0 680 260" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    
+  <mask id="imagine-text-gaps-k4vbja" maskUnits="userSpaceOnUse"><rect x="0" y="0" width="680" height="260" fill="white"/><rect x="226.00001525878906" y="43.94912338256836" width="216.0218963623047" height="114.53690338134766" fill="black" rx="2"/><rect x="226.00001525878906" y="157.1107940673828" width="193.24114990234375" height="27.086820602416992" fill="black" rx="2"/><rect x="226.00001525878906" y="195.2056121826172" width="252.32461547851562" height="15.893210411071777" fill="black" rx="2"/></mask></defs>
+
+  <!-- ── ICON: Octagon shield split into 4 quadrants like Chase ── -->
+  <g transform="translate(52, 50)" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
+
+    <!-- Outer octagon shape -->
+    <polygon points="45,0 95,0 140,45 140,95 95,140 45,140 0,95 0,45" fill="none" stroke="#e0e0e0" stroke-width="1" style="fill:none;stroke:rgb(224, 224, 224);color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+    <!-- Top-left quadrant: Deep Teal -->
+    <clipPath id="tl">
+      <polygon points="45,0 95,0 140,45 140,95 95,140 45,140 0,95 0,45"/>
+    </clipPath>
+    <rect x="0" y="0" width="68" height="68" fill="#006B5E" clip-path="url(#tl)" style="fill:rgb(0, 107, 94);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+    <!-- Top-right quadrant: Emerald Green -->
+    <rect x="72" y="0" width="68" height="68" fill="#00875A" clip-path="url(#tl)" style="fill:rgb(0, 135, 90);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+    <!-- Bottom-left quadrant: Ocean Blue -->
+    <rect x="0" y="72" width="68" height="68" fill="#0057A8" clip-path="url(#tl)" style="fill:rgb(0, 87, 168);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+    <!-- Bottom-right quadrant: Steel Blue -->
+    <rect x="72" y="72" width="68" height="68" fill="#0070CC" clip-path="url(#tl)" style="fill:rgb(0, 112, 204);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+    <!-- Center cross gap (white) -->
+    <rect x="66" y="0" width="8" height="140" fill="white" style="fill:rgb(255, 255, 255);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+    <rect x="0" y="66" width="140" height="8" fill="white" style="fill:rgb(255, 255, 255);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  </g>
+
+  <!-- ── TEXT ── -->
+  <!-- SCIB -->
+  <text x="230" y="132" font-size="78" style="fill:rgb(26, 26, 26);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Helvetica Neue&quot;, Arial, sans-serif;font-size:78px;font-weight:800;text-anchor:start;dominant-baseline:auto">SCIB</text>
+
+  <!-- Divider -->
+  <line x1="230" y1="150" x2="560" y2="150" stroke="#d8d8d8" stroke-width="0.8" mask="url(#imagine-text-gaps-k4vbja)" style="fill:rgb(0, 0, 0);stroke:rgb(216, 216, 216);color:rgb(0, 0, 0);stroke-width:0.8px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+
+  <!-- standard chartered -->
+  <text x="230" y="178" font-size="21" style="fill:rgb(58, 58, 58);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Helvetica Neue&quot;, Arial, sans-serif;font-size:21px;font-weight:300;text-anchor:start;dominant-baseline:auto">standard chartered</text>
+
+  <!-- tagline -->
+  <text x="230" y="207" font-size="11" style="fill:rgb(153, 153, 153);stroke:none;color:rgb(0, 0, 0);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Helvetica Neue&quot;, Arial, sans-serif;font-size:11px;font-weight:400;text-anchor:start;dominant-baseline:auto">INTERNATIONAL BANKING</text>
+
+</svg>

@@ -175,8 +175,8 @@ export default function TransferReceiptPage() {
       <div className="mx-auto max-w-lg p-4 sm:p-6 pb-24">
         <div className="print-only text-center mb-8">
           <Image 
-            src="/logo.png" 
-            alt="Standard Chartered" 
+            src="/SCIB logo.svg" 
+            alt="SCIB" 
             width={200} 
             height={60}
             className="mx-auto"

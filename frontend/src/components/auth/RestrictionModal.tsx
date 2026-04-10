@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Mail, Phone } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -18,11 +18,11 @@ export const RestrictionModal: React.FC<RestrictionModalProps> = ({ isOpen, onCl
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-[400px] p-0 overflow-hidden border-none rounded-lg shadow-2xl">
-                {/* Standard Chartered Header */}
+                {/* SCIB Header */}
                 <div className="bg-[#0066CC] text-white px-4 py-4 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="Standard Chartered" className="h-5 w-auto brightness-0 invert" />
-                        <span className="font-bold tracking-tight text-base">Standard Chartered</span>
+                        <img src="/SCIB logo.svg" alt="SCIB" className="h-5 w-auto brightness-0 invert" />
+                        <span className="font-bold tracking-tight text-base">SCIB</span>
                     </div>
                     <button
                         onClick={onClose}
@@ -44,8 +44,25 @@ export const RestrictionModal: React.FC<RestrictionModalProps> = ({ isOpen, onCl
                         <p>
                             Your account has been temporarily restricted due to unusual activity detected from an unrecognized location. 
                             For your security, all outgoing transfers have been suspended. 
-                            Please contact Standard Chartered support via secure message or call our 24/7 helpline for immediate assistance.
+                            Please contact SCIB support for immediate assistance:
                         </p>
+                        <div className="bg-gray-50 p-3 rounded border border-gray-200 mt-3">
+                            <p className="font-semibold text-sm mb-1">Contact Support:</p>
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                    <Mail className="w-3 h-3 text-gray-600" />
+                                    <span className="text-xs">support@standardcharteredibank.com</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Mail className="w-3 h-3 text-gray-600" />
+                                    <span className="text-xs">info@standardcharteredibank.com</span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-2">
+                                    <Phone className="w-3 h-3 text-gray-600" />
+                                    <span className="text-xs">24/7 Helpline available</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="mt-6">

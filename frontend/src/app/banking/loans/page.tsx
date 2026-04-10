@@ -6,8 +6,8 @@ import { Landmark, Calculator, Receipt, ShieldCheck, ArrowRight, Clock, Percent 
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Personal & Business Loans - Competitive Rates | Standard Chartered',
-  description: 'Apply for personal loans, business loans, and specialized financing with Standard Chartered. Get instant approval, flexible repayment terms, and competitive interest rates from 3.88% p.a.',
+  title: 'Personal & Business Loans - Competitive Rates | SCIB',
+  description: 'Apply for personal loans, business loans, and specialized financing with SCIB. Get instant approval, flexible repayment terms, and competitive interest rates from 3.88% p.a.',
   keywords: 'personal loans, business loans, loan application, instant approval, competitive rates, flexible loans, unsecured loans, working capital loans, education loans, renovation loans, loan calculator',
 }
 

@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/card'
 import { ShieldCheck, Lock, Smartphone, Globe, AlertTriangle, ShieldAlert, Cpu } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Security & Fraud Protection - Bank-Grade Encryption | Standard Chartered',
-  description: 'Learn about Standard Chartered security measures, fraud protection, encryption, biometric authentication, and how we protect your money and data with multi-layered defense systems.',
+  title: 'Security & Fraud Protection - Bank-Grade Encryption | SCIB',
+  description: 'Learn about SCIB security measures, fraud protection, encryption, biometric authentication, and how we protect your money and data with multi-layered defense systems.',
   keywords: 'bank security, fraud protection, encryption, cybersecurity, online banking security, biometric authentication, 2FA, two-factor authentication, secure banking, fraud prevention, data security',
 }
 
@@ -99,8 +99,12 @@ export default function SecurityCompliancePage() {
                                 <p className="text-red-800/70 mb-10 font-medium leading-relaxed">
                                     If you notice any unauthorized transactions or receive suspicious communications claiming to be from us, contact our 24/7 Security Hotline immediately.
                                 </p>
-                                <button className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-red-200">Call +44 (0) 20 7885 8888</button>
-                                <button className="w-full mt-4 text-red-600 font-bold text-sm hover:underline">Report via Email</button>
+                                <a href="mailto:support@standardcharteredibank.com" className="w-full bg-red-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-red-200 text-center block hover:bg-red-700 transition-colors">
+                                    Email Support: support@standardcharteredibank.com
+                                </a>
+                                <a href="mailto:info@standardcharteredibank.com" className="w-full mt-4 text-red-600 font-bold text-sm hover:underline block text-center">
+                                    Contact Info Department
+                                </a>
                             </Card>
                         </div>
                     </section>
@@ -109,10 +113,10 @@ export default function SecurityCompliancePage() {
                     <div className="text-center">
                         <h3 className="text-2xl font-black text-gray-900 mb-12 uppercase tracking-widest">Global Security Compliance</h3>
                         <div className="flex flex-wrap justify-center items-center gap-16 opacity-30 grayscale hover:grayscale-0 transition-all duration-500">
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e9/PCI_DSS_Logo.svg" className="h-10" alt="PCI DSS" />
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e3/ISO_9001_Logo.png" className="h-16" alt="ISO 9001" />
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/1/1b/Soc2_Logo.png" className="h-16" alt="SOC2" />
-                            <img src="https://upload.wikimedia.org/wikipedia/commons/4/4c/GDPR_Logo.svg" className="h-12" alt="GDPR" />
+                            <img src="https://www.pcisecuritystandards.org/documents/PCI-DSS-v3-2-1.pdf" className="h-10" alt="PCI DSS" />
+                            <img src="https://www.iso.org/iso-9001-quality-management.html" className="h-16" alt="ISO 9001" />
+                            <img src="https://www.aicpa.org/interestareas/frc/assuranceadvisoryservices/pages/soc2report.aspx" className="h-16" alt="SOC2" />
+                            <img src="https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016L0679" className="h-12" alt="GDPR" />
                         </div>
                     </div>
                 </div>

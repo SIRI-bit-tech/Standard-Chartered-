@@ -6,8 +6,8 @@ import { Gift, Plane, Star, ShieldCheck, ShoppingCart } from 'lucide-react'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Credit Cards - Cashback, Travel Rewards & Premium Cards | Standard Chartered',
-  description: 'Discover Standard Chartered credit cards with unlimited cashback, travel miles, and premium rewards. Compare cards, apply online, and enjoy global acceptance with contactless payments.',
+  title: 'Credit Cards - Cashback, Travel Rewards & Premium Cards | SCIB',
+  description: 'Discover SCIB credit cards with unlimited cashback, travel miles, and premium rewards. Compare cards, apply online, and enjoy global acceptance with contactless payments.',
   keywords: 'credit cards, cashback credit card, travel credit card, rewards credit card, premium credit card, miles credit card, contactless payment, credit card application, credit card rewards',
 }
 

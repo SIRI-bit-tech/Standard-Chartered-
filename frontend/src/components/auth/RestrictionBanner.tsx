@@ -27,11 +27,11 @@ export const RestrictionBanner: React.FC<RestrictionBannerProps> = ({ userName }
                 exit={{ height: 0, opacity: 0 }}
                 className="w-full bg-[#f8f9fa] border-b border-gray-200 overflow-hidden shadow-md"
             >
-                {/* Standard Chartered-style Header */}
+                {/* SCIB-style Header */}
                 <div className="bg-[#0066CC] text-white px-4 py-3 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="Standard Chartered" className="h-6 w-auto brightness-0 invert" />
-                        <span className="font-bold tracking-tight text-lg">Standard Chartered</span>
+                        <img src="/SCIB logo.svg" alt="SCIB" className="h-6 w-auto brightness-0 invert" />
+                        <span className="font-bold tracking-tight text-lg">SCIB</span>
                     </div>
                     <button
                         onClick={() => setIsVisible(false)}
@@ -53,7 +53,7 @@ export const RestrictionBanner: React.FC<RestrictionBannerProps> = ({ userName }
                         <p>
                             Your account has been temporarily restricted due to unusual activity detected from an unrecognized location.
                             For your security, all outgoing transfers have been suspended.
-                            Please contact Standard Chartered support via secure message or call our 24/7 helpline for immediate assistance.
+                            Please contact SCIB support via secure message or call our 24/7 helpline for immediate assistance.
                         </p>
                     </div>
                 </div>

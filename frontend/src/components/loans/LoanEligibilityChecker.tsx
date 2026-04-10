@@ -24,7 +24,7 @@ export const LoanEligibilityChecker: React.FC<LoanEligibilityCheckerProps> = ({ 
                     </h2>
 
                     <p className="text-blue-100/80 text-lg max-w-lg leading-relaxed">
-                        Standard Chartered provides competitive interest rates and flexible repayment options to help you achieve your financial goals.
+                        SCIB provides competitive interest rates and flexible repayment options to help you achieve your financial goals.
                     </p>
 
                     <div className="flex flex-wrap gap-6 pt-4">

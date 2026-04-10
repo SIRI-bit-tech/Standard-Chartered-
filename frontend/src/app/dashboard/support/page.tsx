@@ -58,14 +58,15 @@ export default function SupportPage() {
     { id: 'f17', question: 'Why was my login session ended?', answer: 'For security, sessions expire after a period of inactivity. Log in again and consider enabling 2FA and trusted devices.', category: 'Security', tags: ['session'] },
     { id: 'f18', question: 'Can I change or remove a saved beneficiary?', answer: 'Yes. During transfer, choose Manage beneficiaries to edit or remove saved recipients.', category: 'Transfers', tags: ['beneficiary'] },
     { id: 'f19', question: 'How do I update notification preferences?', answer: 'Go to Profile → Notifications to enable or disable email/SMS alerts for transfers, logins and statements.', category: 'Profile', tags: ['notifications'] },
-    { id: 'f20', question: 'What are support hours and response times?', answer: 'Live Chat and tickets are monitored 24/7. Most tickets receive a first response within 24 hours.', category: 'Support', tags: ['support'] },
+    { id: 'f20', question: 'What are support hours and response times?', answer: 'Live Chat and tickets are monitored 24/7. Most tickets receive a first response within 24 hours. Email us at support@standardcharteredibank.com for general inquiries.', category: 'Support', tags: ['support'] },
+    { id: 'f21', question: 'How can I contact customer support?', answer: 'You can reach us via Live Chat (24/7), email at support@standardcharteredibank.com, or info@standardcharteredibank.com for general information. Phone support available at +1 (800) 555-0102.', category: 'Support', tags: ['contact', 'email'] },
   ]
 
   const branches: BranchOffice[] = [
-    { id: 'b1', country: 'United Kingdom', city: 'London', address: '1 Basinghall Ave, London', phone: '+44 20 1234 0000', hours: 'Mon–Fri 9am–5pm' },
-    { id: 'b2', country: 'Singapore', city: 'Singapore', address: '6 Battery Rd, Singapore', phone: '+65 6225 0000', hours: 'Mon–Fri 9am–5pm' },
-    { id: 'b3', country: 'UAE', city: 'Dubai', address: 'DIFC, Dubai', phone: '+971 4 000 0000', hours: 'Sun–Thu 9am–5pm' },
-    { id: 'b4', country: 'USA', city: 'New York', address: '1095 6th Ave, New York', phone: '+1 212 000 0000', hours: 'Mon–Fri 9am–5pm' },
+    { id: 'b1', country: 'United Kingdom', city: 'London', address: '1 Basinghall Ave, London', phone: '+44 20 1234 0000', email: 'support@standardcharteredibank.com', hours: 'Mon–Fri 9am–5pm' },
+    { id: 'b2', country: 'Singapore', city: 'Singapore', address: '6 Battery Rd, Singapore', phone: '+65 6225 0000', email: 'support@standardcharteredibank.com', hours: 'Mon–Fri 9am–5pm' },
+    { id: 'b3', country: 'UAE', city: 'Dubai', address: 'DIFC, Dubai', phone: '+971 4 000 0000', email: 'support@standardcharteredibank.com', hours: 'Sun–Thu 9am–5pm' },
+    { id: 'b4', country: 'USA', city: 'New York', address: '1095 6th Ave, New York', phone: '+1 212 000 0000', email: 'support@standardcharteredibank.com', hours: 'Mon–Fri 9am–5pm' },
   ]
 
   return (

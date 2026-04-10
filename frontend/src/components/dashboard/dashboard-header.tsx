@@ -136,7 +136,7 @@ export function DashboardHeader() {
     >
       <div className="flex h-14 items-center justify-between gap-2 px-4 sm:px-6">
         <Link href="/dashboard" className="flex items-center shrink-0">
-          <img src="/logo.png" alt="Standard Chartered" className="h-8 w-auto" />
+          <img src="/SCIB logo.svg" alt="SCIB" className="h-14 w-auto drop-shadow-2xl rounded-lg" />
         </Link>
         <div className="ml-auto flex items-center justify-end gap-2">
           <DropdownMenu>

@@ -186,7 +186,7 @@ export function VirtualCardApply({ onCreated }: Props) {
         <div className="text-sm font-semibold">Live Preview</div>
         <div className="mt-3">
           <VirtualCardApplyPreview
-            name={form.card_name || 'Standard Chartered'}
+            name={form.card_name || 'SCIB'}
             type={form.card_type}
           />
         </div>

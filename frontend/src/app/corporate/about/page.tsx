@@ -22,7 +22,7 @@ export default function AboutUsPage() {
                                 Here for good,<br />Since 1853.
                             </h1>
                             <p className="text-xl text-gray-500 leading-relaxed mb-10 font-medium">
-                                Standard Chartered is a leading international banking group, with a presence in 60 of the world's most dynamic markets. Our purpose is to drive commerce and prosperity through our unique diversity.
+                                SCIB is a leading international banking group, with a presence in 60 of the world's most dynamic markets. Our purpose is to drive commerce and prosperity through our unique diversity.
                             </p>
                             <div className="flex gap-12 border-t pt-10">
                                 <div>

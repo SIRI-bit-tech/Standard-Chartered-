@@ -45,7 +45,7 @@ export function LoginForm() {
       <CardHeader className="space-y-2">
         <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
         <CardDescription>
-          Access your Standard Chartered banking account
+          Access your SCIB banking account
         </CardDescription>
       </CardHeader>
       <CardContent>

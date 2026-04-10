@@ -10,7 +10,7 @@ export default function PressReleasesPage() {
         {
             date: "Feb 20, 2026",
             tag: "Financial Results",
-            title: "Standard Chartered reports strong full-year performance with 10% income growth",
+            title: "SCIB reports strong full-year performance with 10% income growth",
             summary: "Group announces record operating income and confirms 2026 strategic financial targets ahead of schedule."
         },
         {
@@ -22,13 +22,13 @@ export default function PressReleasesPage() {
         {
             date: "Feb 15, 2026",
             tag: "Technology",
-            title: "Standard Chartered partners with leading AI firm to revolutionize wealth management",
+            title: "SCIB partners with leading AI firm to revolutionize wealth management",
             summary: "Integration of advanced generative AI to provide personalized investment insights for global clients."
         },
         {
             date: "Feb 12, 2026",
             tag: "Awards",
-            title: "Standard Chartered named 'Digital Bank of the Year' for third consecutive year",
+            title: "SCIB named 'Digital Bank of the Year' for third consecutive year",
             summary: "Excellence in mobile banking and customer experience recognized by international banking authority."
         }
     ]
@@ -42,7 +42,7 @@ export default function PressReleasesPage() {
                         <div className="max-w-2xl">
                             <h1 className="text-5xl font-black text-gray-900 mb-6">Press Releases</h1>
                             <p className="text-xl text-gray-500 font-medium">
-                                The latest news, announcements, and perspectives from Standard Chartered across the globe.
+                                The latest news, announcements, and perspectives from SCIB across the globe.
                             </p>
                         </div>
                         <div className="flex items-center gap-4">

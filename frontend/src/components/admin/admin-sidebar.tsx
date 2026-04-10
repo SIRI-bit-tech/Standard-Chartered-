@@ -51,7 +51,7 @@ function SidebarContent() {
           </div>
           <div>
             <p className="text-sm font-semibold" style={{ color: colors.textPrimary }}>
-              Standard Chartered
+              SCIB
             </p>
             <p className="text-xs" style={{ color: colors.textSecondary }}>
               Admin Portal

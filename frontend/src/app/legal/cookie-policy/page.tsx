@@ -45,7 +45,7 @@ export default function CookiePolicyPage() {
                     <div className="mb-12">
                         <h1 className="text-4xl font-black text-gray-900 mb-4">Cookie Policy</h1>
                         <p className="text-lg text-gray-500 leading-relaxed font-medium">
-                            This policy explains how Standard Chartered uses cookies and similar technologies to recognize you when you visit our website.
+                            This policy explains how SCIB uses cookies and similar technologies to recognize you when you visit our website.
                         </p>
                         <div className="flex items-center gap-4 mt-8">
                             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Last Updated: Feb 20, 2026</span>
@@ -60,7 +60,7 @@ export default function CookiePolicyPage() {
                             Cookies are small data files that are placed on your computer or mobile device when you visit a website. Cookies are widely used by website owners in order to make their websites work, or to work more efficiently, as well as to provide reporting information.
                         </p>
                         <p className="text-gray-600 leading-relaxed font-medium">
-                            Cookies set by the website owner (in this case, Standard Chartered) are called "first-party cookies". Cookies set by parties other than the website owner are called "third-party cookies".
+                            Cookies set by the website owner (in this case, SCIB) are called "first-party cookies". Cookies set by parties other than the website owner are called "third-party cookies".
                         </p>
                     </Card>
 

@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/card'
 import { FileText, ShieldAlert, Scale, CreditCard, Laptop, AlertCircle } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Terms of Service - Banking Terms & Conditions | Standard Chartered',
-  description: 'Read Standard Chartered terms of service and general banking conditions. Understand your rights, responsibilities, and the legal terms governing your banking relationship with us.',
+  title: 'Terms of Service - Banking Terms & Conditions | SCIB',
+  description: 'Read SCIB terms of service and general banking conditions. Understand your rights, responsibilities, and the legal terms governing your banking relationship with us.',
   keywords: 'terms of service, terms and conditions, banking terms, legal terms, user agreement, service agreement, banking conditions, account terms, regulatory compliance, banking agreement',
 }
 
@@ -22,7 +22,7 @@ export default function TermsOfServicePage() {
                 <Scale className="w-3.5 h-3.5" /> LEGALLY BINDING AGREEMENT
               </div>
               <h1 className="text-4xl md:text-5xl font-black mb-4 text-gray-900 leading-tight">Terms of Service</h1>
-              <p className="text-lg text-gray-500 font-medium">Standard Chartered Bank Global Banking Conditions</p>
+              <p className="text-lg text-gray-500 font-medium">SCIB Bank Global Banking Conditions</p>
               <div className="flex flex-wrap gap-4 mt-6 text-sm text-gray-400 font-bold uppercase tracking-wider">
                 <span>Revised: February 2026</span>
                 <span className="text-gray-200">|</span>
@@ -40,7 +40,7 @@ export default function TermsOfServicePage() {
                   <h2 className="text-2xl font-bold text-gray-900 m-0">1. General Banking Terms</h2>
                 </div>
                 <p className="text-gray-600 leading-relaxed font-medium">
-                  These General Banking Terms and Conditions apply when you use any Standard Chartered Bank account, product, or service. They form a binding agreement between you and the Bank. We reserve the right to amend these terms at any time with prior notice.
+                  These General Banking Terms and Conditions apply when you use any SCIB Bank account, product, or service. They form a binding agreement between you and the Bank. We reserve the right to amend these terms at any time with prior notice.
                 </p>
                 <div className="p-6 bg-white rounded-2xl shadow-sm border border-gray-100 mt-6">
                   <p className="text-sm text-gray-500 m-0 leading-relaxed font-medium">
@@ -127,7 +127,7 @@ export default function TermsOfServicePage() {
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Need Legal Clarification?</p>
                 <p className="font-bold text-gray-900">legal@sc.com</p>
                 <p className="text-xs text-gray-400 mt-4 leading-relaxed">
-                  Standard Chartered Bank is authorized by the Prudential Regulation Authority and regulated by the Financial Conduct Authority and the Prudential Regulation Authority.
+                  SCIB Bank is authorized by the Prudential Regulation Authority and regulated by the Financial Conduct Authority and the Prudential Regulation Authority.
                 </p>
               </section>
             </div>

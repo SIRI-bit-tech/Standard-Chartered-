@@ -93,7 +93,7 @@ export function RegisterForm() {
       <CardHeader className="space-y-2">
         <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
         <CardDescription>
-          Join Standard Chartered banking platform
+          Join SCIB banking platform
         </CardDescription>
       </CardHeader>
       <CardContent>

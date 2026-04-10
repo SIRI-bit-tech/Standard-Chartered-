@@ -11,7 +11,6 @@ import { apiClient } from '@/lib/api-client'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import { useLoadingStore } from '@/lib/store'
-import { trackEvent, hashString } from '@/lib/analytics'
 import { parseApiError } from '@/utils/error-handler'
 
 export default function RegisterPage() {
@@ -133,17 +132,6 @@ export default function RegisterPage() {
       )
 
       if (response.success) {
-        // Hash the email for analytics — never send raw PII to PostHog
-        try {
-          const userEmailHash = await hashString(formData.email);
-          trackEvent('registration_success', {
-            userEmailHash,
-            country: formData.country,
-          });
-        } catch {
-          // If hashing fails, capture without any email identifier
-          trackEvent('registration_success', { country: formData.country });
-        }
 
         setSuccess(true)
         // Redirect to email verification page with email parameter
@@ -180,7 +168,7 @@ export default function RegisterPage() {
     <div className="bg-white p-8 rounded-2xl shadow-lg border border-border">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Create Account</h1>
-        <p className="text-muted-foreground font-medium">Join Standard Chartered today</p>
+        <p className="text-muted-foreground font-medium">Join SCIB today</p>
       </div>
 
       {error && (

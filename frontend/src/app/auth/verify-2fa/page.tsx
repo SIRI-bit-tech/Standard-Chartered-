@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
-import { identifyUser, trackEvent } from '@/lib/analytics'
 import { BiometricSetupPrompt } from '@/components/auth/biometric-setup-prompt'
 
 export default function Verify2FA() {
@@ -86,13 +85,6 @@ export default function Verify2FA() {
         setUser(userData as any)
         setToken(res.token.access_token)
 
-        // Identify user – only non-PII attributes, only with consent
-        identifyUser(userData.id, {
-          country: userData.country,
-          tier: userData.tier
-        });
-        trackEvent('2fa_verified');
-        trackEvent('login_success', { mfa: true });
 
         maybeShowBiometricPrompt(userData.biometric_enabled, device_id || undefined)
         return

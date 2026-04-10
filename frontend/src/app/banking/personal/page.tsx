@@ -6,8 +6,8 @@ import { ShieldCheck, ArrowRight, User, PieChart, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'Personal Banking - Savings, Current Accounts & Wealth Management | Standard Chartered',
-  description: 'Manage your daily finances with Standard Chartered personal banking. Access savings accounts, current accounts, wealth management, priority banking, and digital banking services across Asia, Africa, and the Middle East.',
+  title: 'Personal Banking - Savings, Current Accounts & Wealth Management | SCIB',
+  description: 'Manage your daily finances with SCIB personal banking. Access savings accounts, current accounts, wealth management, priority banking, and digital banking services across Asia, Africa, and the Middle East.',
   keywords: 'personal banking, savings account, current account, wealth management, priority banking, retail banking, personal finance, online banking, mobile banking, multi-currency account, international banking',
 }
 
@@ -97,7 +97,7 @@ export default function PersonalBankingPage() {
                             <div>
                                 <h2 className="text-3xl font-bold mb-6">Why Personal Banking with us?</h2>
                                 <p className="text-gray-600 mb-8 leading-relaxed">
-                                    Standard Chartered is more than just a bank. We are your partner in financial growth. With over 160 years of experience, we've helped millions of people achieve their financial goals.
+                                    SCIB is more than just a bank. We are your partner in financial growth. With over 160 years of experience, we've helped millions of people achieve their financial goals.
                                 </p>
                                 <div className="space-y-4">
                                     <div className="flex items-start gap-4">

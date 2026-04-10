@@ -23,9 +23,9 @@ export default function AuthLayout({
           <div>
             <Link href="/" className="inline-block bg-white p-2 rounded-lg shadow-lg">
               <img
-                src="/logo.png"
-                alt="Standard Chartered"
-                className="h-10 w-auto"
+                src="/SCIB logo.svg"
+                alt="SCIB"
+                className="h-16 w-auto drop-shadow-2xl rounded-lg"
               />
             </Link>
             <p className="mt-3 text-white font-semibold text-lg">Digital Banking Platform</p>
@@ -66,15 +66,15 @@ export default function AuthLayout({
       <div className="flex-1 flex flex-col items-center justify-start lg:justify-center p-4 sm:p-6 overflow-y-auto">
         {/* Mobile logo header - only visible on small screens */}
         <div className="lg:hidden w-full max-w-md mb-6 flex items-center gap-3">
-          <Link href="/" className="inline-block bg-white p-2 rounded-lg shadow border border-gray-100">
+          <Link href="/" className="inline-block p-2 rounded-lg shadow">
             <img
-              src="/logo.png"
-              alt="Standard Chartered"
-              className="h-8 w-auto"
+              src="/SCIB logo.svg"
+              alt="SCIB"
+              className="h-14 w-auto drop-shadow-2xl rounded-lg"
             />
           </Link>
           <div>
-            <p className="text-sm font-bold text-foreground">Standard Chartered</p>
+            <p className="text-sm font-bold text-foreground">SCIB</p>
             <p className="text-xs text-muted-foreground">Digital Banking Platform</p>
           </div>
         </div>

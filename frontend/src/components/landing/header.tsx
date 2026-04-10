@@ -17,11 +17,11 @@ export function Header() {
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0">
               <Image
-                src="/logo.png"
-                alt="Standard Chartered"
-                width={200}
-                height={48}
-                className="h-12 w-auto cursor-pointer"
+                src="/SCIB logo.svg"
+                alt="SCIB"
+                width={240}
+                height={58}
+                className="h-16 w-auto cursor-pointer drop-shadow-2xl rounded-lg"
                 priority
               />
             </Link>

@@ -4,30 +4,34 @@ import '../styles/globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from 'sonner'
 import { StytchClientProvider } from '@/providers/stytch-provider'
-import { CSPostHogProvider } from '@/providers/posthog-provider'
 
 export const metadata: Metadata = {
-  title: 'Standard Chartered Bank - Personal, Business & Corporate Banking',
-  description: 'Leading international bank serving clients across Asia, Africa and the Middle East. Wealth management, corporate banking, investment banking, trade finance, and cross-border banking solutions for individuals, SMEs, and multinational corporations.',
+  title: 'SCIB Bank - Personal, Business & Corporate Banking',
+  description: 'Leading international bank serving clients across Asia, Middle East, United States and worldwide markets. Wealth management, corporate banking, investment banking, trade finance, and cross-border banking solutions for individuals, SMEs, and multinational corporations.',
   keywords:
-    'Standard Chartered, Standard Chartered Bank, international banking, cross-border banking, wealth management, corporate banking, investment banking, private banking, priority banking, retail banking, personal banking, business banking, SME banking, trade finance, foreign exchange, FX trading, cash management, transaction banking, emerging markets, frontier markets, Asia banking, Africa banking, Middle East banking, multinational banking, institutional banking, treasury services, corporate finance, sustainable finance, Islamic banking, Shariah-compliant banking, digital banking, online banking, mobile banking',
+    'SCIB, SCIB Bank, international banking, worldwide banking, United States banking, cross-border banking, wealth management, corporate banking, investment banking, private banking, priority banking, retail banking, personal banking, business banking, SME banking, trade finance, foreign exchange, FX trading, cash management, transaction banking, global finance, emerging markets, Asia banking, Middle East banking, US banking, worldwide banking services, multinational banking, institutional banking, treasury services, corporate finance, sustainable finance, digital banking, online banking, mobile banking, international money transfer, global bank, best bank worldwide',
   openGraph: {
-    title: 'Standard Chartered - International Banking Solutions',
-    description: 'Leading international bank connecting businesses and individuals across Asia, Africa and the Middle East with comprehensive banking and financial services',
+    title: 'SCIB - International Banking Solutions',
+    description: 'Leading international bank connecting businesses and individuals across Asia and the Middle East with comprehensive banking and financial services',
     type: 'website',
     url: 'https://www.standardcharteredibank.com',
   },
   robots: 'index, follow',
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' }
+      { url: '/scib_favicon.ico', sizes: 'any' },
+      { url: '/scib_favicon_16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/scib_favicon_32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/scib_favicon_48x48.png', sizes: '48x48', type: 'image/png' },
+      { url: '/scib_favicon_64x64.png', sizes: '64x64', type: 'image/png' },
+      { url: '/scib_favicon_128x128.png', sizes: '128x128', type: 'image/png' },
+      { url: '/scib_favicon_256x256.png', sizes: '256x256', type: 'image/png' }
     ],
     apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
+      { url: '/scib_favicon_192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/scib_favicon_512x512.png', sizes: '512x512', type: 'image/png' }
     ],
-    shortcut: '/favicon.ico',
+    shortcut: '/scib_favicon.ico',
   },
 }
 
@@ -65,8 +69,7 @@ export default function RootLayout({
       </head>
       <body className="bg-background text-foreground antialiased" style={{ colorScheme: 'light' }}>
         <StytchClientProvider>
-          <CSPostHogProvider>
-            <ThemeProvider
+          <ThemeProvider
               attribute="class"
               defaultTheme="light"
               enableSystem={false}
@@ -76,7 +79,6 @@ export default function RootLayout({
               {children}
               <Toaster position="top-center" richColors />
             </ThemeProvider>
-          </CSPostHogProvider>
         </StytchClientProvider>
       </body>
     </html>

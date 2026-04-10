@@ -12,7 +12,6 @@ import { Loader2, Lock, ArrowLeft, CheckCircle, Shield } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
 import { useLoadingStore } from '@/lib/store'
-import { identifyUser, trackEvent } from '@/lib/analytics'
 
 export default function SetTransferPinPage() {
   const router = useRouter()
@@ -71,17 +70,6 @@ export default function SetTransferPinPage() {
         }
         if (response.data?.user) {
           localStorage.setItem('user', JSON.stringify(response.data.user))
-
-          // Identify user – only non-PII attributes, only with consent
-          const userData = response.data.user;
-          identifyUser(userData.id, {
-            country: userData.country,
-            tier: userData.tier,
-          });
-          trackEvent('transfer_pin_set');
-          trackEvent('registration_complete');
-
-
           setUser(response.data.user) // Update auth store
         }
 

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useLoadingStore } from '@/lib/store'
-import posthog from 'posthog-js'
 import { CheckCircle2, XCircle, Loader2, Mail, ArrowLeft, RefreshCw, ShieldCheck } from 'lucide-react'
 
 export default function EmailVerificationPage() {
@@ -26,7 +25,6 @@ export default function EmailVerificationPage() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   const handleVerificationSuccess = (data: any) => {
-    posthog.capture('email_verified_code', { email: data?.email || email });
     setSuccess(true)
     setTimeout(() => {
       const redirectEmail = data?.email || email
@@ -241,7 +239,7 @@ export default function EmailVerificationPage() {
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back to Login
           </Link>
-          <span className="text-xs text-gray-400 font-medium">© 2026 Standard Chartered</span>
+          <span className="text-xs text-gray-400 font-medium">© 2026 SCIB</span>
         </div>
       </div>
     </div>
