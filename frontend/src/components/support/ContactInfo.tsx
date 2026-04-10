@@ -9,7 +9,7 @@ export function ContactInfo({ branches }: { branches: BranchOffice[] }) {
           <div className="text-sm font-semibold">Contact Info</div>
           <div className="text-sm">Email: support@standardcharteredibank.com</div>
           <div className="text-sm">Info: info@standardcharteredibank.com</div>
-          <div className="text-sm">Phone: +1 (800)</div>
+          {/* <div className="text-sm">Phone: +1 (800)</div> */}
           <div className="text-sm">Hours: 24/7 </div>
         </div>
         <div>
@@ -21,7 +21,6 @@ export function ContactInfo({ branches }: { branches: BranchOffice[] }) {
                   {b.city}, {b.country}
                 </div>
                 <div className="text-xs text-muted-foreground">{b.address}</div>
-                <div className="text-xs mt-1">Phone: {b.phone}</div>
                 {b.email ? <div className="text-xs">Email: {b.email}</div> : null}
                 {b.hours ? <div className="text-xs">Hours: {b.hours}</div> : null}
               </div>
