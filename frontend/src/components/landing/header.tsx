@@ -38,6 +38,9 @@ export function Header() {
             <Link href="/corporate/about" className="text-gray-700 hover:text-gray-900 transition-colors">
               About Us
             </Link>
+            <Link href="/contact" className="text-gray-700 hover:text-gray-900 transition-colors">
+              Contact Us
+            </Link>
           </nav>
 
           {/* Search and Actions */}
@@ -83,6 +86,9 @@ export function Header() {
               </Link>
               <Link href="/corporate/about" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
                 About Us
+              </Link>
+              <Link href="/contact" className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md">
+                Contact Us
               </Link>
               <div className="pt-2 space-y-2">
                 <Link href="/auth/login">

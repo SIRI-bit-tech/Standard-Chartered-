@@ -29,7 +29,7 @@ class EmailService:
         self.surface = "#FFFFFF"
         self.background = "#F8F9FA"
         self.border = "#E5E7EB"
-        self.logo_url = f"{settings.FRONTEND_URL}/logo.png" if getattr(settings, "FRONTEND_URL", None) else None
+        self.logo_url = f"{settings.FRONTEND_URL}/SCIB logo.svg" if getattr(settings, "FRONTEND_URL", None) else None
         self.logo_data_uri = None
         self.logo_file_path = None
         self.logo_cid = "brandlogo"
@@ -38,8 +38,8 @@ class EmailService:
         if explicit_path:
             candidates.append(explicit_path)
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        candidates.append(os.path.abspath(os.path.join(base_dir, "..", "frontend", "public", "logo.png")))
-        candidates.append(os.path.abspath(os.path.join(base_dir, "public", "logo.png")))
+        candidates.append(os.path.abspath(os.path.join(base_dir, "..", "frontend", "public", "standardcharted.png")))
+        candidates.append(os.path.abspath(os.path.join(base_dir, "public", "standardcharted.png")))
         for p in candidates:
             try:
                 if os.path.exists(p):
@@ -52,27 +52,33 @@ class EmailService:
                 continue
     
     def _wrap_html(self, title: str, inner_html: str) -> str:
-        header_brand = "<div style='font-weight:700;font-size:18px;color:%s;'>SCIB</div>" % self.brand_primary
-        if self.logo_file_path:
-            header_brand = f"<img src='cid:{self.logo_cid}' alt='SCIB' style='height:40px;display:block'/>"
-        elif self.logo_url:
-            header_brand = f"<img src='{self.logo_url}' alt='Standard Chartered' style='height:40px;display:block'/>"
+        header_brand = "<div style='font-weight:700;font-size:24px;color:%s;letter-spacing:-0.02em;'>SCIB</div>" % self.brand_primary
         return f"""
         <html>
-          <body style="margin:0;padding:0;background:{self.background};">
-            <div style="padding:24px 12px;">
-              <div style="max-width:600px;margin:0 auto;background:{self.surface};border:1px solid {self.border};border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,0.06);overflow:hidden;">
-                <div style="padding:18px 22px;border-bottom:3px solid {self.brand_primary};display:flex;align-items:center;gap:12px;">
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+            <style>
+              @media only screen and (max-width: 600px) {{
+                .container {{ width: 100% !important; padding: 10px !important; }}
+                .content {{ padding: 20px !important; }}
+              }}
+            </style>
+          </head>
+          <body style="margin:0;padding:0;background:{self.background};-webkit-font-smoothing:antialiased;">
+            <div style="padding:40px 10px;" class="container">
+              <div style="max-width:600px;margin:0 auto;background:{self.surface};border:1px solid {self.border};border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.03);overflow:hidden;">
+                <div style="padding:24px 32px;border-bottom:1px solid {self.border};">
                   {header_brand}
                 </div>
-                <div style="padding:24px 24px 8px 24px;">
-                  <h2 style="margin:0 0 10px 0;color:{self.text_primary};font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:22px;">{title}</h2>
-                  <div style="color:{self.text_secondary};font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;line-height:1.7;font-size:14px;">
+                <div style="padding:32px 32px 16px 32px;" class="content">
+                  <h2 style="margin:0 0 16px 0;color:{self.text_primary};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:24px;font-weight:700;letter-spacing:-0.01em;">{title}</h2>
+                  <div style="color:{self.text_secondary};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.6;font-size:16px;">
                     {inner_html}
                   </div>
                 </div>
-                <div style="padding:16px 20px;border-top:1px solid {self.border};text-align:center;color:#9CA3AF;font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:12px;background:#FCFCFD;">
-                  © 2026 SCIB Bank. All rights reserved.
+                <div style="padding:24px 32px;border-top:1px solid {self.border};text-align:left;color:#94A3B8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:13px;background:#FAFAFA;">
+                  <p style="margin:0;">&copy; 2026 SCIB International Banking. All rights reserved.</p>
+                  <p style="margin:4px 0 0 0;">Secure Communication &bull; Confidential</p>
                 </div>
               </div>
             </div>
@@ -94,17 +100,21 @@ class EmailService:
                 with open(self.logo_file_path, "rb") as f:
                     img = MIMEImage(f.read())
                     img.add_header('Content-ID', f"<{self.logo_cid}>")
-                    img.add_header('Content-Disposition', 'inline', filename='logo.png')
+                    img.add_header('Content-Disposition', 'inline', filename='standardcharted.png')
                     root.attach(img)
             except Exception:
                 pass
         return root
     
-    def _create_connection(self) -> smtplib.SMTP:
-        """Create SMTP connection"""
+    def _create_connection(self) -> smtplib.SMTP | smtplib.SMTP_SSL:
+        """Create SMTP or SMTP_SSL connection"""
         try:
-            server = smtplib.SMTP(self.smtp_server, self.smtp_port)
-            server.starttls()
+            if str(self.smtp_port) == "465":
+                server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=10)
+            else:
+                server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=10)
+                server.starttls()
+            
             server.login(self.smtp_user, self.smtp_password)
             return server
         except Exception as e:
@@ -335,22 +345,34 @@ class EmailService:
     def send_support_ticket_reply(self, to_email: str, ticket_number: str, ticket_subject: str, reply_text: str) -> bool:
         """Notify user by email that an admin replied to their support ticket."""
         try:
-            subject = f"Support Reply • Ticket #{ticket_number}"
-            safe_subject = escape(ticket_subject or "")
+            subject = f"Official Support Update: Ticket #{ticket_number}"
+            safe_subject = escape(ticket_subject or "General Inquiry")
             safe_reply = escape(reply_text or "").replace("\n", "<br>")
-            body = f"""
-              <p>Hello,</p>
-              <p>We replied to your support ticket <strong>#{ticket_number}</strong> — <em>{safe_subject}</em>.</p>
-              <div style="margin:12px 0;padding:12px;border:1px solid {self.border};background:{self.brand_light};border-radius:6px;">
-                <p style="margin:0;color:{self.text_primary}"><strong>Our reply:</strong></p>
-                <div style="margin-top:6px;white-space:pre-wrap;color:{self.text_primary}">{safe_reply}</div>
+            
+            inner_html = f"""
+              <p style="margin-top:0;">Dear Client,</p>
+              <p>This is an official update regarding your support request <strong>#{ticket_number}</strong>.</p>
+              
+              <div style="margin:32px 0; padding:24px; background-color:#F8FAFC; border-left:4px solid {self.brand_primary}; border-radius:4px;">
+                <p style="margin:0 0 12px 0; font-size:14px; font-weight:700; color:{self.brand_primary}; text-transform:uppercase; letter-spacing:0.05em;">Inquiry Subject</p>
+                <p style="margin:0 0 20px 0; font-weight:600; color:{self.text_primary};">{safe_subject}</p>
+                
+                <p style="margin:0 0 12px 0; font-size:14px; font-weight:700; color:{self.brand_primary}; text-transform:uppercase; letter-spacing:0.05em;">Advisor's Response</p>
+                <div style="margin:0; color:{self.text_primary}; line-height:1.6;">{safe_reply}</div>
               </div>
-              <p>You can continue the conversation securely from your dashboard.</p>
-              <a href="{settings.FRONTEND_URL}/dashboard/support" style="display:inline-block;background:{self.brand_primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Open Support</a>
-              <p style="margin-top:16px;color:{self.text_secondary}"><strong>Security reminder:</strong> We will never ask for your full card number, CVV, or 2FA codes.</p>
+
+              <p>To provide further details or documentation, please access our secure client portal.</p>
+              
+              <div style="margin:32px 0;">
+                <a href="{settings.FRONTEND_URL}/dashboard/support" style="display:inline-block; background-color:{self.brand_primary}; color:#ffffff; padding:14px 28px; border-radius:8px; text-decoration:none; font-weight:700; font-size:16px;">Access Secure Dashboard</a>
+              </div>
+
+              <p style="font-size:14px; color:#64748B;">For your protection, SCIB will never ask for your full credit card number, PIN, or secure access codes via email. Always ensure you are on our official domain before entering credentials.</p>
             """
-            html_content = self._wrap_html("Support Ticket Reply", body)
+            
+            html_content = self._wrap_html("Support Update", inner_html)
             msg = self._build_message(subject, to_email, html_content)
+            
             with self._create_connection() as server:
                 server.send_message(msg)
             logger.info(f"Support reply email sent to {to_email} for ticket {ticket_number}")
@@ -401,6 +423,18 @@ class EmailService:
             return True
         except Exception as e:
             logger.error(f"Failed to send loan status email to {to_email}: {e}")
+            return False
+
+    def send_custom_email(self, to_email: str, subject: str, html_content: str) -> bool:
+        """Send custom email with branding"""
+        try:
+            msg = self._build_message(subject, to_email, html_content)
+            with self._create_connection() as server:
+                server.send_message(msg)
+            logger.info(f"Custom email sent to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send custom email to {to_email}: {e}")
             return False
 
 # Global email service instance

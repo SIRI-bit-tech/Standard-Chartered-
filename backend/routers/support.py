@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.support import SupportTicket, TicketMessage, Chat, ChatMessage
@@ -12,8 +12,13 @@ from models.user import User
 from models.admin import AdminUser
 from models.notification import Notification, NotificationType
 from config import settings
+from services.email import email_service
+from schemas.support import ContactFormRequest
+import logging
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
 
 class CreateTicketRequest(BaseModel):
     subject: str = Field(..., min_length=3, max_length=160)
@@ -327,3 +332,48 @@ async def post_ticket_reply(
         pass
     await db.commit()
     return {"success": True, "data": {"id": msg.id}}
+
+
+def _send_contact_email(request: ContactFormRequest):
+    """Internal helper to send the contact email in background"""
+    try:
+        # Build email content
+        subject = f"Contact Form: {request.subject}"
+        body = f"""
+          <p>You have received a new message from the public contact form:</p>
+          <div style="margin:16px 0;padding:16px;border:1px solid #E5E7EB;border-radius:8px;background:#F9FAFB;">
+            <p><strong>From:</strong> {request.fullName} ({request.email})</p>
+            <p><strong>Subject:</strong> {request.subject}</p>
+            <p><strong>Message:</strong></p>
+            <p style="white-space: pre-wrap;">{request.message}</p>
+          </div>
+          <p>Please respond to the client at <strong>{request.email}</strong> as soon as possible.</p>
+        """
+        html_content = email_service._wrap_html("New Contact Inquiry", body)
+        
+        # Send email to info@standardcharteredibank.com
+        success = email_service.send_custom_email(
+            to_email="info@standardcharteredibank.com",
+            subject=subject,
+            html_content=html_content
+        )
+        
+        if not success:
+            logger.error("Failed to send contact form email in background")
+    except Exception as e:
+        logger.error(f"Error in background email task: {e}")
+
+
+@router.post("/contact")
+async def contact_form_submission(
+    request: ContactFormRequest,
+    background_tasks: BackgroundTasks
+):
+    """Public contact form submission - sends email to info@standardcharteredibank.com"""
+    # Queue the email sending to avoid blocking the request and timing out
+    background_tasks.add_task(_send_contact_email, request)
+    
+    return {
+        "success": True,
+        "message": "Your message has been received. Our specialized global support team will contact you within 24 hours."
+    }

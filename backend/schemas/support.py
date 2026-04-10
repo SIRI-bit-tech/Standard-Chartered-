@@ -89,3 +89,11 @@ class TicketUpdateRequest(BaseModel):
     status: Optional[TicketStatus] = None
     priority: Optional[TicketPriority] = None
     assigned_to: Optional[str] = None
+
+
+class ContactFormRequest(BaseModel):
+    """Public contact form request"""
+    fullName: str = Field(..., min_length=2, max_length=100)
+    email: str = Field(..., min_length=5, max_length=100)
+    subject: str = Field(..., min_length=2, max_length=200)
+    message: str = Field(..., min_length=10, max_length=5000)

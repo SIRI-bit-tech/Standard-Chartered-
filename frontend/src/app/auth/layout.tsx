@@ -2,7 +2,6 @@ import React from "react"
 import Link from 'next/link'
 import { Shield, Globe, Zap } from 'lucide-react'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
-import { RouteChangeLoader } from '@/components/ui/route-change-loader'
 import { LinkClickLoader } from '@/components/ui/link-click-loader'
 import Script from 'next/script'
 
@@ -83,7 +82,6 @@ export default function AuthLayout({
         </div>
       </div>
       <LoadingOverlay />
-      <RouteChangeLoader />
       <LinkClickLoader />
     </div>
   )

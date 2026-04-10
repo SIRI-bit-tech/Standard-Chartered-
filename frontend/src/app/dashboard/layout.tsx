@@ -8,7 +8,6 @@ import BottomNavbar from '@/components/navigation/bottom-navbar'
 import { apiClient } from '@/lib/api-client'
 import { SessionKeeper } from '@/hooks/use-session-keeper'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
-import { RouteChangeLoader } from '@/components/ui/route-change-loader'
 import { LinkClickLoader } from '@/components/ui/link-click-loader'
 import Script from 'next/script'
 
@@ -43,7 +42,6 @@ export default function DashboardLayout({
           <SessionKeeper />
         </div>
         <LoadingOverlay />
-        <RouteChangeLoader />
         <LinkClickLoader />
         <BottomNavbar />
       </div>
