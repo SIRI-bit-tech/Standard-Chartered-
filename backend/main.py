@@ -532,10 +532,19 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     # Log the full error internally
     logger.error(f"Validation error: {exc.errors()} | Body: {exc.body}")
     
-    # Return structured error for parseApiError to handle
+    # Extract simple message for user
+    error_msg = "Validation failed"
+    if exc.errors():
+        first_error = exc.errors()[0]
+        if 'msg' in first_error:
+            error_msg = first_error['msg']
+        elif 'type' in first_error and first_error['type'] == 'value_error':
+            error_msg = first_error.get('ctx', {}).get('error', str(first_error.get('input', '')))
+    
+    # Return simple message for user
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()}
+        content={"detail": error_msg}
     )
 
 
