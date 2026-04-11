@@ -58,14 +58,8 @@ async def register(
                 message="This email or username is already registered"
             )
 
-        # Strict password validation
+        # No password validation - let Stytch handle it
         password = request.password
-        if len(password) < 10:
-            raise ValidationError(message="Password must be at least 10 characters long", details={"field": "password"})
-        if not any(char.isdigit() for char in password):
-            raise ValidationError(message="Password must contain at least one number", details={"field": "password"})
-        if not any(not char.isalnum() for char in password):
-            raise ValidationError(message="Password must contain at least one symbol", details={"field": "password"})
         
         primary_currency = AccountService.CURRENCY_MAP.get(request.country, "USD")
 
@@ -174,7 +168,14 @@ async def register(
             try:
                 msg, code = parse_stytch_error(e)
                 if msg:
-                   raise ValidationError(message=msg, operation="stytch registration")
+                    # Only show simple error message, no long codes
+                    if "password" in msg.lower():
+                        msg = "Password is not allowed. Please choose a different password."
+                    elif "email" in msg.lower():
+                        msg = "Email is already registered or invalid."
+                    else:
+                        msg = "Registration failed. Please check your information."
+                    raise ValidationError(message=msg)
             except Exception:
                 pass
             
