@@ -174,7 +174,6 @@ async def register(
             try:
                 msg, code = parse_stytch_error(e)
                 if msg:
-                   from utils.errors import ValidationError
                    raise ValidationError(message=msg, operation="stytch registration")
             except Exception:
                 pass
@@ -596,10 +595,8 @@ async def complete_two_factor(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar()
     if not user or not getattr(user, "two_factor_enabled", False) or not getattr(user, "two_factor_secret", None):
-        from utils.errors import ValidationError
         raise ValidationError(message="Two-factor authentication not enabled")
     if not verify_totp(code, user.two_factor_secret):
-        from utils.errors import ValidationError
         raise ValidationError(message="Invalid authentication code", details={"field": "code"})
     # Success -> issue tokens
     access_token = create_access_token({"sub": user.id, "email": user.username})
