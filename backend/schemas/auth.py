@@ -105,6 +105,25 @@ class ChangePasswordRequest(BaseModel):
         return v
 
 
+class ChangeTransferPinRequest(BaseModel):
+    """Change transfer PIN request"""
+    current_pin: str = Field(..., min_length=4, max_length=4)
+    new_pin: str = Field(..., min_length=4, max_length=4)
+    confirm_pin: str = Field(..., min_length=4, max_length=4)
+    
+    @validator('current_pin', 'new_pin', 'confirm_pin')
+    def validate_pin_digits(cls, v):
+        if not v.isdigit():
+            raise ValueError('PIN must contain only digits')
+        return v
+    
+    @validator('confirm_pin')
+    def validate_pins_match(cls, v, values):
+        if 'new_pin' in values and v != values['new_pin']:
+            raise ValueError('PINs do not match')
+        return v
+
+
 class TwoFactorSetupRequest(BaseModel):
     """Two-factor authentication setup request"""
     method: str = Field(..., pattern="^(sms|email|authenticator)$")

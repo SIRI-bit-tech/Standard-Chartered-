@@ -5,7 +5,7 @@ import { apiClient } from "@/lib/api-client"
 import type { TwoFactorSetupPayload } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { QRCodeSVG } from "qrcode.react"
-import { ShieldCheck, ShieldAlert, Key, Trash2, ShieldX, AlertTriangle, Fingerprint, Smartphone } from 'lucide-react'
+import { ShieldCheck, ShieldAlert, Key, Trash2, ShieldX, AlertTriangle, Fingerprint, Smartphone, CreditCard } from 'lucide-react'
 import { ConfirmModal } from "@/components/ui/confirm-modal"
 import { useToast } from "@/hooks/use-toast"
 import { parseApiError } from "@/utils/error-handler"
@@ -33,6 +33,13 @@ export function SecurityPanel() {
   const [pwdError, setPwdError] = useState<string | null>(null)
   const [pwdSuccess, setPwdSuccess] = useState<string | null>(null)
   const [pwdErrorFields, setPwdErrorFields] = useState<string[]>([])
+  const [pinOpen, setPinOpen] = useState(false)
+  const [currentPin, setCurrentPin] = useState('')
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [pinError, setPinError] = useState<string | null>(null)
+  const [pinSuccess, setPinSuccess] = useState<string | null>(null)
+  const [pinErrorFields, setPinErrorFields] = useState<string[]>([])
 
   const loadStatus = async () => {
     try {
@@ -134,6 +141,47 @@ export function SecurityPanel() {
       const { message, errorFields } = parseApiError(e)
       setPwdError(message)
       setPwdErrorFields(errorFields)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const submitPinChange = async () => {
+    setPinError(null)
+    setPinSuccess(null)
+    if (!currentPin || !newPin || !confirmPin) {
+      setPinError('All fields are required.')
+      return
+    }
+    if (newPin !== confirmPin) {
+      setPinError('New PIN and confirmation do not match.')
+      return
+    }
+    if (newPin.length !== 4) {
+      setPinError('PIN must be exactly 4 digits.')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await apiClient.post<{ success: boolean; message?: string }>('/api/v1/security/transfer-pin/change', {
+        current_pin: currentPin,
+        new_pin: newPin,
+        confirm_pin: confirmPin
+      })
+      if (res?.success) {
+        setPinSuccess(res.message || 'Transfer PIN changed successfully.')
+        setCurrentPin('')
+        setNewPin('')
+        setConfirmPin('')
+        setTimeout(() => {
+          setPinOpen(false)
+          setPinSuccess(null)
+        }, 2000)
+      }
+    } catch (e: any) {
+      const { message, errorFields } = parseApiError(e)
+      setPinError(message)
+      setPinErrorFields(errorFields)
     } finally {
       setBusy(false)
     }
@@ -283,6 +331,30 @@ export function SecurityPanel() {
               )}
             </div>
             {error && <p className="text-sm text-red-600 font-medium mt-3">{error}</p>}
+          </div>
+        </div>
+      </div>
+
+      {/* Transfer PIN Section */}
+      <div className="p-6 bg-white rounded-2xl border border-border shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start gap-4">
+          <div className="p-3 rounded-full bg-green-50">
+            <CreditCard className="w-6 h-6 text-green-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-gray-900">Transfer PIN</h3>
+            <p className="text-sm text-gray-500 mt-1 leading-relaxed">
+              Change your 4-digit transfer PIN used for authorizing transactions and transfers.
+            </p>
+            <div className="mt-4">
+              <button
+                onClick={() => setPinOpen(true)}
+                className="w-full sm:w-auto px-6 py-2.5 border border-border rounded-xl hover:bg-gray-50 transition-all font-semibold text-gray-700 disabled:opacity-50"
+                disabled={busy}
+              >
+                Change Transfer PIN
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -439,6 +511,110 @@ export function SecurityPanel() {
                 onClick={submitPasswordChange}
               >
                 {busy ? 'Updating...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Transfer PIN Dialog */}
+      <Dialog open={pinOpen} onOpenChange={(o) => setPinOpen(o)}>
+        <DialogContent className="w-[95%] sm:max-w-md rounded-2xl overflow-hidden p-0 shadow-2xl">
+          <div className="bg-green-500/5 p-6 border-b border-green-500/10">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <CreditCard className="w-6 h-6 text-green-600" />
+              Change Transfer PIN
+            </DialogTitle>
+          </div>
+
+          <div className="p-6 space-y-4">
+            {pinError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-red-600 font-medium">{pinError}</p>
+              </div>
+            )}
+
+            {pinSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-xl">
+                <p className="text-sm text-green-600 font-medium">{pinSuccess}</p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700">Current PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all text-center text-xl font-mono tracking-[0.5rem] ${pinErrorFields.includes('current_pin') ? 'border-red-500 ring-red-500/20' : 'border-border'}`}
+                value={currentPin}
+                onChange={(e) => {
+                  setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  if (pinErrorFields.includes('current_pin')) setPinErrorFields(prev => prev.filter(f => f !== 'current_pin'));
+                  setPinError(null);
+                }}
+                placeholder="••••"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700">New PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all text-center text-xl font-mono tracking-[0.5rem] ${pinErrorFields.includes('new_pin') ? 'border-red-500 ring-red-500/20' : 'border-border'}`}
+                value={newPin}
+                onChange={(e) => {
+                  setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  if (pinErrorFields.includes('new_pin')) setPinErrorFields(prev => prev.filter(f => f !== 'new_pin'));
+                  setPinError(null);
+                }}
+                placeholder="••••"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-gray-700">Confirm New PIN</label>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                className="w-full px-4 py-3 bg-gray-50 border border-border rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all text-center text-xl font-mono tracking-[0.5rem]"
+                value={confirmPin}
+                onChange={(e) => {
+                  setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  setPinError(null);
+                }}
+                placeholder="••••"
+              />
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <button
+                className="flex-1 py-3 border border-border rounded-xl hover:bg-gray-50 transition-all font-bold text-gray-500 order-2 sm:order-1"
+                onClick={() => {
+                  setPinOpen(false);
+                  setCurrentPin('');
+                  setNewPin('');
+                  setConfirmPin('');
+                  setPinError(null);
+                  setPinSuccess(null);
+                  setPinErrorFields([]);
+                }}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all font-bold shadow-lg shadow-green-600/20 disabled:opacity-50 order-1 sm:order-2"
+                disabled={busy || currentPin.length !== 4 || newPin.length !== 4 || confirmPin.length !== 4}
+                onClick={submitPinChange}
+              >
+                {busy ? 'Updating...' : 'Change PIN'}
               </button>
             </div>
           </div>

@@ -113,13 +113,16 @@ async def register(
             postal_code=request.postal_code,
             password_hash=hash_password(request.password),
             primary_currency=primary_currency,
-            tier=UserTier.PREMIUM,  # All users get Premium tier
+            tier=UserTier.PREMIUM,
             is_active=False,
+            is_approved=False,
             email_verified=False,
             email_verification_token=generate_verification_token(),
-            email_verification_expires=datetime.utcnow().timestamp() + 86400,
-            created_at=datetime.utcnow()
+            email_verification_expires=datetime.now(timezone.utc).timestamp() + 86400,
+            created_at=datetime.now(timezone.utc)
         )
+
+        # Remove redundant import inside function since it is already at the top level
 
         # Create user and accounts in a single transaction
         try:
@@ -326,7 +329,23 @@ async def login(
     
     if not user.is_active:
         from utils.errors import UnauthorizedError
-        raise UnauthorizedError(message="Account is inactive. Please verify your email.")
+        if not user.email_verified:
+            raise UnauthorizedError(message="Please verify your email address first.")
+        if not user.is_approved:
+            raise UnauthorizedError(message="Your account is currently undergoing approval. You will be notified via email once approved.")
+        raise UnauthorizedError(message="Account is inactive. Please contact support.")
+    
+    # If approved but transfer pin is not set, redirect to set pin
+    redirect_to = None
+    if user.is_approved and not user.transfer_pin:
+        # Generate a short-lived token for setting the PIN if we don't already have one
+        import secrets
+        verification_token = secrets.token_urlsafe(32)
+        user.email_verification_token = verification_token
+        user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 3600  # 1 hour
+        db.add(user)
+        # We'll include this in the response if the frontend needs it
+        redirect_to = "/auth/set-transfer-pin"
     
     device_id = request.device_id
     device_name = request.device_name
@@ -502,21 +521,28 @@ async def login(
         success=True,
         message="Login successful",
         data={
-            "user_id": user.id,
-            "email": user.email,
-            "username": user.username,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "country": user.country,
-            "primary_currency": user.primary_currency,
-            "tier": user.tier,
-            "biometric_enabled": getattr(user, "biometric_enabled", False),
-            "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or (user.restricted_until.replace(tzinfo=timezone.utc) if user.restricted_until.tzinfo is None else user.restricted_until) > datetime.now(timezone.utc)),
-            "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "tier": user.tier,
+                "transfer_pin_set": bool(user.transfer_pin),
+                "is_restricted": bool(user.is_restricted),
+                "biometric_enabled": bool(user.biometric_enabled),
+                "email_verified": bool(user.email_verified),
+                "phone_verified": bool(user.phone_verified),
+                "identity_verified": bool(user.identity_verified),
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "last_login": user.last_login.isoformat() if user.last_login else None
+            },
             "token": stytch_session_token or access_token,
             "is_new_device": is_new_device,
             "device_id": device_id,
             "device_name": device_name,
+            "redirect_to": redirect_to or "/dashboard",
+            "verification_token": user.email_verification_token if redirect_to == "/auth/set-transfer-pin" else None
         },
         token=TokenResponse(
             access_token=stytch_session_token or access_token,

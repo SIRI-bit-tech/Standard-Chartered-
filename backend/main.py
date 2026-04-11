@@ -110,15 +110,21 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS postal_code VARCHAR"
             ))
             
-            # Restriction columns
+            # Status columns
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE NOT NULL"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_approved BOOLEAN DEFAULT FALSE NOT NULL"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE NOT NULL"
+            ))
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE NOT NULL"
             ))
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS restricted_until TIMESTAMPTZ"
-            ))
-            await conn.execute(text(
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT FALSE NOT NULL"
             ))
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio VARCHAR"

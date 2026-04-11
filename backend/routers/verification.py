@@ -80,13 +80,9 @@ async def verify_email(
         user.email_verified = True
         user.email_verification_token = None
         user.email_verification_expires = None
-        user.is_active = True
+        user.is_active = False  # Inactive until approved
+        user.is_approved = False # Explicitly not approved yet
         user.updated_at = datetime.now(timezone.utc)
-        
-        # Generate short-lived verification token for PIN setup (5 minutes)
-        verification_token = secrets.token_urlsafe(32)
-        user.email_verification_token = verification_token
-        user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 300  # 5 minutes
         
         await db.commit()
         
@@ -94,10 +90,10 @@ async def verify_email(
         
         return AuthResponse(
             success=True,
-            message="Email verified successfully! You can now set your transfer PIN.",
+            message="Email verified successfully! Your account is currently undergoing approval. You will be notified once it is approved.",
             data={
-                "redirect_to": "/auth/set-transfer-pin",
-                "verification_token": verification_token
+                "redirect_to": "/auth/login",
+                "status": "pending_approval"
             }
         )
         
@@ -144,20 +140,16 @@ async def verify_magic_link(
             
             # Update user verification status
             user.email_verified = True
-            user.is_active = True
+            user.is_active = False  # Inactive until approved
+            user.is_approved = False
             user.updated_at = datetime.now(timezone.utc)
-            
-            # Generate short-lived token for PIN setup
-            verification_token = secrets.token_urlsafe(32)
-            user.email_verification_token = verification_token
-            user.email_verification_expires = datetime.now(timezone.utc).timestamp() + 300
             
             await db.commit()
             
             return AuthResponse(
                 success=True,
-                message="Email verified successfully!",
-                data={"email": user.email, "verification_token": verification_token}
+                message="Email verified successfully! Your account is undergoing approval.",
+                data={"email": user.email, "status": "pending_approval"}
             )
             
         except Exception as e:
@@ -341,6 +333,7 @@ async def resend_verification_code(
 @router.post("/set-transfer-pin", response_model=AuthResponse)
 async def set_transfer_pin(
     request: SetTransferPinRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db)
 ):
     """Set transfer PIN for user with proper authentication"""
@@ -348,13 +341,13 @@ async def set_transfer_pin(
         logger.info(f"Set transfer PIN request for: {request.email}")
         
         # Find user by email
-        user = await db.execute(
+        result = await db.execute(
             select(User).where(User.email == request.email)
         )
-        user = user.scalar_one_or_none()
+        user = result.scalar_one_or_none()
         
         if not user:
-            logger.warning(f"Set transfer PIN failed - user not found: {request.email}")
+            logger.warning(f"Set transfer PIN failed - user not found: '{request.email}'")
             raise NotFoundError("User not found")
         
         # Check if email is verified
@@ -362,20 +355,32 @@ async def set_transfer_pin(
             logger.warning(f"Set transfer PIN failed - email not verified: {request.email}")
             raise ValidationError("Please verify your email first")
         
-        # Validate verification token if provided
-        if request.verification_token:
-            # Verify the short-lived token
-            if not user.email_verification_token:
-                logger.warning(f"Set transfer PIN failed - no verification token: {request.email}")
-                raise ValidationError("Invalid verification token")
-            
-            if user.email_verification_token != request.verification_token:
-                logger.warning(f"Set transfer PIN failed - invalid verification token: {request.email}")
-                raise ValidationError("Invalid or expired verification token")
-            
-            if user.email_verification_expires < datetime.now(timezone.utc).timestamp():
-                logger.warning(f"Set transfer PIN failed - expired verification token: {request.email}")
-                raise ValidationError("Verification token has expired")
+        # Check for active session (Authorization header)
+        auth_header = http_request.headers.get("Authorization")
+        is_authenticated = False
+        if auth_header and auth_header.startswith("Bearer "):
+            session_token = auth_header.split(" ")[1]
+            try:
+                payload = verify_token(session_token)
+                if payload and payload.get("sub") == user.id:
+                    is_authenticated = True
+                    logger.info(f"PIN setup: User {user.email} authenticated via session token.")
+            except Exception:
+                pass
+
+        # Validate verification token ONLY if not authenticated via session
+        if not is_authenticated and user.email_verification_token:
+            if request.verification_token:
+                if user.email_verification_token != request.verification_token:
+                    logger.warning(f"Set transfer PIN failed - invalid verification token: {request.email}")
+                    raise ValidationError("Invalid or expired verification token")
+                
+                if user.email_verification_expires < datetime.now(timezone.utc).timestamp():
+                    logger.warning(f"Set transfer PIN failed - expired verification token: {request.email}")
+                    raise ValidationError("Verification token has expired")
+            else:
+                logger.warning(f"Set transfer PIN failed - no token or session: {request.email}")
+                raise ValidationError("Authentication required to set PIN")
         
         # Check if user already has a PIN set
         if user.transfer_pin:

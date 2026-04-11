@@ -122,6 +122,7 @@ export default function LoginPage() {
       if (response.success && response.data && response.token) {
         const tokens = response.token;
         const data = response.data;
+        const userObj = response.data.user || data;
 
         const completeLogin = () => {
           if (tokens.access_token && tokens.refresh_token) {
@@ -133,24 +134,29 @@ export default function LoginPage() {
             apiClient.setAuthToken(tokens.access_token)
 
             const userData: User = {
-              id: data.user_id || data.id || '',
-              email: data.email || '',
-              username: data.username || '',
-              first_name: data.first_name || '',
-              last_name: data.last_name || '',
-              phone: data.phone || undefined,
-              country: data.country || 'United States',
-              primary_currency: data.primary_currency || 'USD',
-              tier: data.tier || 'basic',
-              profile_picture_url: data.profile_picture_url || null,
-              email_verified: !!data.email_verified,
-              phone_verified: !!data.phone_verified,
-              identity_verified: !!data.identity_verified,
-              biometric_enabled: !!data.biometric_enabled,
-              created_at: data.created_at || new Date().toISOString(),
-              last_login: data.last_login || new Date().toISOString()
+              id: userObj.user_id || userObj.id || '',
+              email: userObj.email || '',
+              username: userObj.username || '',
+              first_name: userObj.first_name || '',
+              last_name: userObj.last_name || '',
+              phone: userObj.phone || undefined,
+              country: userObj.country || 'United States',
+              primary_currency: userObj.primary_currency || 'USD',
+              tier: userObj.tier || 'basic',
+              profile_picture_url: userObj.profile_picture_url || null,
+              email_verified: !!userObj.email_verified,
+              phone_verified: !!userObj.phone_verified,
+              identity_verified: !!userObj.identity_verified,
+              biometric_enabled: !!userObj.biometric_enabled,
+              transfer_pin_set: !!userObj.transfer_pin_set,
+              is_restricted: !!userObj.is_restricted,
+              created_at: userObj.created_at || new Date().toISOString(),
+              last_login: userObj.last_login || new Date().toISOString()
             }
             localStorage.setItem('user', JSON.stringify(userData))
+            if (response.data.verification_token) {
+              localStorage.setItem('verification_token', response.data.verification_token)
+            }
             setUser(userData)
             setToken(tokens.access_token)
 
@@ -159,13 +165,14 @@ export default function LoginPage() {
 
           setLoading(false)
           hide()
-          maybeShowBiometricPrompt(!!data.biometric_enabled, device_id)
+          maybeShowBiometricPrompt(!!userObj.biometric_enabled, device_id)
         }
 
         if (data.is_new_device) {
           setLoading(false)
           hide()
-          setTrustDeviceData({ tokens, data })
+          // Ensure verification_token is preserved in trustDeviceData
+          setTrustDeviceData({ tokens, data: { ...data, verification_token: response.data.verification_token } })
           setShowTrustModal(true)
           return
         }
@@ -227,24 +234,26 @@ export default function LoginPage() {
         localStorage.setItem('refresh_token', tokens.refresh_token)
         document.cookie = `accessToken=${tokens.access_token}; path=/; max-age=3600; secure; samesite=strict`
 
-        const userData: User = {
-          id: data.id || '',
-          email: data.email || '',
-          username: data.username || '',
-          first_name: data.first_name || '',
-          last_name: data.last_name || '',
-          phone: data.phone || undefined,
-          country: data.country || 'United States',
-          primary_currency: data.primary_currency || 'USD',
-          tier: data.tier || 'basic',
-          profile_picture_url: data.profile_picture_url || null,
-          email_verified: !!data.email_verified,
-          phone_verified: !!data.phone_verified,
-          identity_verified: !!data.identity_verified,
-          biometric_enabled: true,
-          created_at: data.created_at || new Date().toISOString(),
-          last_login: new Date().toISOString()
-        }
+          const userData: User = {
+            id: data.id || '',
+            email: data.email || '',
+            username: data.username || '',
+            first_name: data.first_name || '',
+            last_name: data.last_name || '',
+            phone: data.phone || undefined,
+            country: data.country || 'United States',
+            primary_currency: data.primary_currency || 'USD',
+            tier: data.tier || 'basic',
+            profile_picture_url: data.profile_picture_url || null,
+            email_verified: !!data.email_verified,
+            phone_verified: !!data.phone_verified,
+            identity_verified: !!data.identity_verified,
+            biometric_enabled: true,
+            transfer_pin_set: !!data.transfer_pin_set,
+            is_restricted: !!data.is_restricted,
+            created_at: data.created_at || new Date().toISOString(),
+            last_login: new Date().toISOString()
+          }
 
         localStorage.setItem('user', JSON.stringify(userData))
         setUser(userData)
@@ -331,6 +340,7 @@ export default function LoginPage() {
 
                       const data = trustDeviceData.data;
                       const tokens = trustDeviceData.tokens;
+                      const userObj = data.user || data;
 
                       if (tokens.access_token && tokens.refresh_token) {
                         localStorage.setItem('access_token', tokens.access_token)
@@ -341,30 +351,33 @@ export default function LoginPage() {
                         apiClient.setAuthToken(tokens.access_token)
 
                         const userData: User = {
-                          id: data.user_id || data.id || '',
-                          email: data.email || '',
-                          username: data.username || '',
-                          first_name: data.first_name || '',
-                          last_name: data.last_name || '',
-                          phone: data.phone || undefined,
-                          country: data.country || 'United States',
-                          primary_currency: data.primary_currency || 'USD',
-                          tier: data.tier || 'basic',
-                          profile_picture_url: data.profile_picture_url || null,
-                          email_verified: !!data.email_verified,
-                          phone_verified: !!data.phone_verified,
-                          identity_verified: !!data.identity_verified,
-                          biometric_enabled: !!data.biometric_enabled,
-                          created_at: data.created_at || new Date().toISOString(),
-                          last_login: data.last_login || new Date().toISOString()
+                          id: userObj.user_id || userObj.id || '',
+                          email: userObj.email || '',
+                          username: userObj.username || '',
+                          first_name: userObj.first_name || '',
+                          last_name: userObj.last_name || '',
+                          phone: userObj.phone || undefined,
+                          country: userObj.country || 'United States',
+                          primary_currency: userObj.primary_currency || 'USD',
+                          tier: userObj.tier || 'basic',
+                          profile_picture_url: userObj.profile_picture_url || null,
+                          email_verified: !!userObj.email_verified,
+                          phone_verified: !!userObj.phone_verified,
+                          identity_verified: !!userObj.identity_verified,
+                          biometric_enabled: !!userObj.biometric_enabled,
+                          transfer_pin_set: !!userObj.transfer_pin_set,
+                          is_restricted: !!userObj.is_restricted,
+                          created_at: userObj.created_at || new Date().toISOString(),
+                          last_login: userObj.last_login || new Date().toISOString()
                         }
                         localStorage.setItem('user', JSON.stringify(userData))
+                        if (trustDeviceData.data.verification_token) {
+                          localStorage.setItem('verification_token', trustDeviceData.data.verification_token)
+                        }
                         setUser(userData)
                         setToken(tokens.access_token)
-
-
                       }
-                      maybeShowBiometricPrompt(!!data.biometric_enabled, data.device_id || trustDeviceData?.data?.device_id);
+                      maybeShowBiometricPrompt(!!userObj.biometric_enabled, data.device_id || trustDeviceData?.data?.device_id);
                     }
                   }}
                   disabled={isTrusting}
@@ -385,7 +398,7 @@ export default function LoginPage() {
                       // Set token in API client for subsequent requests
                       apiClient.setAuthToken(tokens.access_token)
 
-                      const userData: any = {
+                      const userData: User = {
                         id: data.user_id || data.id || '',
                         email: data.email || '',
                         username: data.username || '',
@@ -396,14 +409,19 @@ export default function LoginPage() {
                         primary_currency: data.primary_currency || 'USD',
                         tier: data.tier || 'basic',
                         profile_picture_url: data.profile_picture_url || null,
-                        email_verified: data.email_verified || false,
-                        phone_verified: data.phone_verified || false,
-                        identity_verified: data.identity_verified || false,
-                        biometric_enabled: data.biometric_enabled || false,
+                        email_verified: !!data.email_verified,
+                        phone_verified: !!data.phone_verified,
+                        identity_verified: !!data.identity_verified,
+                        biometric_enabled: !!data.biometric_enabled,
+                        transfer_pin_set: !!data.transfer_pin_set,
+                        is_restricted: !!data.is_restricted,
                         created_at: data.created_at || new Date().toISOString(),
                         last_login: data.last_login || new Date().toISOString()
                       }
                       localStorage.setItem('user', JSON.stringify(userData))
+                      if (data.verification_token) {
+                        localStorage.setItem('verification_token', data.verification_token)
+                      }
                       setUser(userData)
                       setToken(tokens.access_token)
 

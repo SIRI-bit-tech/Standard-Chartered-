@@ -24,12 +24,10 @@ export default function EmailVerificationPage() {
   const { show, hide } = useLoadingStore()
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  const handleVerificationSuccess = (data: any) => {
+  const handleVerificationSuccess = () => {
     setSuccess(true)
     setTimeout(() => {
-      const redirectEmail = data?.email || email
-      const vToken = data?.verification_token || ''
-      router.push(`/auth/set-transfer-pin?email=${encodeURIComponent(redirectEmail)}&token=${encodeURIComponent(vToken)}`)
+      router.push(`/auth/pending-approval?email=${encodeURIComponent(email)}`)
     }, 2000)
   }
 
@@ -91,7 +89,7 @@ export default function EmailVerificationPage() {
       )
 
       if (response.success) {
-        handleVerificationSuccess(response.data)
+        handleVerificationSuccess()
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Invalid verification code')
@@ -148,7 +146,7 @@ export default function EmailVerificationPage() {
             </CardTitle>
             <CardDescription className="text-gray-500 font-medium">
               {success
-                ? 'Your email has been confirmed. Redirecting...'
+                ? 'Your email has been confirmed. Your account is currently undergoing approval.'
                 : 'Please enter the 6-digit code sent to your email.'}
             </CardDescription>
           </CardHeader>
@@ -158,6 +156,12 @@ export default function EmailVerificationPage() {
               <div className="flex flex-col items-center justify-center py-6 animate-in zoom-in duration-500">
                 <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <CheckCircle2 className="w-14 h-14 text-green-600" />
+                </div>
+                <p className="text-center text-gray-600 font-medium px-4">
+                  We are reviewing your registration. You will be redirected to the approval status page in a moment.
+                </p>
+                <div className="flex justify-center mt-6">
+                  <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
                 </div>
               </div>
             ) : (

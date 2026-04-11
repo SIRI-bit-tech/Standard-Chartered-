@@ -15,15 +15,19 @@ interface ApprovalItem {
   user_email: string
   amount?: number
   status: string
-  created_at: string
+  created_at?: string
   details: string
   name_on_check?: string
   front_image_url?: string
+  // User specific fields
+  name?: string
+  user_id?: string
+  country?: string
 }
 
 function ApprovalsContent() {
   const searchParams = useSearchParams()
-  const initialTab = searchParams.get('tab') || 'transfers'
+  const initialTab = searchParams.get('tab') || 'users'
   const [activeTab, setActiveTab] = useState(initialTab)
   const [items, setItems] = useState<ApprovalItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -34,7 +38,8 @@ function ApprovalsContent() {
     try {
       const adminId = localStorage.getItem('admin_id')
       let endpoint = ''
-      if (activeTab === 'transfers') endpoint = '/admin/transfers/pending'
+      if (activeTab === 'users') endpoint = `/admin/users/list?status_filter=pending_approval`
+      else if (activeTab === 'transfers') endpoint = '/admin/transfers/pending'
       else if (activeTab === 'deposits') endpoint = '/admin/deposits/list?status=pending'
       else if (activeTab === 'cards') endpoint = '/admin/cards/list?status=pending'
       else if (activeTab === 'loans') endpoint = '/admin/loans/applications?status=submitted'
@@ -47,7 +52,19 @@ function ApprovalsContent() {
           : Array.isArray(payload)
             ? payload
             : []
-        setItems(nextItems)
+        
+        // Normalize user items if needed
+        if (activeTab === 'users') {
+          const normalized = nextItems.map((u: any) => ({
+            ...u,
+            user_email: u.email,
+            details: `User registration from ${u.country || 'Unknown'}`,
+            created_at: u.created_at // Assuming created_at exists in user object
+          }))
+          setItems(normalized)
+        } else {
+          setItems(nextItems)
+        }
       }
     } catch (err) {
       logger.error(`Failed to fetch ${activeTab}`, { error: err })
@@ -61,6 +78,7 @@ function ApprovalsContent() {
   }, [activeTab])
 
   const tabs = [
+    { id: 'users', label: 'User Registrations' },
     { id: 'transfers', label: 'Pending Transfers' },
     { id: 'deposits', label: 'Pending Deposits' },
     { id: 'cards', label: 'Pending Virtual Cards' },
@@ -76,31 +94,41 @@ function ApprovalsContent() {
 
     setApproving(itemId)
     try {
-      const endpoint = activeTab === 'transfers'
-        ? '/admin/transfers/approve'
-        : activeTab === 'deposits'
-          ? '/admin/deposits/approve'
-          : activeTab === 'cards'
-            ? '/admin/cards/approve'
-            : '/admin/loans/approve'
-
-      const idField = activeTab === 'transfers'
-        ? 'transfer_id'
-        : activeTab === 'deposits'
-          ? 'deposit_id'
-          : activeTab === 'cards'
-            ? 'card_id'
-            : 'application_id'
+      let endpoint = ''
+      let idField = ''
+      
+      switch (activeTab) {
+        case 'users':
+          endpoint = '/admin/users/approve'
+          idField = 'user_id'
+          break
+        case 'transfers':
+          endpoint = '/admin/transfers/approve'
+          idField = 'transfer_id'
+          break
+        case 'deposits':
+          endpoint = '/admin/deposits/approve'
+          idField = 'deposit_id'
+          break
+        case 'cards':
+          endpoint = '/admin/cards/approve'
+          idField = 'card_id'
+          break
+        case 'loans':
+          endpoint = '/admin/loans/approve'
+          idField = 'application_id'
+          break
+      }
 
       await apiClient.post(endpoint, {
         [idField]: itemId,
-        notes: 'Approved by admin'
+        notes: 'Approved by admin via Approvals dashboard'
       }, {
         params: { admin_id: adminId }
       })
 
       setItems(items.filter(item => item.id !== itemId))
-      toast.success(`${activeTab.slice(0, -1)} approved successfully`)
+      toast.success(`${activeTab === 'users' ? 'User' : activeTab.slice(0, -1)} approved successfully`)
       logger.debug(`${activeTab} item approved: ${itemId}`)
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Approval failed')
@@ -119,31 +147,42 @@ function ApprovalsContent() {
 
     setApproving(itemId)
     try {
-      const endpoint = activeTab === 'transfers'
-        ? '/admin/transfers/decline'
-        : activeTab === 'deposits'
-          ? '/admin/deposits/decline'
-          : activeTab === 'cards'
-            ? '/admin/cards/decline'
-            : '/admin/loans/decline'
-
-      const idField = activeTab === 'transfers'
-        ? 'transfer_id'
-        : activeTab === 'deposits'
-          ? 'deposit_id'
-          : activeTab === 'cards'
-            ? 'card_id'
-            : 'application_id'
+      let endpoint = ''
+      let idField = ''
+      let payloadKey = 'reason'
+      
+      switch (activeTab) {
+        case 'users':
+          endpoint = '/admin/users/decline'
+          idField = 'user_id'
+          break
+        case 'transfers':
+          endpoint = '/admin/transfers/decline'
+          idField = 'transfer_id'
+          break
+        case 'deposits':
+          endpoint = '/admin/deposits/decline'
+          idField = 'deposit_id'
+          break
+        case 'cards':
+          endpoint = '/admin/cards/decline'
+          idField = 'card_id'
+          break
+        case 'loans':
+          endpoint = '/admin/loans/decline'
+          idField = 'application_id'
+          break
+      }
 
       await apiClient.post(endpoint, {
         [idField]: itemId,
-        reason: 'Declined by admin'
+        [payloadKey]: 'Declined by admin via Approvals dashboard'
       }, {
         params: { admin_id: adminId }
       })
 
       setItems(items.filter(item => item.id !== itemId))
-      toast.info(`${activeTab.slice(0, -1)} declined`)
+      toast.info(`${activeTab === 'users' ? 'User registration' : activeTab.slice(0, -1)} declined`)
       logger.debug(`${activeTab} item declined: ${itemId}`)
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Decline failed')
@@ -189,6 +228,7 @@ function ApprovalsContent() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <p className="font-semibold text-foreground">{item.user_email}</p>
+                    {item.name && <p className="text-sm font-medium text-foreground">{item.name}</p>}
                     <p className="text-sm text-muted-foreground mt-1">{item.details}</p>
 
                     {item.name_on_check && (
@@ -213,9 +253,11 @@ function ApprovalsContent() {
                     {item.amount && (
                       <p className="text-lg font-bold text-primary mt-2">${item.amount.toLocaleString()}</p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(item.created_at).toLocaleString()}
-                    </p>
+                    {item.created_at && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {new Date(item.created_at).toLocaleString()}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 ml-4">

@@ -28,6 +28,8 @@ function statusBadge(status: AdminUserRow['status']) {
   if (status === 'active') return { bg: `${colors.success}20`, fg: colors.success, label: 'Active' }
   if (status === 'suspended') return { bg: `${colors.error}20`, fg: colors.error, label: 'Suspended' }
   if (status === 'restricted') return { bg: `${colors.warning}20`, fg: colors.warning, label: 'Restricted' }
+  if (status === 'pending_approval') return { bg: `${colors.warning}20`, fg: colors.warning, label: 'Pending Approval' }
+  if (status === 'pending_verification') return { bg: `${colors.gray300}55`, fg: colors.textSecondary, label: 'Pending Verification' }
   return { bg: `${colors.gray300}55`, fg: colors.textSecondary, label: 'Inactive' }
 }
 
@@ -129,6 +131,10 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
                 <TableCell>
                   {u.verification === 'verified' ? (
                     <ShieldCheck className="h-4 w-4" style={{ color: colors.primary }} />
+                  ) : u.verification === 'pending_approval' ? (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-5 border-yellow-200 text-yellow-700 bg-yellow-50">
+                      Approval
+                    </Badge>
                   ) : u.verification === 'needs_review' ? (
                     <AlertTriangle className="h-4 w-4" style={{ color: colors.warning }} />
                   ) : (
@@ -145,6 +151,42 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      {u.status === 'pending_approval' && (
+                        <DropdownMenuItem
+                          className="text-green-600 font-bold"
+                          onClick={() => {
+                            setConfirmConfig({
+                              isOpen: true,
+                              title: 'Approve User?',
+                              description: `Are you sure you want to approve ${u.name}'s account? This will send them an approval email.`,
+                              confirmText: 'Yes, Approve',
+                              variant: 'default',
+                              action: async () => {
+                                try {
+                                  const adminId = localStorage.getItem('admin_id')
+                                  const adminToken = localStorage.getItem('admin_token')
+                                  if (!adminId || !adminToken) {
+                                    window.location.href = '/admin/auth/login'
+                                    return
+                                  }
+                                  apiClient.setAuthToken(adminToken)
+                                  await apiClient.post(`/admin/users/approve?admin_id=${adminId}`, {
+                                    user_id: u.id,
+                                    notes: 'Approved via User Directory'
+                                  })
+                                  toast.success('User approved successfully')
+                                  window.location.reload()
+                                } catch (err: any) {
+                                  logger.error('Failed to approve user', { error: err })
+                                  toast.error(err.response?.data?.detail || 'Failed to approve user')
+                                }
+                              }
+                            })
+                          }}
+                        >
+                          Approve Account
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         onClick={() => {
                           setEditingId(u.id)

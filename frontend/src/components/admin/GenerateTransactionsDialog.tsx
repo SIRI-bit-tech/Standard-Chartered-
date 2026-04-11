@@ -52,7 +52,7 @@ export function GenerateTransactionsDialog({
   const [loading, setLoading] = useState(false)
   
   // Form state
-  const [startDate, setStartDate] = useState<Date>()
+  const [startDate, setStartDate] = useState<Date>(new Date())
   const [endDate, setEndDate] = useState<Date>(new Date())
   const [startingBalance, setStartingBalance] = useState('')
   const [closingBalance, setClosingBalance] = useState('')
@@ -178,7 +178,7 @@ export function GenerateTransactionsDialog({
 
   const handleClose = () => {
     setStep('form')
-    setStartDate(undefined)
+    setStartDate(new Date())
     setEndDate(new Date())
     setStartingBalance('')
     setClosingBalance('')
@@ -224,7 +224,7 @@ export function GenerateTransactionsDialog({
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         value={startDate}
-                        onChange={setStartDate}
+                        onChange={(date) => date && setStartDate(date)}
                       />
                     </PopoverContent>
                   </Popover>

@@ -157,7 +157,7 @@ export default function RegisterPage() {
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-foreground mb-2">Account Created Successfully!</h1>
           <p className="text-muted-foreground mb-6 font-medium">
-            Redirecting you to login page in a moment...
+            Redirecting you to verify email in a moment...
           </p>
         </div>
       </div>

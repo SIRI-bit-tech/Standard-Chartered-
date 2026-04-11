@@ -42,6 +42,8 @@ export function AdminUserFilters({ countries, filters, onChange }: AdminUserFilt
             <SelectContent>
               <SelectItem value="all">Status: All</SelectItem>
               <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="pending_approval">Pending Approval</SelectItem>
+              <SelectItem value="pending_verification">Pending Verification</SelectItem>
               <SelectItem value="restricted">Restricted</SelectItem>
               <SelectItem value="suspended">Suspended</SelectItem>
               <SelectItem value="inactive">Inactive</SelectItem>
@@ -57,6 +59,7 @@ export function AdminUserFilters({ countries, filters, onChange }: AdminUserFilt
             <SelectContent>
               <SelectItem value="all">Verification: All</SelectItem>
               <SelectItem value="verified">Verified</SelectItem>
+              <SelectItem value="pending_approval">Pending Approval</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="needs_review">Needs Review</SelectItem>
             </SelectContent>

@@ -14,6 +14,27 @@ from data.names_database import (
     HIGH_INCOME_DESCRIPTIONS
 )
 
+# Bills and utilities for debits
+BILLS_PAYMENTS = [
+    "AT&T Bill Payment", "Verizon Wireless Bill", "T-Mobile Bill", "Comcast Xfinity Bill",
+    "Spectrum Internet Bill", "Con Edison Electric Bill", "PG&E Gas & Electric",
+    "Duke Energy Bill", "Southern California Edison Bill", "Cox Communications Bill",
+    "CenturyLink Bill", "Frontier Communications Bill"
+]
+
+# Loan payments for debits
+LOAN_PAYMENTS = [
+    "Auto Loan Payment", "Mortgage Payment", "Personal Loan Payment", 
+    "Business Loan Payment", "Student Loan Payment", "Home Equity Loan Payment"
+]
+
+# Check deposits for credits
+CHECK_DEPOSITS = [
+    "Payroll Check Deposit", "Tax Refund Check", "Insurance Claim Check",
+    "Dividend Check Deposit", "Settlement Check", "Refund Check Deposit",
+    "Rebate Check", "Gift Check Deposit", "Inheritance Check"
+]
+
 
 class TransactionGenerator:
     """Generate realistic transaction history with high amounts"""
@@ -24,7 +45,8 @@ class TransactionGenerator:
         "Burger King", "Dunkin'", "Chipotle Mexican Grill"
     ]
     
-    def __init__(self):
+    def __init__(self, user_name: str = "User"):
+        self.user_name = user_name  # Store user's name for internal transfers
         self.used_names = set()  # Track used names to ensure uniqueness
         self.fast_food_count = 0  # Track fast food transactions
         self.max_fast_food = 3  # Maximum fast food transactions per generation
@@ -188,7 +210,8 @@ class TransactionGenerator:
         closing_balance: Decimal,
         transaction_count: int,
         account_id: str,
-        currency: str = "USD"
+        currency: str = "USD",
+        user_name: str = "User"
     ) -> List[Dict]:
         """
         Generate realistic transactions with high amounts
@@ -252,31 +275,38 @@ class TransactionGenerator:
             # Determine transaction type and description
             if is_credit:
                 transaction_type = "credit"
-                # Credits should be high amounts: person-to-person transfers, income, etc.
-                # 50% person-to-person (high amounts), 50% income/business (high amounts $10k+)
-                if random.random() < 0.5:
+                # Credits should be high amounts: person-to-person transfers, income, check deposits, internal transfers, etc.
+                # 25% person-to-person, 25% income/business, 25% check deposits, 25% internal transfers
+                credit_type = random.random()
+                if credit_type < 0.33:
                     person_name = self.get_unique_person_name()
                     description = random.choice([
                         f"Transfer from {person_name}",
                         f"Payment from {person_name}",
                         f"Zelle from {person_name}",
-                        f"Wire transfer from {person_name}",
-                        f"Check deposit from {person_name}"
+                        f"Wire transfer from {person_name}"
                     ])
-                else:
+                elif credit_type < 0.67:
                     # Use high-value income sources
                     description = random.choice(HIGH_INCOME_DESCRIPTIONS)
                     # Ensure amount is at least $10,000 for income
                     if not is_last and amount < Decimal('10000'):
                         amount = Decimal(str(round(random.uniform(10000, 50000), 2)))
+                else:
+                    # Check deposits
+                    description = random.choice(CHECK_DEPOSITS)
+                    # Check deposits can be various amounts
+                    if not is_last and amount < Decimal('500'):
+                        amount = Decimal(str(round(random.uniform(500, 15000), 2)))
                 
                 current_balance += amount
                 remaining_change -= amount
             else:
                 transaction_type = "debit"
-                # Debits: Mostly equipment purchases (high amounts) with some small purchases
-                # 70% equipment/professional purchases (high amounts), 30% small purchases
-                if random.random() < 0.7:
+                # Debits: Mix of equipment purchases, bills, loan payments, and other expenses
+                # 40% equipment purchases, 25% bills, 20% loan payments, 15% other
+                debit_type = random.random()
+                if debit_type < 0.40:
                     # Professional equipment purchase - use high amounts
                     if is_last:
                         amount = abs(remaining_change)
@@ -288,8 +318,20 @@ class TransactionGenerator:
                         merchant = random.choice(HIGH_AMOUNT_MERCHANTS)
                     
                     description = f"{merchant} Purchase"
+                elif debit_type < 0.65:
+                    # Bills and utilities payments
+                    description = random.choice(BILLS_PAYMENTS)
+                    # Bills are typically $50 - $500
+                    if not is_last and (amount < 50 or amount > 500):
+                        amount = Decimal(str(round(random.uniform(50, 500), 2)))
+                elif debit_type < 0.85:
+                    # Loan payments
+                    description = random.choice(LOAN_PAYMENTS)
+                    # Loan payments are typically $200 - $2000
+                    if not is_last and (amount < 200 or amount > 2000):
+                        amount = Decimal(str(round(random.uniform(200, 2000), 2)))
                 else:
-                    # Small purchase or person-to-person transfer
+                    # Other expenses and person-to-person transfers
                     if random.random() < 0.5:
                         # Small merchant purchase with realistic amount
                         merchant, realistic_amount = self.get_merchant_with_amount(amount)

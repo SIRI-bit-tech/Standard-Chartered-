@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import uuid
 import logging
 from models.admin import AdminAuditLog
-from schemas.auth import ChangePasswordRequest
+from schemas.auth import ChangePasswordRequest, ChangeTransferPinRequest
 from utils.auth import verify_password, hash_password
 from utils.ip import get_client_ip, geolocate_ip
 from schemas.security import WebAuthnRegisterStartResponse, WebAuthnRegisterRequest
@@ -324,6 +324,58 @@ async def change_password(
         pass
     await db.commit()
     return {"success": True, "message": "Password changed successfully"}
+
+
+@router.post("/transfer-pin/change")
+async def change_transfer_pin(
+    payload: ChangeTransferPinRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    res = await db.execute(select(User).where(User.id == current_user_id))
+    user = res.scalar_one_or_none()
+    if not user:
+        from utils.errors import NotFoundError
+        raise NotFoundError(message="User not found")
+    
+    if not user.transfer_pin:
+        from utils.errors import ValidationError
+        raise ValidationError(
+            message="No transfer PIN is currently set",
+            error_code="NO_PIN_SET"
+        )
+    
+    # Verify current PIN
+    if not verify_password(payload.current_pin, user.transfer_pin):
+        from utils.errors import ValidationError
+        raise ValidationError(
+            message="Current transfer PIN is incorrect",
+            error_code="INVALID_PIN",
+            details={"field": "current_pin"}
+        )
+    
+    # Hash and update the new PIN
+    user.transfer_pin = hash_password(payload.new_pin)
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    
+    # Audit log
+    try:
+        log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=user.id,
+            admin_email=user.email,
+            action="user_transfer_pin_change",
+            resource_type="security",
+            resource_id=user.id,
+            details='{"new_pin_set": true}'
+        )
+        db.add(log)
+    except Exception:
+        pass
+    
+    await db.commit()
+    return {"success": True, "message": "Transfer PIN changed successfully"}
 
 
 @router.post("/biometrics/register/start", response_model=WebAuthnRegisterStartResponse)

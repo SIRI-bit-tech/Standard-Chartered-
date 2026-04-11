@@ -10,8 +10,8 @@ import { AdminUserTable } from './admin-user-table'
 
 export interface AdminUserDirectoryFilters {
   q: string
-  status: 'all' | 'active' | 'restricted' | 'suspended' | 'inactive'
-  verification: 'all' | 'verified' | 'pending' | 'needs_review'
+  status: 'all' | 'active' | 'restricted' | 'suspended' | 'inactive' | 'pending_approval' | 'pending_verification'
+  verification: 'all' | 'verified' | 'pending' | 'needs_review' | 'pending_approval'
   country: 'all' | string
 }
 

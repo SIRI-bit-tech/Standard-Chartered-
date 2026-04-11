@@ -136,6 +136,26 @@ class AdminCreateUserRequest(BaseModel):
     country: str
 
 
+class ApproveUserRequest(BaseModel):
+    """Approve user registration"""
+    user_id: str
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+class DeclineUserRequest(BaseModel):
+    """Decline user registration"""
+    user_id: str
+    reason: str = Field(..., max_length=500)
+
+
+class UserApprovalResponse(BaseModel):
+    """User approval response"""
+    success: bool
+    user_id: str
+    status: str
+    message: str
+
+
 class AdminEditUserRequest(BaseModel):
     """Admin edit user details"""
     user_id: str

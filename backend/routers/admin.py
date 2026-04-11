@@ -23,6 +23,7 @@ from schemas.admin import (
     ApproveDepositRequest, DeclineDepositRequest, DepositApprovalResponse,
     ApproveVirtualCardRequest, DeclineVirtualCardRequest, VirtualCardApprovalResponse,
     ApproveLoanRequest, DeclineLoanRequest, LoanApprovalResponse,
+    ApproveUserRequest, DeclineUserRequest, UserApprovalResponse,
     AdminCreateUserRequest, AdminEditUserRequest, AdminAuditLogResponse,
     AdminAccountStatusRequest, AdminAdjustBalanceRequest, AdminUpdateCardStatusRequest, AdminCardActionRequest,
     AdminStatisticsResponse, AdminCreateLoanProductRequest,
@@ -52,6 +53,10 @@ def _to_admin_user_id(user: User) -> str:
 
 
 def _user_status(user: User) -> str:
+    if not user.email_verified:
+        return "pending_verification"
+    if not user.is_approved:
+        return "pending_approval"
     if not user.is_active:
         return "inactive"
     if getattr(user, "is_locked", False):
@@ -62,9 +67,11 @@ def _user_status(user: User) -> str:
 
 
 def _verification_status(user: User) -> str:
-    if getattr(user, "email_verified", False):
-        return "verified"
-    return "pending"
+    if not user.email_verified:
+        return "pending"
+    if not user.is_approved:
+        return "pending_approval"
+    return "verified"
 
 
 @router.get("/dashboard/overview")
@@ -457,9 +464,9 @@ async def admin_update_card_status(
         if not card:
             raise NotFoundError(resource="Virtual Card", error_code="CARD_NOT_FOUND")
         if request.status == "pending":
-            card.status = CardStatus.PENDING
+            card.status = VirtualCardStatus.PENDING
         elif request.status == "active":
-            card.status = CardStatus.ACTIVE
+            card.status = VirtualCardStatus.ACTIVE
         else:
             raise ValidationError(message="Invalid status", error_code="INVALID_STATUS")
         db.add(card)
@@ -528,9 +535,9 @@ async def admin_freeze_card(admin_id: str, request: AdminCardActionRequest, db: 
         card = card_result.scalar_one_or_none()
         if not card:
             raise NotFoundError(resource="Virtual Card", error_code="CARD_NOT_FOUND")
-        if card.status != CardStatus.ACTIVE:
+        if card.status != VirtualCardStatus.ACTIVE:
             raise ValidationError(message="Only active cards can be frozen", error_code="INVALID_STATE")
-        card.status = CardStatus.SUSPENDED
+        card.status = VirtualCardStatus.SUSPENDED
         db.add(card)
         audit_log = AdminAuditLog(
             id=str(uuid.uuid4()),
@@ -543,7 +550,7 @@ async def admin_freeze_card(admin_id: str, request: AdminCardActionRequest, db: 
         db.add(audit_log)
         await db.commit()
         AblyRealtimeManager.publish_admin_event("cards", {"type": "frozen", "card_id": card.id})
-        AblyRealtimeManager.publish_card_status_update(card.user_id, card.id, CardStatus.SUSPENDED.value if hasattr(CardStatus.SUSPENDED, "value") else "suspended", "freeze")
+        AblyRealtimeManager.publish_card_status_update(card.user_id, card.id, VirtualCardStatus.SUSPENDED.value if hasattr(VirtualCardStatus.SUSPENDED, "value") else "suspended", "freeze")
         return {"success": True, "message": "Card frozen"}
     except (UnauthorizedError, NotFoundError, ValidationError):
         raise
@@ -562,9 +569,9 @@ async def admin_unfreeze_card(admin_id: str, request: AdminCardActionRequest, db
         card = card_result.scalar_one_or_none()
         if not card:
             raise NotFoundError(resource="Virtual Card", error_code="CARD_NOT_FOUND")
-        if card.status != CardStatus.SUSPENDED:
+        if card.status != VirtualCardStatus.SUSPENDED:
             raise ValidationError(message="Only suspended cards can be unfreezed", error_code="INVALID_STATE")
-        card.status = CardStatus.ACTIVE
+        card.status = VirtualCardStatus.ACTIVE
         db.add(card)
         audit_log = AdminAuditLog(
             id=str(uuid.uuid4()),
@@ -577,7 +584,7 @@ async def admin_unfreeze_card(admin_id: str, request: AdminCardActionRequest, db
         db.add(audit_log)
         await db.commit()
         AblyRealtimeManager.publish_admin_event("cards", {"type": "unfrozen", "card_id": card.id})
-        AblyRealtimeManager.publish_card_status_update(card.user_id, card.id, CardStatus.ACTIVE.value if hasattr(CardStatus.ACTIVE, "value") else "active", "unfreeze")
+        AblyRealtimeManager.publish_card_status_update(card.user_id, card.id, VirtualCardStatus.ACTIVE.value if hasattr(VirtualCardStatus.ACTIVE, "value") else "active", "unfreeze")
         return {"success": True, "message": "Card unfrozen"}
     except (UnauthorizedError, NotFoundError, ValidationError):
         raise
@@ -596,7 +603,7 @@ async def admin_block_card(admin_id: str, request: AdminCardActionRequest, db: A
         card = card_result.scalar_one_or_none()
         if not card:
             raise NotFoundError(resource="Virtual Card", error_code="CARD_NOT_FOUND")
-        card.status = CardStatus.BLOCKED
+        card.status = VirtualCardStatus.BLOCKED
         db.add(card)
         audit_log = AdminAuditLog(
             id=str(uuid.uuid4()),
@@ -609,7 +616,7 @@ async def admin_block_card(admin_id: str, request: AdminCardActionRequest, db: A
         db.add(audit_log)
         await db.commit()
         AblyRealtimeManager.publish_admin_event("cards", {"type": "blocked", "card_id": card.id})
-        AblyRealtimeManager.publish_card_status_update(card.user_id, card.id, CardStatus.BLOCKED.value if hasattr(CardStatus.BLOCKED, "value") else "blocked", "block")
+        AblyRealtimeManager.publish_card_status_update(card.user_id, card.id, VirtualCardStatus.BLOCKED.value if hasattr(VirtualCardStatus.BLOCKED, "value") else "blocked", "block")
         return {"success": True, "message": "Card blocked"}
     except (UnauthorizedError, NotFoundError, ValidationError):
         raise
@@ -706,6 +713,7 @@ async def admin_list_users(
                 "verification": _verification_status(u),
                 "is_restricted": getattr(u, "is_restricted", False),
                 "restricted_until": u.restricted_until.isoformat() if getattr(u, "restricted_until", None) else None,
+                "created_at": u.created_at.isoformat() if u.created_at else None,
             }
         )
 
@@ -1271,6 +1279,145 @@ async def approve_transfer(
         )
 
 
+@router.post("/users/approve", response_model=UserApprovalResponse)
+async def approve_user(
+    admin_id: str,
+    request: ApproveUserRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Approve a newly registered user"""
+    try:
+        # Verify admin exists and has permission
+        admin_result = await db.execute(
+            select(AdminUser).where(AdminUser.id == admin_id)
+        )
+        admin = admin_result.scalar()
+        
+        if not admin:
+            raise UnauthorizedError(message="Admin not found")
+        
+        if not AdminPermissionManager.has_permission(admin.role, "users:update"):
+            raise UnauthorizedError(message="You don't have permission to approve users")
+            
+        # Get user
+        user_result = await db.execute(
+            select(User).where(User.id == request.user_id)
+        )
+        user = user_result.scalar()
+        
+        if not user:
+            raise NotFoundError(resource="User")
+            
+        if user.is_approved:
+            raise ConflictError("User is already approved")
+            
+        # Approve user
+        user.is_approved = True
+        user.is_active = True
+        user.updated_at = datetime.now(timezone.utc)
+        db.add(user)
+        
+        # Log audit
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="approve_user",
+            resource_type="user",
+            resource_id=user.id,
+            details=json.dumps({"notes": request.notes})
+        )
+        db.add(audit_log)
+        
+        await db.commit()
+        
+        # Send approval email
+        try:
+            email_service.send_approval_email(user.email, user.first_name)
+        except Exception as e:
+            logger.error(f"Failed to send approval email to {user.email}: {e}")
+            
+        # Create notification for user
+        notif = Notification(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            type=NotificationType.SYSTEM,
+            title="Account Approved",
+            message="Your account has been approved! Welcome to SCIB. Please set your transfer PIN to begin banking.",
+            action_url="/auth/set-transfer-pin"
+        )
+        db.add(notif)
+        await db.commit()
+        
+        # Publish real-time events
+        try:
+            AblyRealtimeManager.publish_admin_event("users", {
+                "type": "user_approved",
+                "user_id": user.id,
+                "admin_email": admin.email
+            })
+            AblyRealtimeManager.publish_notification(user.id, "account_approved", "Account Approved", "Your account is now active.")
+        except Exception:
+            pass
+            
+        return UserApprovalResponse(
+            success=True,
+            user_id=user.id,
+            status="approved",
+            message="User account approved successfully"
+        )
+    except (UnauthorizedError, NotFoundError, ConflictError):
+        raise
+    except Exception as e:
+        logger.error(f"User approval failed: {e}")
+        raise InternalServerError(operation="approve user", original_error=e)
+
+
+@router.post("/users/decline", response_model=UserApprovalResponse)
+async def decline_user(
+    admin_id: str,
+    request: DeclineUserRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Decline a user registration"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        if not admin or not AdminPermissionManager.has_permission(admin.role, "users:update"):
+            raise UnauthorizedError(message="Permission denied")
+            
+        user_result = await db.execute(select(User).where(User.id == request.user_id))
+        user = user_result.scalar()
+        if not user:
+            raise NotFoundError(resource="User")
+            
+        user.is_active = False
+        user.is_approved = False
+        db.add(user)
+        
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="decline_user",
+            resource_type="user",
+            resource_id=user.id,
+            details=json.dumps({"reason": request.reason})
+        )
+        db.add(audit_log)
+        await db.commit()
+        
+        return UserApprovalResponse(
+            success=True,
+            user_id=user.id,
+            status="declined",
+            message="User registration declined"
+        )
+    except Exception as e:
+        logger.error(f"User decline failed: {e}")
+        raise InternalServerError(operation="decline user", original_error=e)
+
+
 @router.post("/transfers/decline", response_model=TransferApprovalResponse)
 async def decline_transfer(
     admin_id: str,
@@ -1823,7 +1970,7 @@ async def approve_virtual_card(
                 error_code="CARD_NOT_FOUND"
             )
         
-        card.status = CardStatus.ACTIVE
+        card.status = VirtualCardStatus.ACTIVE
         db.add(card)
         
         # Log audit
@@ -1854,7 +2001,7 @@ async def approve_virtual_card(
         return {
             "success": True,
             "card_id": card.id,
-            "status": CardStatus.ACTIVE,
+            "status": VirtualCardStatus.ACTIVE,
             "message": "Virtual card approved successfully"
         }
     except (UnauthorizedError, NotFoundError):
@@ -1904,7 +2051,7 @@ async def decline_virtual_card(
                 error_code="CARD_NOT_FOUND"
             )
         
-        card.status = CardStatus.DECLINED
+        card.status = VirtualCardStatus.DECLINED
         db.add(card)
         
         # Log audit
@@ -1935,7 +2082,7 @@ async def decline_virtual_card(
         return {
             "success": True,
             "card_id": card.id,
-            "status": CardStatus.DECLINED,
+            "status": VirtualCardStatus.DECLINED,
             "message": "Virtual card declined successfully"
         }
     except (UnauthorizedError, NotFoundError):
@@ -3047,7 +3194,7 @@ async def generate_transactions_for_user(
     """
     Generate realistic transaction history for a user
     
-    This endpoint creates actual transaction records in the database with:
+    This endpoint creates actual transaction records in database with:
     - Real merchant and person names (no AI-generated names)
     - High transaction amounts ($100 - $50,000)
     - Realistic distribution of debits and credits
@@ -3061,6 +3208,8 @@ async def generate_transactions_for_user(
     try:
         from services.transaction_generator import TransactionGenerator
         from decimal import Decimal
+        from models.account import AccountType as AT
+        import random
         
         # Verify user exists
         user_result = await db.execute(select(User).where(User.id == user_id))
@@ -3082,7 +3231,7 @@ async def generate_transactions_for_user(
             raise NotFoundError(resource="Account", identifier=request.account_id)
         
         # Create generator instance
-        generator = TransactionGenerator()
+        generator = TransactionGenerator(user_name=f"{user.first_name} {user.last_name}")
         
         # Generate transactions
         transactions_data = generator.generate_transactions(
@@ -3092,36 +3241,17 @@ async def generate_transactions_for_user(
             closing_balance=Decimal(str(request.closing_balance)),
             transaction_count=request.transaction_count,
             account_id=request.account_id,
-            currency=request.currency
+            currency=request.currency,
+            user_name=f"{user.first_name} {user.last_name}"
         )
         
-        # Insert transactions into database and create linked transfer receipts
+        # Insert transactions into database without creating synthetic transfer records
+        # Generated transactions should stand alone with descriptive text
         created_count = 0
         for txn_data in transactions_data:
             # Parse datetime and remove timezone info for database
             created_at = datetime.fromisoformat(txn_data["created_at"]).replace(tzinfo=None)
             posted_date = datetime.fromisoformat(txn_data["posted_date"]).replace(tzinfo=None)
-            transfer_id = str(uuid.uuid4())
-            transfer_reference = f"GEN-{uuid.uuid4().hex[:12].upper()}"
-
-            # Create a synthetic completed transfer so generated history has receipt links
-            transfer = Transfer(
-                id=transfer_id,
-                from_account_id=request.account_id,
-                from_user_id=user_id,
-                to_account_id=request.account_id if txn_data["type"] == "credit" else None,
-                type=TransferType.DOMESTIC,
-                status=TransferStatus.COMPLETED,
-                amount=txn_data["amount"],
-                currency=txn_data["currency"],
-                fee_amount=0.0,
-                total_amount=txn_data["amount"],
-                description=txn_data["description"],
-                reference_number=transfer_reference,
-                created_at=created_at,
-                processed_at=posted_date,
-            )
-            db.add(transfer)
             
             transaction = Transaction(
                 id=str(uuid.uuid4()),
@@ -3135,7 +3265,7 @@ async def generate_transactions_for_user(
                 balance_before=txn_data["balance_before"],
                 balance_after=txn_data["balance_after"],
                 reference_number=txn_data["reference_number"],
-                transfer_id=transfer_id,
+                transfer_id=None,  # No transfer link for generated transactions
                 created_at=created_at,
                 posted_date=posted_date
             )
@@ -3167,6 +3297,61 @@ async def generate_transactions_for_user(
         await db.commit()
         await db.refresh(account)
         
+        # Get all user accounts to update balances appropriately
+        all_accounts_result = await db.execute(
+            select(Account).where(Account.user_id == user_id)
+        )
+        all_accounts = all_accounts_result.scalars().all()
+        
+        # Separate account types
+        checking_accounts = [acc for acc in all_accounts if acc.account_type == AT.CHECKING]
+        savings_accounts = [acc for acc in all_accounts if acc.account_type == AT.SAVINGS]
+        crypto_accounts = [acc for acc in all_accounts if acc.account_type == AT.CRYPTO]
+        
+        # Update only checking and savings accounts with the closing balance
+        # Ensure savings balance is always larger than checking balance
+        total_closing_balance = Decimal(str(request.closing_balance))
+        
+        if checking_accounts and savings_accounts:
+            # Split balance: 60% to savings, 40% to checking
+            checking_balance = total_closing_balance * Decimal('0.4')
+            savings_balance = total_closing_balance * Decimal('0.6')
+            
+            # Update checking accounts
+            for checking_acc in checking_accounts:
+                checking_acc.balance = checking_balance
+                checking_acc.available_balance = checking_balance
+                checking_acc.updated_at = datetime.utcnow()
+                db.add(checking_acc)
+            
+            # Update savings accounts
+            for savings_acc in savings_accounts:
+                savings_acc.balance = savings_balance
+                savings_acc.available_balance = savings_balance
+                savings_acc.updated_at = datetime.utcnow()
+                db.add(savings_acc)
+                
+        elif checking_accounts:
+            # Only checking accounts - give them full balance
+            for checking_acc in checking_accounts:
+                checking_acc.balance = total_closing_balance
+                checking_acc.available_balance = total_closing_balance
+                checking_acc.updated_at = datetime.utcnow()
+                db.add(checking_acc)
+                
+        elif savings_accounts:
+            # Only savings accounts - give them full balance
+            for savings_acc in savings_accounts:
+                savings_acc.balance = total_closing_balance
+                savings_acc.available_balance = total_closing_balance
+                savings_acc.updated_at = datetime.utcnow()
+                db.add(savings_acc)
+        
+        # Crypto accounts remain unchanged (keep existing balance)
+        
+        # Commit balance updates
+        await db.commit()
+        
         logger.info(f"Admin {admin.id} generated {created_count} transactions for user {user_id}, account {request.account_id}")
         
         return {
@@ -3174,7 +3359,7 @@ async def generate_transactions_for_user(
             "message": f"Successfully generated {created_count} transactions",
             "transactions_created": created_count,
             "account_id": request.account_id,
-            "new_balance": account.balance
+            "new_balance": float(total_closing_balance)
         }
         
     except ValueError as e:

@@ -16,6 +16,8 @@ export interface User {
   phone_verified: boolean
   identity_verified: boolean
   biometric_enabled: boolean
+  transfer_pin_set: boolean
+  is_restricted?: boolean
   created_at: string
   last_login?: string
 }
@@ -242,8 +244,8 @@ export interface AdminDashboardOverviewResponse {
   system_alerts: AdminSystemAlert[]
 }
 
-export type AdminUserStatus = 'active' | 'suspended' | 'inactive' | 'restricted'
-export type AdminVerificationStatus = 'verified' | 'pending' | 'needs_review'
+export type AdminUserStatus = 'active' | 'suspended' | 'inactive' | 'restricted' | 'pending_approval' | 'pending_verification'
+export type AdminVerificationStatus = 'verified' | 'pending' | 'needs_review' | 'pending_approval'
 
 export interface AdminUserRow {
   id: string
@@ -254,8 +256,9 @@ export interface AdminUserRow {
   email: string
   status: AdminUserStatus
   verification: AdminVerificationStatus
-  is_restricted?: boolean
-  restricted_until?: string | null
+  is_restricted: boolean
+  restricted_until: string | null
+  created_at?: string | null
 }
 
 // Security types

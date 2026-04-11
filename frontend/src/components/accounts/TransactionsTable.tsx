@@ -29,7 +29,7 @@ export interface TransactionsTableProps {
 
 export function TransactionsTable({ items = [], historyItems = [], onLoadMore, canLoadMore, loadingMore }: TransactionsTableProps) {
   const [typeFilter, setTypeFilter] = useState<'all' | Transaction['type'] | 'debit' | 'credit'>('all')
-  const [periodFilter, setPeriodFilter] = useState<'30' | '90' | 'all'>('30')
+  const [periodFilter, setPeriodFilter] = useState<'30' | '90' | 'all'>('all')
   const isUsingHistory = historyItems.length > 0
 
   const filteredHistory = useMemo(() => {

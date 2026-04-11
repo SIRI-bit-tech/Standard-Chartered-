@@ -817,6 +817,56 @@ async def get_transfer_history(
             "loan": "Loan Disbursement",
         }.get(tval, tval.title())
 
+    def _get_transfer_subtitle(transaction, direction: str) -> str:
+        """Get meaningful subtitle for generated transactions"""
+        desc = getattr(transaction, "description", "")
+        if not desc:
+            return "Credit" if direction == "credit" else "Debit"
+        
+        desc_str = str(desc)
+        
+        # Check for specific transaction types with priority order
+        if "Salary" in desc_str or "Payroll" in desc_str:
+            return "Salary/Payroll"
+        elif "Bonus" in desc_str or "Commission" in desc_str:
+            return "Bonus/Commission"
+        elif "Dividend" in desc_str:
+            return "Dividend"
+        elif "Investment" in desc_str or "Stock" in desc_str:
+            return "Investment"
+        elif "Tax Refund" in desc_str:
+            return "Tax Refund"
+        elif "Insurance" in desc_str:
+            return "Insurance"
+        elif "Rental Income" in desc_str:
+            return "Rental Income"
+        elif "Freelance" in desc_str:
+            return "Freelance"
+        elif "Check Deposit" in desc_str or "Check deposit" in desc_str:
+            return "Check Deposit"
+        elif "Zelle" in desc_str:
+            return "Zelle"
+        elif "Venmo" in desc_str:
+            return "Venmo"
+        elif "Cash App" in desc_str:
+            return "Cash App"
+        elif "PayPal" in desc_str:
+            return "PayPal"
+        elif "Wire transfer" in desc_str or "Wire Transfer" in desc_str:
+            return "Wire Transfer"
+        elif "Purchase" in desc_str:
+            return "Purchase"
+        elif "Bill Payment" in desc_str:
+            return "Bill Payment"
+        elif "Loan Payment" in desc_str:
+            return "Loan Payment"
+        elif "Crypto" in desc_str or "Bitcoin" in desc_str or "Ethereum" in desc_str:
+            return "Cryptocurrency"
+        elif any(keyword in desc_str for keyword in ["Transfer", "Payment"]):
+            return "Transfer"
+        else:
+            return "Credit" if direction == "credit" else "Debit"
+
     items = []
     for t in page_items:
         acc = accounts.get(t.account_id)
@@ -894,15 +944,31 @@ async def get_transfer_history(
 
         # Fallbacks if no transfer/bill link
         if not counterparty:
+            # Try to extract from transaction description for generated transactions
             if t.description:
-                counterparty = t.description
+                desc = str(t.description)
+                # Check if this is a person-to-person transaction
+                if any(keyword in desc for keyword in [
+                    "Transfer from ", "Payment from ", "Zelle from ", "Wire transfer from ",
+                    "Venmo from ", "Cash App from ", "Check deposit from ", "PayPal from ",
+                    "Transfer to ", "Payment to ", "Zelle to ", "Wire transfer to ",
+                    "Check payment to ", "Venmo to ", "Cash App to ", "PayPal to "
+                ]):
+                    # Extract name from description
+                    if " from " in desc:
+                        counterparty = desc.split(" from ", 1)[1].strip()
+                    elif " to " in desc:
+                        counterparty = desc.split(" to ", 1)[1].strip()
+                else:
+                    # Use full description for other types (salary, purchases, etc.)
+                    counterparty = desc
             else:
                 counterparty = "External Bank" if direction == "debit" else "Incoming Transfer"
         items.append({
             "id": t.id,
             "date": t.created_at.isoformat(),
             "counterparty": counterparty,
-            "subtitle": subtitle or ("Credit" if direction == "credit" else "Debit"),
+            "subtitle": subtitle or _get_transfer_subtitle(t, direction),
             "bank_name": bank_name,
             "reference": t.reference_number,
             "account_masked": mask_account(acc),

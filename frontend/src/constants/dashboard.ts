@@ -9,6 +9,7 @@ import {
   CreditCard,
   LifeBuoy,
   User,
+  ShieldCheck,
 } from 'lucide-react'
 import type { NavItem, QuickActionItem } from '@/types'
 
@@ -21,6 +22,7 @@ export const DASHBOARD_NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/loans', label: 'Loans', icon: PiggyBank },
   { href: '/dashboard/deposits', label: 'Deposits', icon: CircleArrowOutDownLeft },
   { href: '/dashboard/virtual-cards', label: 'Cards', icon: CreditCard },
+  { href: '/dashboard/security', label: 'Security', icon: ShieldCheck },
   { href: '/dashboard/support', label: 'Support', icon: LifeBuoy },
   { href: '/dashboard/profile', label: 'Profile', icon: User },
 ]

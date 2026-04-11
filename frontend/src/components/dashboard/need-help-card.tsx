@@ -20,7 +20,7 @@ export function NeedHelpCard() {
         Our support team is available 24/7 for premium members.
       </p>
       <Button asChild size="sm" className="w-full">
-        <Link href="/dashboard/support">Contact Agent</Link>
+        <Link href="/dashboard/support">Contact Support</Link>
       </Button>
     </div>
   )

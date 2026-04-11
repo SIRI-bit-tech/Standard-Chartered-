@@ -38,21 +38,32 @@ class EmailService:
         if explicit_path:
             candidates.append(explicit_path)
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        # Prioritize "SCIB logo.svg" as requested
+        candidates.append(os.path.abspath(os.path.join(base_dir, "..", "frontend", "public", "SCIB logo.svg")))
+        candidates.append(os.path.abspath(os.path.join(base_dir, "public", "SCIB logo.svg")))
         candidates.append(os.path.abspath(os.path.join(base_dir, "..", "frontend", "public", "standardcharted.png")))
         candidates.append(os.path.abspath(os.path.join(base_dir, "public", "standardcharted.png")))
         for p in candidates:
             try:
                 if os.path.exists(p):
                     self.logo_file_path = p
+                    file_ext = os.path.splitext(p)[1].lower().replace('.', '')
+                    mime_type = "image/svg+xml" if file_ext == "svg" else f"image/{file_ext}"
                     with open(p, "rb") as f:
                         b64 = base64.b64encode(f.read()).decode("ascii")
-                        self.logo_data_uri = f"data:image/png;base64,{b64}"
+                        self.logo_data_uri = f"data:{mime_type};base64,{b64}"
                     break
             except Exception:
                 continue
     
     def _wrap_html(self, title: str, inner_html: str) -> str:
-        header_brand = "<div style='font-weight:700;font-size:24px;color:%s;letter-spacing:-0.02em;'>SCIB</div>" % self.brand_primary
+        logo_html = f'<img src="cid:{self.logo_cid}" alt="SCIB Logo" style="height:40px;display:block;margin-bottom:8px;" />' if self.logo_file_path else ""
+        header_brand = f"""
+            <div style='display:flex;align-items:center;gap:12px;'>
+                {logo_html}
+                <div style='font-weight:700;font-size:24px;color:{self.brand_primary};letter-spacing:-0.02em;'>SCIB</div>
+            </div>
+        """
         return f"""
         <html>
           <head>
@@ -98,9 +109,11 @@ class EmailService:
         if self.logo_file_path:
             try:
                 with open(self.logo_file_path, "rb") as f:
-                    img = MIMEImage(f.read())
+                    file_ext = os.path.splitext(self.logo_file_path)[1].lower().replace('.', '')
+                    subtype = "svg+xml" if file_ext == "svg" else file_ext
+                    img = MIMEImage(f.read(), _subtype=subtype)
                     img.add_header('Content-ID', f"<{self.logo_cid}>")
-                    img.add_header('Content-Disposition', 'inline', filename='standardcharted.png')
+                    img.add_header('Content-Disposition', 'inline', filename=os.path.basename(self.logo_file_path))
                     root.attach(img)
             except Exception:
                 pass
@@ -229,6 +242,50 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send welcome email to {to_email}: {e}")
             return False
+
+    def send_approval_email(self, to_email: str, first_name: str) -> bool:
+        """Send account approval email to user"""
+        try:
+            subject = "Account Approved - Welcome to SCIB"
+            body = f"""
+              <p>Hello {first_name},</p>
+              <p>Great news! Your registration with SCIB Bank has been reviewed and <strong>approved</strong>. Your account is now fully active and ready for use.</p>
+              <p>You can now log in using your registered username and password. For your security, on your first login, you will be required to set a 4-digit transfer PIN to protect your transactions.</p>
+              
+              <div style="margin:24px 0; text-align:center">
+                <a href="{settings.FRONTEND_URL}/auth/login" style="display:inline-block; background-color:{self.brand_primary}; color:#ffffff; padding:14px 32px; border-radius:8px; text-decoration:none; font-weight:700; font-size:16px; box-shadow:0 4px 6px rgba(0,0,0,0.1);">Click here to Login</a>
+              </div>
+
+              <p style="margin:24px 0 8px 0;"><strong>What you can do now:</strong></p>
+              <ul style="margin:0 0 24px 18px; color:{self.text_primary}">
+                <li>Set your secure 4-digit transfer PIN.</li>
+                <li>Fund your account and start making instant transfers.</li>
+                <li>Apply for virtual cards and manageable loans.</li>
+                <li>Experience seamless global banking at your fingertips.</li>
+              </ul>
+
+              <div style="padding:20px; background-color:#F1F5F9; border-radius:12px; border:1px solid {self.border}; margin-bottom:24px;">
+                <p style="margin:0 0 12px 0; font-size:14px; color:{self.text_secondary};"><strong>Security Notice:</strong> If you did not register for an account with SCIB Bank using this email address, please contact our security team immediately by clicking the button below.</p>
+                <div style="text-align:left">
+                  <a href="mailto:support@standardcharteredibank.com" style="display:inline-block; background-color:#ffffff; color:{self.brand_primary}; padding:10px 20px; border-radius:6px; text-decoration:none; font-weight:600; font-size:14px; border:1px solid {self.brand_primary};">Contact Support</a>
+                </div>
+              </div>
+
+              <p style="font-size:14px; color:{self.text_secondary};">If you have any questions, our support team is available 24/7 through support@standardcharteredibank.com.</p>
+              <p>Welcome to the future of banking!</p>
+            """
+            html_content = self._wrap_html("Account Approved", body)
+            
+            msg = self._build_message(subject, to_email, html_content)
+            
+            with self._create_connection() as server:
+                server.send_message(msg)
+            
+            logger.info(f"Approval email sent to {to_email}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send approval email to {to_email}: {e}")
+            return False
     
     def send_card_ready_email(self, to_email: str, card_name: str, card_type: str, expiry_month: int, expiry_year: int) -> bool:
         try:
@@ -329,7 +386,7 @@ class EmailService:
               </ul>
               <a href="{settings.FRONTEND_URL}/dashboard/profile" style="display:inline-block;margin-top:12px;background:{self.brand_primary};color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">View Profile</a>
               <div style="margin-top:16px;padding:12px 16px;border:1px solid {self.border};background:#FFF;border-radius:8px;">
-                <p style="margin:0;color:{self.text_primary}">If you did not make this request, please <a href="{settings.FRONTEND_URL}/dashboard/support" style="color:{self.brand_primary};text-decoration:none">contact Support immediately</a>.</p>
+                <p style="margin:0;color:{self.text_primary}">If you did not make this request, please <a href="mailto:support@standardcharteredibank.com" style="color:{self.brand_primary};text-decoration:none">contact Support immediately</a>.</p>
               </div>
             """
             html_content = self._wrap_html("Profile Updated", body)

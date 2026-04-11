@@ -140,7 +140,15 @@ export function useAuth() {
           tier: data.tier,
         });
 
-        router.push("/dashboard")
+        if (data.redirect_to) {
+          if (data.redirect_to === "/auth/set-transfer-pin" && data.verification_token) {
+            router.push(`${data.redirect_to}?email=${encodeURIComponent(data.email)}&token=${encodeURIComponent(data.verification_token)}`)
+          } else {
+            router.push(data.redirect_to)
+          }
+        } else {
+          router.push("/dashboard")
+        }
       } catch (error: any) {
         const message = error.response?.data?.detail || "Login failed. Please try again."
         throw new Error(message)

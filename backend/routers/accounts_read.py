@@ -166,11 +166,64 @@ async def get_transactions(
     }
 
 
+def _get_transaction_subtitle(transaction, direction: str) -> str:
+    """Get meaningful subtitle for generated transactions"""
+    desc = getattr(transaction, "description", "")
+    if not desc:
+        return "Credit" if direction == "credit" else "Debit"
+    
+    desc_str = str(desc)
+    
+    # Check for specific transaction types with priority order
+    if any(keyword in desc_str for keyword in ["Bill Payment"]):
+        return "Bill Payment"
+    elif any(keyword in desc_str for keyword in ["Loan Payment"]):
+        return "Loan Payment"
+    elif "Salary" in desc_str or "Payroll" in desc_str:
+        return "Salary/Payroll"
+    elif "Bonus" in desc_str or "Commission" in desc_str:
+        return "Bonus/Commission"
+    elif "Dividend" in desc_str:
+        return "Dividend"
+    elif "Investment" in desc_str or "Stock" in desc_str:
+        return "Investment"
+    elif "Tax Refund" in desc_str:
+        return "Tax Refund"
+    elif "Insurance" in desc_str:
+        return "Insurance"
+    elif "Rental Income" in desc_str:
+        return "Rental Income"
+    elif "Freelance" in desc_str:
+        return "Freelance"
+    elif "Check Deposit" in desc_str or "Check deposit" in desc_str:
+        return "Check Deposit"
+    elif "Zelle" in desc_str:
+        return "Zelle"
+    elif "Venmo" in desc_str:
+        return "Venmo"
+    elif "Cash App" in desc_str:
+        return "Cash App"
+    elif "PayPal" in desc_str:
+        return "PayPal"
+    elif "Wire transfer" in desc_str or "Wire Transfer" in desc_str:
+        return "Wire Transfer"
+    elif "Purchase" in desc_str:
+        return "Purchase"
+    elif "Subscription" in desc_str:
+        return "Subscription"
+    elif "Crypto" in desc_str or "Bitcoin" in desc_str or "Ethereum" in desc_str:
+        return "Cryptocurrency"
+    elif any(keyword in desc_str for keyword in ["Transfer", "Payment"]):
+        return "Transfer"
+    else:
+        return "Credit" if direction == "credit" else "Debit"
+
+
 @router.get("/{account_id}/history")
 async def get_account_history(
     account_id: str,
-    limit: int = Query(20, le=100),
-    offset: int = Query(0),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -178,12 +231,20 @@ async def get_account_history(
     # Ensure the requester owns this account
     account = await _get_owned_account(db, account_id, user_id)
 
+    # Get total count
+    from sqlalchemy import func
+    count_res = await db.execute(
+        select(func.count(Transaction.id)).where(Transaction.account_id == account_id)
+    )
+    total = count_res.scalar() or 0
+
     # Load recent transactions for this account
+    offset = (page - 1) * page_size
     tx_res = await db.execute(
         select(Transaction)
         .where(Transaction.account_id == account_id)
         .order_by(Transaction.created_at.desc())
-        .limit(limit)
+        .limit(page_size)
         .offset(offset)
     )
     txs = list(tx_res.scalars().all())
@@ -194,6 +255,19 @@ async def get_account_history(
     if transfer_ids:
         tr_res = await db.execute(select(Transfer).where(Transfer.id.in_(transfer_ids)))
         transfer_map = {tr.id: tr for tr in tr_res.scalars().all()}
+
+    # Batch load bill payments for payment-linked transactions
+    from models.bill_payment import BillPayment, BillPayee
+    payment_ids = [getattr(t, "payment_id", None) for t in txs if getattr(t, "payment_id", None)]
+    bill_map = {}
+    payee_map = {}
+    if payment_ids:
+        bp_res = await db.execute(select(BillPayment).where(BillPayment.id.in_(payment_ids)))
+        bill_map = {bp.id: bp for bp in bp_res.scalars().all()}
+        payee_ids = [bp.payee_id for bp in bill_map.values()]
+        if payee_ids:
+            py_res = await db.execute(select(BillPayee).where(BillPayee.id.in_(payee_ids)))
+            payee_map = {py.id: py for py in py_res.scalars().all()}
 
     # Batch load accounts referenced by transfers to resolve names/ownership
     to_ids = [getattr(tr, "to_account_id", None) for tr in transfer_map.values() if getattr(tr, "to_account_id", None)]
@@ -257,47 +331,126 @@ async def get_account_history(
         bank_name = None
         if tr:
             subtitle = type_label(getattr(tr, "type", None))
-            # For outgoing from this account, show current user's name (like transfer history)
             if direction == "debit":
-                counterparty = my_display_name or "Sender"
+                # Outgoing: show the recipient (destination account user)
+                dest_acc = acc_map.get(getattr(tr, "to_account_id", None)) if acc_map else None
+                if dest_acc:
+                    if dest_acc.user_id == user_id:
+                        # Internal transfer to own account -> show user's name
+                        counterparty = my_display_name or "Siri Dev"
+                    else:
+                        u = user_map.get(dest_acc.user_id) if user_map else None
+                        if u:
+                            full_name = f"{getattr(u, 'first_name', '')} {getattr(u, 'last_name', '')}".strip()
+                            counterparty = full_name or getattr(u, "username", None) or "Recipient"
+                else:
+                    # External transfer - extract from description
+                    name = None
+                    try:
+                        desc = str(getattr(tr, "description", ""))
+                        if "|" in desc:
+                            name = desc.split("|", 1)[0].strip()
+                    except: pass
+                    counterparty = name or getattr(tr, "description", None) or "Recipient"
             else:
-                # Incoming: try to resolve sender account/user first
+                # Incoming: show the sender (source account user)
                 src_acc = acc_map.get(getattr(tr, "from_account_id", None)) if acc_map else None
                 if src_acc:
                     if src_acc.user_id == user_id:
-                        # Sender is one of our own accounts
-                        acc_label = getattr(src_acc.account_type, "value", str(src_acc.account_type)).title()
-                        counterparty = src_acc.nickname or f"Own {acc_label} Account"
+                        # Internal transfer from own account -> show user's name
+                        counterparty = my_display_name or "Siri Dev"
                     else:
                         u = user_map.get(src_acc.user_id) if user_map else None
                         if u:
                             full_name = f"{getattr(u, 'first_name', '')} {getattr(u, 'last_name', '')}".strip()
                             counterparty = full_name or getattr(u, "username", None) or "Sender"
-                # Fallback: prefer encoded sender name "name | bank" in transfer.description
-                if not counterparty:
+                else:
+                    # For external incoming - extract from description
+                    name = None
                     try:
-                        desc = getattr(tr, "description", None)
-                        if desc and "|" in str(desc):
-                            parts = [p.strip() for p in str(desc).split("|", 1)]
-                            if parts:
-                                counterparty = parts[0]
+                        desc = str(getattr(tr, "description", ""))
+                        if "|" in desc:
+                            parts = [p.strip() for p in desc.split("|", 1)]
+                            name = parts[0]
                             if len(parts) == 2:
                                 bank_name = parts[1]
-                    except Exception:
-                        pass
-        # Fallbacks
-        if not counterparty:
-            if getattr(t, "description", None):
-                counterparty = t.description
+                    except: pass
+                    counterparty = name or getattr(tr, "description", None) or "External Bank"
+            # Extract recipient bank from encoded "name | bank" where applicable
+            if not bank_name:
+                try:
+                    if getattr(tr, "description", None) and "|" in str(tr.description):
+                        parts = [p.strip() for p in str(tr.description).split("|", 1)]
+                        if len(parts) == 2:
+                            bank_name = parts[1]
+                except Exception:
+                    bank_name = None
+        
+        # If this is a bill payment, prefer payee name and 'Bill Payment'
+        if not counterparty and getattr(t, "payment_id", None):
+            bp = bill_map.get(getattr(t, "payment_id"))
+            if bp:
+                payee = payee_map.get(getattr(bp, "payee_id", None))
+                if payee:
+                    counterparty = payee.name
+                    subtitle = "Bill Payment"
+                    bank_name = getattr(payee, "category", None)
+        
+        # For generated transactions, extract counterparty from description
+        if not counterparty and getattr(t, "description", None):
+            desc = str(t.description)
+            
+            # Check if this is a person-to-person transaction (Transfer/Payment/Zelle/etc from/to someone)
+            if any(keyword in desc for keyword in [
+                "Transfer from ", "Payment from ", "Zelle from ", "Wire transfer from ", 
+                "Venmo from ", "Cash App from ", "Check deposit from ", "PayPal from ",
+                "Transfer to ", "Payment to ", "Zelle to ", "Wire transfer to ", 
+                "Check payment to ", "Venmo to ", "Cash App to ", "PayPal to "
+            ]):
+                # Extract name from description like "Transfer from John Smith" or "Payment to Jane Doe"
+                if " from " in desc:
+                    counterparty = desc.split(" from ", 1)[1].strip()
+                elif " to " in desc:
+                    counterparty = desc.split(" to ", 1)[1].strip()
+            
+            # Check for income/salary transactions (show as-is)
+            elif any(keyword in desc for keyword in [
+                "Salary", "Payroll", "Bonus", "Commission", "Tax Refund", 
+                "Insurance Claim", "Investment Return", "Stock Dividend", 
+                "Rental Income", "Business Income", "Freelance", "Dividend",
+                "Crypto Investment", "Bitcoin", "Ethereum", "Cryptocurrency"
+            ]):
+                counterparty = desc
+            
+            # Check for check deposits (show as-is)
+            elif any(keyword in desc for keyword in [
+                "Check Deposit", "Payroll Check", "Tax Refund Check", 
+                "Insurance Claim Check", "Dividend Check", "Settlement Check",
+                "Refund Check", "Rebate Check", "Gift Check", "Inheritance Check"
+            ]):
+                counterparty = desc
+            
+            # Check for bill payments, loan payments, purchases (show as-is)
+            elif any(keyword in desc for keyword in [
+                "Bill Payment", "Loan Payment", "Purchase", "Subscription",
+                "Utility Payment", "Credit Card Payment"
+            ]):
+                counterparty = desc
+            
             else:
-                counterparty = "External Bank" if direction == "debit" else "Incoming Transfer"
+                # Fallback to full description
+                counterparty = desc
+        
+        # Final fallback
+        if not counterparty:
+            counterparty = "External Bank" if direction == "debit" else "Incoming Transfer"
 
         items.append(
             {
                 "id": t.id,
                 "date": t.created_at.isoformat(),
                 "counterparty": counterparty,
-                "subtitle": subtitle or ("Credit" if direction == "credit" else "Debit"),
+                "subtitle": subtitle or _get_transaction_subtitle(t, direction),
                 "bank_name": bank_name,
                 "reference": getattr(t, "reference_number", None),
                 "account_masked": mask_account(),
@@ -309,7 +462,16 @@ async def get_account_history(
             }
         )
 
-    return {"success": True, "data": {"items": items, "total": len(items)}, "message": "Account history retrieved"}
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        },
+        "message": "Account history retrieved"
+    }
 
 @router.get("/{account_id}/statements")
 async def get_statements(

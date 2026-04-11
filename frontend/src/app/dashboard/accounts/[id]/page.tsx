@@ -20,13 +20,16 @@ export default function AccountDetailPage() {
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [txLimit, setTxLimit] = useState(50)
+  const [page, setPage] = useState(1)
+  const [totalTx, setTotalTx] = useState(0)
+  const pageSize = 20
 
   useEffect(() => {
     loadAccountDetails()
   }, [accountId, searchParams])
 
   const loadAccountDetails = async () => {
+    setLoading(true)
     try {
       const res = await apiClient.get<{ success: boolean; data: Account }>(
         `${API_BASE_URL}${API_ENDPOINTS.ACCOUNTS}/${accountId}`,
@@ -39,10 +42,14 @@ export default function AccountDetailPage() {
         }
       }
 
-      const histRes = await apiClient.get<{ success: boolean; data: { items: TransferHistoryItem[] } }>(
-        `${API_BASE_URL}${API_ENDPOINTS.ACCOUNTS}/${accountId}/history?limit=${txLimit}`,
+      const histRes = await apiClient.get<{ success: boolean; data: { items: TransferHistoryItem[]; total: number } }>(
+        `${API_BASE_URL}${API_ENDPOINTS.ACCOUNTS}/${accountId}/history?page=1&page_size=${pageSize}`,
       )
-      if (histRes.success) setTransactions(histRes.data.items)
+      if (histRes.success) {
+        setTransactions(histRes.data.items)
+        setTotalTx(histRes.data.total)
+        setPage(1)
+      }
     } catch (e) {
       console.error('Failed to load account details:', e)
     } finally {
@@ -51,14 +58,17 @@ export default function AccountDetailPage() {
   }
 
   const handleLoadMoreTransactions = async () => {
-    const nextLimit = txLimit + 50
+    const nextPage = page + 1
     setLoadingMore(true)
     try {
-      const histRes = await apiClient.get<{ success: boolean; data: { items: TransferHistoryItem[] } }>(
-        `${API_BASE_URL}${API_ENDPOINTS.ACCOUNTS}/${accountId}/history?limit=${nextLimit}`,
+      const histRes = await apiClient.get<{ success: boolean; data: { items: TransferHistoryItem[]; total: number } }>(
+        `${API_BASE_URL}${API_ENDPOINTS.ACCOUNTS}/${accountId}/history?page=${nextPage}&page_size=${pageSize}`,
       )
-      if (histRes.success) setTransactions(histRes.data.items)
-      setTxLimit(nextLimit)
+      if (histRes.success) {
+        setTransactions([...transactions, ...histRes.data.items])
+        setPage(nextPage)
+        setTotalTx(histRes.data.total)
+      }
     } catch (e) {
       console.error('Failed to load more transactions:', e)
     } finally {
@@ -110,7 +120,7 @@ export default function AccountDetailPage() {
           <TransactionsTable
             historyItems={transactions}
             onLoadMore={handleLoadMoreTransactions}
-            canLoadMore={transactions.length >= txLimit}
+            canLoadMore={transactions.length < totalTx}
             loadingMore={loadingMore}
           />
         </div>
