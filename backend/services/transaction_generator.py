@@ -146,16 +146,31 @@ class TransactionGenerator:
             return []
         
         if count == 1:
-            return [start_date]
+            # For single transaction, place it at the end date
+            return [end_date]
         
         total_seconds = (end_date - start_date).total_seconds()
-        interval = total_seconds / count
+        interval = total_seconds / (count - 1)  # Changed to count-1 to ensure last transaction is at end_date
         
         timestamps = []
         for i in range(count):
-            # Add some randomness to make it more realistic
-            random_offset = random.uniform(-interval * 0.3, interval * 0.3)
-            timestamp = start_date + timedelta(seconds=(i * interval + random_offset))
+            if i == count - 1:
+                # Last transaction should be exactly at end_date
+                timestamp = end_date
+            else:
+                # Add some randomness to make it more realistic, but keep within bounds
+                base_time = start_date + timedelta(seconds=(i * interval))
+                random_offset = random.uniform(-interval * 0.3, interval * 0.3)
+                timestamp = base_time + timedelta(seconds=random_offset)
+                
+                # Ensure timestamp doesn't exceed end_date
+                if timestamp > end_date:
+                    timestamp = end_date - timedelta(seconds=random.uniform(1, 3600))  # 1 second to 1 hour before end
+                
+                # Ensure timestamp doesn't go before start_date
+                if timestamp < start_date:
+                    timestamp = start_date + timedelta(seconds=random.uniform(1, 3600))
+            
             timestamps.append(timestamp)
         
         # Sort chronologically
