@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CreditCard, Landmark, Wallet, ArrowRightLeft, Eye, EyeOff, Download, Copy, Check } from 'lucide-react'
+import { CreditCard, Landmark, Wallet, ArrowRightLeft, Eye, EyeOff, Copy, Check } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore, useAccountStore } from '@/lib/store'
 import { formatCurrency, cn, toTitleCase, getCurrencyFromCountry } from '@/lib/utils'
@@ -47,32 +47,6 @@ export default function AccountsPage() {
     : (primaryAccount?.currency || getCurrencyFromCountry(user?.country))
 
   const totalNetWorth = accounts.reduce((sum, a) => sum + a.balance, 0)
-
-  const handleDownloadStatement = async () => {
-    const now = new Date()
-    const month = now.toLocaleString('default', { month: 'long' })
-    const year = now.getFullYear()
-    const lines = [
-      `Account Statement - ${month} ${year}`,
-      `Generated: ${now.toISOString().slice(0, 10)}`,
-      '',
-      'Account Summary',
-      '---',
-      ...accounts.map(
-        (a) =>
-          `${a.nickname || toTitleCase(a.type)} (****${a.account_number.slice(-4)}): ${formatCurrency(a.balance, a.currency)}`,
-      ),
-      '',
-      `Total Net Worth: ${formatCurrency(totalNetWorth, primaryCurrency)}`,
-    ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `statement-${year}-${String(now.getMonth() + 1).padStart(2, '0')}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   if (!user) return null
 
@@ -131,17 +105,6 @@ export default function AccountsPage() {
               <p className="text-xl sm:text-2xl font-bold" style={{ color: colors.primary }}>
                 {formatCurrency(totalNetWorth, primaryCurrency)}
               </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadStatement}
-                className="flex-1 sm:flex-none gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Statement
-              </Button>
             </div>
           </div>
         </div>
