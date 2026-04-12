@@ -994,13 +994,16 @@ async def admin_list_transactions(
     page_size: int = Query(10, ge=5, le=50),
     db: AsyncSession = Depends(get_db),
 ):
-    """Transactions list for admin UI."""
+    """Transactions list for admin UI - includes both real and generated transactions."""
     admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
     admin = admin_result.scalar()
     if not admin:
         raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
 
-    tx_result = await db.execute(select(Transaction))
+    # Get all transactions (both with and without transfer_id - includes generated transactions)
+    tx_result = await db.execute(
+        select(Transaction).order_by(Transaction.created_at.desc())
+    )
     transactions = tx_result.scalars().all()
 
     accounts_result = await db.execute(select(Account))
@@ -1023,6 +1026,7 @@ async def admin_list_transactions(
         transactions = [t for t in transactions if getattr(t, "status", None) and t.status == status]
 
     total = len(transactions)
+    total_pages = (total + page_size - 1) // page_size  # Calculate total pages
     start = (page - 1) * page_size
     end = start + page_size
     items = transactions[start:end]
@@ -1040,6 +1044,7 @@ async def admin_list_transactions(
                 "status": t.status,
                 "created_at": t.created_at.isoformat() if getattr(t, "created_at", None) else None,
                 "transfer_id": getattr(t, "transfer_id", None),
+                "is_generated": getattr(t, "transfer_id", None) is None,  # Flag for generated transactions
                 "account_number": acc.account_number if acc else "",
                 "user": {
                     "id": user.id if user else "",
@@ -1049,7 +1054,18 @@ async def admin_list_transactions(
             }
         )
 
-    return {"success": True, "data": {"items": payload, "total": total, "page": page, "page_size": page_size}}
+    return {
+        "success": True, 
+        "data": {
+            "items": payload, 
+            "total": total, 
+            "page": page, 
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1
+        }
+    }
 
 
 @router.post("/auth/register")

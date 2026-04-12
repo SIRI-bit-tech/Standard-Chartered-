@@ -10,6 +10,7 @@
  } from '@/components/ui/table'
  import { Badge } from '@/components/ui/badge'
  import { colors } from '@/types'
+ import { Sparkles } from 'lucide-react'
  
  import type { AdminTransactionRow } from '@/types'
  import { AdminTransactionActions } from './admin-transaction-actions'
@@ -25,6 +26,7 @@
              <TableHead>Account</TableHead>
              <TableHead className="text-right">Amount</TableHead>
              <TableHead>Status</TableHead>
+             <TableHead>Type</TableHead>
             <TableHead className="text-right pr-4">Actions</TableHead>
            </TableRow>
          </TableHeader>
@@ -52,6 +54,18 @@
                  <Badge variant="outline" className="border-0">
                    {t.status}
                  </Badge>
+               </TableCell>
+               <TableCell>
+                 {t.is_generated ? (
+                   <Badge variant="secondary" className="gap-1 text-xs">
+                     <Sparkles className="h-3 w-3" />
+                     Generated
+                   </Badge>
+                 ) : (
+                   <Badge variant="outline" className="text-xs">
+                     Real
+                   </Badge>
+                 )}
                </TableCell>
               <TableCell className="text-right pr-4">
                 <AdminTransactionActions tx={t} />

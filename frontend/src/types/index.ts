@@ -142,6 +142,7 @@ export interface AdminTransactionRow {
   account_number: string
   user: { id: string; name: string; display_id: string }
   transfer_id?: string | null
+  is_generated?: boolean
 }
 
 /** Form state for internal transfer (own accounts) */
