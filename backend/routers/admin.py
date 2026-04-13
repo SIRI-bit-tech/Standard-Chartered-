@@ -489,8 +489,8 @@ async def admin_update_card_status(
                     id=str(uuid.uuid4()),
                     user_id=user.id,
                     type=NotificationType.SYSTEM,
-                    title="Virtual Card Generated",
-                    message=f"Your card \"{card.card_name}\" is now active.",
+                    title="Virtual Card Ready",
+                    message=f"Your card \"{card.card_name}\" is ready and available for use.",
                     action_url=f"{settings.FRONTEND_URL}/dashboard/virtual-cards",
                 )
                 db.add(notif)
@@ -498,8 +498,8 @@ async def admin_update_card_status(
                 AblyRealtimeManager.publish_notification(
                     user.id,
                     "system",
-                    "Virtual Card Generated",
-                    f"Your card \"{card.card_name}\" is now active.",
+                    "Virtual Card Ready",
+                    f"Your card \"{card.card_name}\" is ready and available for use.",
                     {"id": notif.id, "created_at": datetime.now(timezone.utc).isoformat()}
                 )
                 try:
