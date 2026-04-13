@@ -25,9 +25,19 @@ from utils.logger import logger
 router = APIRouter(tags=["virtual-cards"])
 
 
-def generate_virtual_card_number() -> str:
-    """Generate a virtual card number"""
-    return "4532" + "".join([str(secrets.randbelow(10)) for _ in range(12)])
+def generate_virtual_card_number(card_type: str = "debit") -> str:
+    """Generate a virtual card number with correct BIN prefix.
+    - Visa (debit): starts with 4 (e.g. 4532)
+    - Mastercard (credit): starts with 51-55 (e.g. 5412)
+    """
+    if card_type == "credit":
+        # Mastercard BIN: first two digits are 51-55
+        prefix = "5" + str(secrets.randbelow(5) + 1)  # 51, 52, 53, 54, or 55
+        remaining = 16 - len(prefix)
+        return prefix + "".join([str(secrets.randbelow(10)) for _ in range(remaining)])
+    else:
+        # Visa BIN: starts with 4
+        return "4532" + "".join([str(secrets.randbelow(10)) for _ in range(12)])
 
 
 def generate_cvv() -> str:
@@ -105,7 +115,7 @@ async def create_virtual_card(
             id=str(uuid.uuid4()),
             user_id=current_user_id,
             account_id=request.account_id,
-            card_number=generate_virtual_card_number(),
+            card_number=generate_virtual_card_number(card_type=model_card_type.value),
             card_type=model_card_type,
             status=VirtualCardStatus.PENDING,
             expiry_month=expiry_month,
