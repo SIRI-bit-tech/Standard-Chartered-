@@ -5,7 +5,8 @@ import { apiClient } from '@/lib/api-client'
 import { logger } from '@/lib/logger'
 import { Loader2 } from 'lucide-react'
 import { AdminKpiCard } from '@/components/admin/admin-kpi-card'
-import { AdminLineChart } from '@/components/admin/admin-line-chart'
+import { AdminTransactionChart } from '@/components/admin/admin-transaction-chart'
+import { AdminUserGrowthChart } from '@/components/admin/admin-user-growth-chart'
 import { AdminActivityFeed, AdminSystemAlerts } from '@/components/admin/admin-dashboard-panels'
 import { colors } from '@/types'
 import type { AdminDashboardOverviewResponse } from '@/types'
@@ -111,7 +112,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="mt-4">
-            <AdminLineChart data={data.transaction_volume} />
+            <AdminTransactionChart data={data.transaction_volume} />
           </div>
         </div>
 
@@ -128,7 +129,7 @@ export default function AdminDashboard() {
             <button className="text-muted-foreground">⋮</button>
           </div>
           <div className="mt-4">
-            <AdminLineChart data={data.user_growth} height={180} />
+            <AdminUserGrowthChart data={data.user_growth} />
           </div>
           <div className="mt-4 flex items-center justify-between">
             <div>
