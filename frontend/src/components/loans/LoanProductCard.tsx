@@ -40,7 +40,7 @@ export const LoanProductCard: React.FC<LoanProductCardProps> = ({ product, onApp
                 </div>
 
                 <ul className="space-y-3 mb-8 flex-1">
-                    {(product.features || [
+                    {(Array.isArray(product.features) && product.features.length > 0 ? product.features : [
                         `Up to ${formatCurrency(product.max_amount, currency)}`,
                         'Fixed rate options',
                         'No processing fees',

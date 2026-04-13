@@ -255,6 +255,16 @@ class AdminCreateLoanProductRequest(BaseModel):
     available_to_premium: bool = True
 
 
+class AdminCreateLoanRequest(BaseModel):
+    """Admin creates a loan directly for a user (no disbursement)."""
+    user_id: str = Field(..., description="Target user ID")
+    loan_type: str = Field(..., description="personal, home, auto, education, business")
+    amount: float = Field(..., gt=0, description="Principal loan amount")
+    interest_rate: float = Field(..., ge=0, description="Annual interest rate (%)")
+    daily_interest_rate: float = Field(0.0, ge=0, description="Daily interest amount ($) added to balance")
+    term_months: int = Field(..., ge=1, description="Loan duration in months")
+
+
 # Transaction Generation Schemas
 class GenerateTransactionsRequest(BaseModel):
     """Request to generate transaction history"""

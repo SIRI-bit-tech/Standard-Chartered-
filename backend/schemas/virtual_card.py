@@ -72,13 +72,10 @@ class VirtualCardResponse(BaseModel):
     updated_at: datetime
     
     @validator('card_number', pre=True)
-    def mask_card_number(cls, v):
+    def format_card_number(cls, v):
         if not v:
             return v
-        s = str(v).replace(" ", "")
-        if len(s) > 4:
-            return f"****{s[-4:]}"
-        return s
+        return str(v).replace(" ", "")
 
     class Config:
         from_attributes = True

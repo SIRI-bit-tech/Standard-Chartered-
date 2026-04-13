@@ -156,6 +156,12 @@ class Loan(Base):
     total_interest_paid = Column(Float, default=0.0, nullable=False)
     total_payments_made = Column(Integer, default=0, nullable=False)
     
+    # Daily interest accrual (admin-set, added to remaining_balance daily)
+    daily_interest_rate = Column(Float, default=0.0, nullable=False)
+    
+    # Internal flag — never exposed to user frontend
+    created_by_admin = Column(Boolean, default=False, nullable=False)
+    
     # Status
     is_in_arrears = Column(Boolean, default=False, nullable=False)
     days_in_arrears = Column(Integer, default=0, nullable=False)

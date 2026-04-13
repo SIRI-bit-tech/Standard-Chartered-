@@ -26,7 +26,7 @@ from schemas.admin import (
     ApproveUserRequest, DeclineUserRequest, UserApprovalResponse,
     AdminCreateUserRequest, AdminEditUserRequest, AdminAuditLogResponse,
     AdminAccountStatusRequest, AdminAdjustBalanceRequest, AdminUpdateCardStatusRequest, AdminCardActionRequest,
-    AdminStatisticsResponse, AdminCreateLoanProductRequest,
+    AdminStatisticsResponse, AdminCreateLoanProductRequest, AdminCreateLoanRequest,
     GenerateTransactionsRequest, GenerateTransactionsPreviewRequest,
     GenerateTransactionsPreviewResponse, GenerateTransactionsResponse
 )
@@ -2003,13 +2003,26 @@ async def approve_virtual_card(
         
         await db.commit()
         
-        # Notify user
+        # Notify user (Realtime)
         AblyRealtimeManager.publish_notification(
             card.user_id,
             "card_approved",
             "Virtual Card Approved",
-            f"Your virtual card has been approved and is ready to use."
+            f"Your virtual card '{card.card_name}' has been approved and is ready to use."
         )
+
+        # Create in-app notification record
+        from models.notification import Notification, NotificationType
+        notif = Notification(
+            id=str(uuid.uuid4()),
+            user_id=card.user_id,
+            type=NotificationType.LOAN,
+            title="Card Approved",
+            message=f"Your virtual card '{card.card_name}' has been approved. You can now view its details in the card management section.",
+            created_at=datetime.utcnow()
+        )
+        db.add(notif)
+        
         AblyRealtimeManager.publish_admin_event("accounts", {"type": "card_approved", "card_id": card.id})
         
         logger.info(f"Virtual card approved by {admin.email}: {card.id}")
@@ -2084,13 +2097,26 @@ async def decline_virtual_card(
         
         await db.commit()
         
-        # Notify user
+        # Notify user (Realtime)
         AblyRealtimeManager.publish_notification(
             card.user_id,
             "card_declined",
             "Virtual Card Request Declined",
-            f"Your virtual card request has been declined. Reason: {request.reason}"
+            f"Your virtual card request for '{card.card_name}' has been declined. Reason: {request.reason}"
         )
+
+        # Create in-app notification record
+        from models.notification import Notification, NotificationType
+        notif = Notification(
+            id=str(uuid.uuid4()),
+            user_id=card.user_id,
+            type=NotificationType.LOAN,
+            title="Card Request Cancelled",
+            message=f"Your request for card '{card.card_name}' was declined. Reason: {request.reason}",
+            created_at=datetime.utcnow()
+        )
+        db.add(notif)
+        
         AblyRealtimeManager.publish_admin_event("accounts", {"type": "card_declined", "card_id": card.id})
         
         logger.info(f"Virtual card declined by {admin.email}: {card.id}")
@@ -3384,3 +3410,276 @@ async def generate_transactions_for_user(
         logger.error(f"Error generating transactions: {str(e)}")
         await db.rollback()
         raise InternalServerError(operation="generate transactions", error_code="GENERATION_FAILED", original_error=e)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Loan Management — Admin endpoints
+# ═══════════════════════════════════════════════════════════════════════
+
+@router.get("/users/search")
+async def admin_search_users(
+    admin_id: str,
+    q: str = Query("", max_length=120),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all users (optionally filtered by search query) for the admin
+    loan-creation modal's searchable dropdown."""
+    admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+    admin = admin_result.scalar()
+    if not admin:
+        raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+
+    q_lower = q.strip().lower()
+    if q_lower:
+        users = [
+            u for u in users
+            if q_lower in (u.email or "").lower()
+            or q_lower in f"{u.first_name} {u.last_name}".lower()
+            or q_lower in (u.username or "").lower()
+        ]
+
+    return {
+        "success": True,
+        "data": [
+            {
+                "id": u.id,
+                "name": f"{u.first_name} {u.last_name}",
+                "email": u.email,
+            }
+            for u in users
+        ],
+    }
+
+
+@router.get("/loans/applications")
+async def admin_get_loan_applications(
+    admin_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Return all loan applications across all users for the admin dashboard."""
+    admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+    admin = admin_result.scalar()
+    if not admin:
+        raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+
+    apps_result = await db.execute(
+        select(LoanApplication).order_by(LoanApplication.created_at.desc())
+    )
+    applications = apps_result.scalars().all()
+
+    # Batch–load users and products for display
+    user_ids = {a.user_id for a in applications}
+    product_ids = {a.product_id for a in applications}
+
+    users_map: dict[str, User] = {}
+    products_map: dict[str, LoanProduct] = {}
+
+    if user_ids:
+        u_res = await db.execute(select(User).where(User.id.in_(list(user_ids))))
+        for u in u_res.scalars().all():
+            users_map[u.id] = u
+    if product_ids:
+        p_res = await db.execute(select(LoanProduct).where(LoanProduct.id.in_(list(product_ids))))
+        for p in p_res.scalars().all():
+            products_map[p.id] = p
+
+    data = []
+    for a in applications:
+        user = users_map.get(a.user_id)
+        product = products_map.get(a.product_id)
+        data.append({
+            "id": a.id,
+            "user_id": a.user_id,
+            "user_email": user.email if user else "Unknown",
+            "product_name": product.name if product else "N/A",
+            "product_id": a.product_id,
+            "status": a.status.value if hasattr(a.status, "value") else a.status,
+            "amount": a.requested_amount,
+            "details": f"{a.requested_amount} - {a.requested_term_months}mo",
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        })
+
+    return {"success": True, "data": data}
+
+
+@router.post("/loans/products")
+async def admin_create_loan_product(
+    request: AdminCreateLoanProductRequest,
+    admin_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new loan product."""
+    admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+    admin = admin_result.scalar()
+    if not admin:
+        raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+
+    product_id = request.id or str(uuid.uuid4())
+    product = LoanProduct(
+        id=product_id,
+        name=request.name,
+        type=request.type,
+        description=request.description,
+        min_amount=request.min_amount,
+        max_amount=request.max_amount,
+        base_interest_rate=request.base_interest_rate,
+        min_term_months=request.min_term_months,
+        max_term_months=request.max_term_months,
+        tag=request.tag,
+        image_url=request.image_url,
+        features=json.dumps(request.features) if request.features else None,
+        employment_required=request.employment_required,
+        available_to_standard=request.available_to_standard,
+        available_to_priority=request.available_to_priority,
+        available_to_premium=request.available_to_premium,
+    )
+    db.add(product)
+
+    audit_log = AdminAuditLog(
+        id=str(uuid.uuid4()),
+        admin_id=admin.id,
+        admin_email=admin.email,
+        action="create_loan_product",
+        resource_type="loan_product",
+        resource_id=product_id,
+        details=json.dumps({"name": request.name, "type": request.type}),
+    )
+    db.add(audit_log)
+    await db.commit()
+
+    return {"success": True, "data": {"id": product_id}, "message": "Loan product created"}
+
+
+@router.post("/loans/create")
+async def admin_create_loan(
+    request: AdminCreateLoanRequest,
+    admin_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin creates a loan directly for a user.
+    - NO disbursement into the user's account.
+    - The loan appears in the user's My Loans tab as a normal active loan.
+    - Daily interest (if set) will accrue automatically.
+    """
+    # Verify admin
+    admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+    admin = admin_result.scalar()
+    if not admin:
+        raise UnauthorizedError(message="Admin not found", error_code="ADMIN_NOT_FOUND")
+
+    # Verify user
+    user_result = await db.execute(select(User).where(User.id == request.user_id))
+    user = user_result.scalar()
+    if not user:
+        raise NotFoundError(resource="User", error_code="USER_NOT_FOUND")
+
+    # Get user's first active account (needed as FK on Loan)
+    acc_result = await db.execute(
+        select(Account).where(Account.user_id == request.user_id, Account.status == "active")
+    )
+    account = acc_result.scalars().first()
+    if not account:
+        raise ValidationError(message="User has no active account", error_code="NO_ACTIVE_ACCOUNT")
+
+    # Calculate monthly payment (standard amortisation formula)
+    monthly_rate = request.interest_rate / 100 / 12
+    if monthly_rate > 0:
+        monthly_payment = (
+            request.amount * monthly_rate / (1 - (1 + monthly_rate) ** (-request.term_months))
+        )
+    else:
+        monthly_payment = request.amount / request.term_months
+
+    loan_id = str(uuid.uuid4())
+    now = datetime.utcnow()
+    maturity = now + timedelta(days=30 * request.term_months)
+
+    # Map string type to enum
+    try:
+        loan_type_enum = LoanType(request.loan_type.lower())
+    except ValueError:
+        loan_type_enum = LoanType.PERSONAL
+
+    # Find a suitable product template for this loan (previously hardcoded to admin_created)
+    prod_res = await db.execute(
+        select(LoanProduct).where(LoanProduct.type == loan_type_enum.value.upper())
+    )
+    template_product = prod_res.scalars().first()
+    if not template_product:
+        # Fallback to any product if type match fails
+        prod_res = await db.execute(select(LoanProduct))
+        template_product = prod_res.scalars().first()
+    
+    if not template_product:
+        raise ValidationError(message="No loan products available to use as a template", error_code="NO_PRODUCTS")
+
+    app_id = str(uuid.uuid4())
+    app = LoanApplication(
+        id=app_id,
+        user_id=request.user_id,
+        product_id=template_product.id,
+        account_id=account.id,
+        status=LoanApplicationStatus.APPROVED,
+        requested_amount=request.amount,
+        requested_term_months=request.term_months,
+        approved_amount=request.amount,
+        approved_interest_rate=request.interest_rate,
+        approved_term_months=request.term_months,
+        monthly_payment=round(monthly_payment, 2),
+        purpose="Facility",
+        submitted_at=now,
+        approved_at=now,
+        created_at=now,
+    )
+    db.add(app)
+    await db.flush()  # Ensure the application exists before the loan references it
+
+    new_loan = Loan(
+        id=loan_id,
+        user_id=request.user_id,
+        account_id=account.id,
+        application_id=app_id,  # Link to the application we just created
+        type=loan_type_enum,
+        status=LoanStatus.ACTIVE,
+        principal_amount=request.amount,
+        interest_rate=request.interest_rate,
+        term_months=request.term_months,
+        monthly_payment=round(monthly_payment, 2),
+        next_payment_date=now + timedelta(days=30),
+        remaining_balance=request.amount,
+        daily_interest_rate=request.daily_interest_rate,
+        created_by_admin=True,
+        originated_at=now,
+        maturity_date=maturity,
+    )
+    db.add(new_loan)
+
+    # Audit log
+    audit = AdminAuditLog(
+        id=str(uuid.uuid4()),
+        admin_id=admin.id,
+        admin_email=admin.email,
+        action="create_loan_for_user",
+        resource_type="loan",
+        resource_id=loan_id,
+        details=json.dumps({
+            "user_id": request.user_id,
+            "amount": request.amount,
+            "interest_rate": request.interest_rate,
+            "daily_interest_rate": request.daily_interest_rate,
+        }),
+    )
+    db.add(audit)
+    await db.commit()
+
+    logger.info(f"Admin {admin.id} created loan {loan_id} for user {request.user_id}, amount={request.amount}")
+
+    return {
+        "success": True,
+        "data": {"loan_id": loan_id},
+        "message": "Loan created successfully",
+    }
+

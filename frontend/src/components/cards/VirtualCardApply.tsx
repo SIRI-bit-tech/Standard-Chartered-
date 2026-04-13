@@ -45,16 +45,14 @@ export function VirtualCardApply({ onCreated }: Props) {
       } catch (e) {
         logger.error('Failed to fetch accounts', { error: e })
       }
+      try {
+        const resp = await apiClient.get<{ success: boolean; data: { cards: VirtualCardSummary[] } }>(`/api/v1/cards/list`)
+        const list = Array.isArray(resp.data?.cards) ? resp.data.cards : []
+        setCards(list)
+      } catch (e) {
+        logger.error('Failed to fetch cards', { error: e })
+      }
     })()
-      ; (async () => {
-        try {
-          const resp = await apiClient.get<{ cards: VirtualCardSummary[] }>(`/api/v1/cards/list`)
-          const list = Array.isArray(resp.cards) ? resp.cards : []
-          setCards(list)
-        } catch (e) {
-          logger.error('Failed to fetch cards', { error: e })
-        }
-      })()
   }, [])
 
   const { toast } = useToast()
@@ -82,7 +80,7 @@ export function VirtualCardApply({ onCreated }: Props) {
       if (res.success && res.data?.id) {
         toast({
           title: "Application Successful",
-          description: "Your card has been applied for successfully.",
+          description: "card successfully applied",
           variant: "default",
         })
 

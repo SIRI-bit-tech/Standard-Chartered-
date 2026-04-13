@@ -338,7 +338,7 @@ export interface LoanApplication {
   requested_term: number
   approved_amount?: number
   approved_interest_rate?: number
-  approved_term_months?: number
+  approved_term?: number
   monthly_payment?: number
   purpose?: string
   created_at: string
@@ -354,6 +354,8 @@ export interface Loan {
   monthly_payment: number
   payments_made: number
   next_payment_date: string
+  term_months: number
+  daily_interest_rate?: number
   status: 'active' | 'completed' | 'defaulted' | 'pending_approval'
 }
 

@@ -193,12 +193,12 @@ export default function LoansPage() {
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 mt-6 pt-6 border-t border-gray-50">
                           <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Requested Amount</p>
-                            <p className="text-sm font-bold text-gray-900">{formatCurrency(app.requested_amount)}</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Loan Amount</p>
+                            <p className="text-sm font-bold text-gray-900">{formatCurrency(app.approved_amount || app.requested_amount)}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Period</p>
-                            <p className="text-sm font-bold text-gray-900">{app.requested_term} Months</p>
+                            <p className="text-sm font-bold text-gray-900">{(app.approved_term || app.requested_term)} Months</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Application ID</p>
@@ -299,10 +299,17 @@ export default function LoansPage() {
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Interest Rate</p>
                           <p className="text-base sm:text-lg font-black text-gray-900">{loan.interest_rate}% APR</p>
                         </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Monthly EMI</p>
-                          <p className="text-base sm:text-lg font-black text-primary">{formatCurrency(loan.monthly_payment)}</p>
-                        </div>
+                        {loan.daily_interest_rate && loan.daily_interest_rate > 0 ? (
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Daily Interest</p>
+                            <p className="text-base sm:text-lg font-black text-amber-600">{formatCurrency(loan.daily_interest_rate)}/day</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Monthly EMI</p>
+                            <p className="text-base sm:text-lg font-black text-primary">{formatCurrency(loan.monthly_payment)}</p>
+                          </div>
+                        )}
                         <div>
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Next Payment</p>
                           <p className="text-base sm:text-lg font-black text-gray-900">{formatDate(loan.next_payment_date)}</p>
@@ -314,10 +321,13 @@ export default function LoansPage() {
                           <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-primary shrink-0">
                             <Clock size={20} />
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-gray-900">{loan.payments_made} Payments Made</p>
-                            <div className="w-full sm:w-32 h-1.5 bg-gray-100 rounded-full mt-1">
-                              <div className="h-full bg-primary rounded-full" style={{ width: '45%' }} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-gray-900">{loan.payments_made || 0} Payments Made</p>
+                            <div className="w-full sm:w-48 h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                              <div 
+                                className="h-full bg-primary rounded-full transition-all duration-500" 
+                                style={{ width: `${(loan.payments_made > 0 && loan.term_months > 0) ? Math.min(100, (loan.payments_made / loan.term_months) * 100) : 0}%` }} 
+                              />
                             </div>
                           </div>
                         </div>

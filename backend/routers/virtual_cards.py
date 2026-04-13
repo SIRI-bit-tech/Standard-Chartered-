@@ -42,7 +42,7 @@ def get_expiry_dates():
     return expiry_date.month, expiry_date.year
 
 
-@router.post("/create", response_model=VirtualCardDetailResponse)
+@router.post("/create")
 async def create_virtual_card(
     request: CreateVirtualCardRequest,
     current_user_id: str = Depends(get_current_user_id),
@@ -146,22 +146,35 @@ async def create_virtual_card(
         AblyRealtimeManager.publish_notification(
             current_user_id,
             "virtual_card_created",
-            "Virtual Card Created",
-            f"Your virtual card '{request.card_name}' has been created successfully."
+            "Virtual Card Request Submitted",
+            f"Your request for virtual card '{request.card_name}' has been submitted and is currently under review."
         )
+
+        # Create in-app notification record
+        from models.notification import Notification, NotificationType
+        notif = Notification(
+            id=str(uuid.uuid4()),
+            user_id=current_user_id,
+            type=NotificationType.LOAN, # Use LOAN type as it fits financial products
+            title="Card Request Under Review",
+            message=f"Your request for card '{request.card_name}' was received and is being processed by our team.",
+            created_at=datetime.utcnow()
+        )
+        db.add(notif)
+        await db.commit()
         
-        return VirtualCardDetailResponse.from_orm(virtual_card)
+        return { "success": True, "data": VirtualCardDetailResponse.from_orm(virtual_card) }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Unexpected error during card creation: {str(e)}", error=e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An internal error occurred: {str(e)}" if settings.ENVIRONMENT == 'development' else "An internal server error occurred while creating the card."
+            detail=f"An internal error occurred: {str(e)}"
         )
 
 
-@router.get("/list", response_model=VirtualCardListResponse)
+@router.get("/list")
 async def list_virtual_cards(
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
@@ -177,10 +190,13 @@ async def list_virtual_cards(
         blocked_count = sum(1 for c in cards if c.status == VirtualCardStatus.BLOCKED)
         
         return {
-            "cards": [VirtualCardResponse.from_orm(c) for c in cards],
-            "total_count": len(cards),
-            "active_count": active_count,
-            "blocked_count": blocked_count
+            "success": True,
+            "data": {
+                "cards": [VirtualCardResponse.from_orm(c) for c in cards],
+                "total_count": len(cards),
+                "active_count": active_count,
+                "blocked_count": blocked_count
+            }
         }
     except Exception as e:
         logger.error("Unexpected error while listing virtual cards", error=e)
@@ -396,9 +412,7 @@ async def delete_virtual_card(
                 detail="Virtual card not found"
             )
         
-        card.status = VirtualCardStatus.CANCELLED
-        card.cancelled_at = datetime.utcnow()
-        db.add(card)
+        await db.delete(card)
         await db.commit()
         
         AblyRealtimeManager.publish_notification(

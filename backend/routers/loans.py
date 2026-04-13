@@ -155,7 +155,12 @@ async def get_applications(
             {
                 "id": a.id,
                 "status": a.status,
-                "amount": a.requested_amount,
+                "requested_amount": a.requested_amount,
+                "requested_term": a.requested_term_months,
+                "approved_amount": a.approved_amount,
+                "approved_term": a.approved_term_months,
+                "approved_interest_rate": a.approved_interest_rate,
+                "purpose": a.purpose,
                 "created_at": a.created_at.isoformat()
             }
             for a in applications
@@ -210,11 +215,14 @@ async def get_loan_accounts(
             {
                 "id": l.id,
                 "type": l.type,
-                "principal": l.principal_amount,
+                "principal_amount": l.principal_amount,
                 "remaining_balance": l.remaining_balance,
                 "interest_rate": l.interest_rate,
+                "term_months": l.term_months,
                 "monthly_payment": l.monthly_payment,
-                "next_payment_date": l.next_payment_date.isoformat()
+                "next_payment_date": l.next_payment_date.isoformat(),
+                "payments_made": l.total_payments_made,
+                "daily_interest_rate": getattr(l, "daily_interest_rate", 0.0) or 0.0,
             }
             for l in loans
         ],

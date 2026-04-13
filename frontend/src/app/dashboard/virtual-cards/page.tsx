@@ -31,16 +31,21 @@ export default function VirtualCardsPage() {
 
   async function fetchCards() {
     try {
-      const response = await apiClient.get<{ cards: VirtualCardSummary[]; total_count: number; active_count: number; blocked_count: number }>(
-        `/api/v1/cards/list`,
-      )
-      setCards(response.cards ?? [])
+      const response = await apiClient.get<{ 
+        success: boolean; 
+        data: { cards: VirtualCardSummary[]; total_count: number; active_count: number; blocked_count: number } 
+      }>(`/api/v1/cards/list`)
+      
+      const data = response.data
+      if (!data) return
+
+      setCards(data.cards ?? [])
       setMetrics({
-        total: response.total_count ?? response.cards?.length ?? 0,
-        active: response.active_count ?? 0,
-        blocked: response.blocked_count ?? 0,
+        total: data.total_count ?? data.cards?.length ?? 0,
+        active: data.active_count ?? 0,
+        blocked: data.blocked_count ?? 0,
       })
-      const activeCards = (response.cards ?? []).filter((c) => c.status !== 'cancelled')
+      const activeCards = (data.cards ?? []).filter((c) => c.status !== 'cancelled')
       const hasDebit = activeCards.some((c) => c.card_type === 'debit')
       const hasCredit = activeCards.some((c) => c.card_type === 'credit')
       const hasBoth = hasDebit && hasCredit
