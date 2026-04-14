@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { colors } from '@/types'
-import { useRouter } from 'next/navigation'
 
 interface AdminHeaderProps {
   onOpenMobileMenu: () => void
@@ -30,7 +29,6 @@ function getInitials(name: string) {
 export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
   const [adminName, setAdminName] = useState('Admin')
   const [adminEmail, setAdminEmail] = useState('')
-  const router = useRouter()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -56,8 +54,8 @@ export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
     localStorage.removeItem('admin_email')
     localStorage.removeItem('admin_username')
     
-    // Redirect to admin login
-    router.push('/admin/auth/login')
+    // Hard redirect to admin login (avoids layout re-render issues)
+    window.location.href = '/admin/auth/login'
   }
 
   return (
