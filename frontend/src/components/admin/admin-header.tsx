@@ -46,17 +46,40 @@ export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
 
   const initials = useMemo(() => getInitials(adminName), [adminName])
 
-  const handleLogout = () => {
-    // Clear admin session data
-    localStorage.removeItem('admin_token')
-    localStorage.removeItem('admin_id')
-    localStorage.removeItem('admin_name')
-    localStorage.removeItem('admin_email')
-    localStorage.removeItem('admin_username')
-    localStorage.removeItem('admin_refresh_token')
-    
-    // Use replace instead of href to prevent back button issues
-    window.location.replace('/admin/auth/login')
+  const handleLogout = async () => {
+    try {
+      const adminId = localStorage.getItem('admin_id')
+      
+      // Call backend logout endpoint if admin_id exists
+      if (adminId) {
+        try {
+          await fetch(`/admin/auth/logout?admin_id=${adminId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+        } catch (error) {
+          // Continue with logout even if backend call fails
+          console.error('Logout API call failed:', error)
+        }
+      }
+      
+      // Clear all admin session data
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_id')
+      localStorage.removeItem('admin_name')
+      localStorage.removeItem('admin_email')
+      localStorage.removeItem('admin_username')
+      localStorage.removeItem('admin_refresh_token')
+      
+      // Force redirect to login page
+      window.location.replace('/admin/auth/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+      // Force redirect anyway
+      window.location.replace('/admin/auth/login')
+    }
   }
 
   return (
