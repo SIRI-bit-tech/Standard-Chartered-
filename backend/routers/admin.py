@@ -1210,51 +1210,6 @@ async def admin_login(
         )
 
 
-@router.post("/auth/logout")
-async def admin_logout(
-    admin_id: str = Query(..., description="Admin ID"),
-    db: AsyncSession = Depends(get_db)
-):
-    """Admin logout - clears session and returns success"""
-    try:
-        # Verify admin exists
-        result = await db.execute(
-            select(AdminUser).where(AdminUser.id == admin_id)
-        )
-        admin = result.scalar()
-        
-        if admin:
-            # Create audit log for logout
-            audit_log = AdminAuditLog(
-                id=str(uuid.uuid4()),
-                admin_id=admin.id,
-                admin_email=admin.email,
-                action="logout",
-                resource_type="auth",
-                resource_id=admin.id,
-                details={"timestamp": datetime.utcnow().isoformat()},
-                ip_address=None,
-                user_agent=None,
-                created_at=datetime.utcnow()
-            )
-            db.add(audit_log)
-            await db.commit()
-            
-            logger.info(f"Admin logged out: {admin.email}")
-        
-        return {
-            "success": True,
-            "message": "Logout successful"
-        }
-    except Exception as e:
-        logger.error(f"Admin logout error: {e}")
-        # Return success anyway - logout should always succeed on client side
-        return {
-            "success": True,
-            "message": "Logout successful"
-        }
-
-
 @router.post("/transfers/approve", response_model=TransferApprovalResponse)
 async def approve_transfer(
     admin_id: str,

@@ -1,18 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Bell, HelpCircle, Menu, Search, LogOut } from 'lucide-react'
+import { Bell, HelpCircle, Menu, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { colors } from '@/types'
 
 interface AdminHeaderProps {
@@ -28,7 +20,6 @@ function getInitials(name: string) {
 
 export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
   const [adminName, setAdminName] = useState('Admin')
-  const [adminEmail, setAdminEmail] = useState('')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -39,48 +30,9 @@ export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
     } else if (email) {
       setAdminName(email)
     }
-    if (email) {
-      setAdminEmail(email)
-    }
   }, [])
 
   const initials = useMemo(() => getInitials(adminName), [adminName])
-
-  const handleLogout = async () => {
-    try {
-      const adminId = localStorage.getItem('admin_id')
-      
-      // Call backend logout endpoint if admin_id exists
-      if (adminId) {
-        try {
-          await fetch(`/admin/auth/logout?admin_id=${adminId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          })
-        } catch (error) {
-          // Continue with logout even if backend call fails
-          console.error('Logout API call failed:', error)
-        }
-      }
-      
-      // Clear all admin session data
-      localStorage.removeItem('admin_token')
-      localStorage.removeItem('admin_id')
-      localStorage.removeItem('admin_name')
-      localStorage.removeItem('admin_email')
-      localStorage.removeItem('admin_username')
-      localStorage.removeItem('admin_refresh_token')
-      
-      // Force redirect to login page
-      window.location.replace('/admin/auth/login')
-    } catch (error) {
-      console.error('Logout error:', error)
-      // Force redirect anyway
-      window.location.replace('/admin/auth/login')
-    }
-  }
 
   return (
     <header className="sticky top-0 z-40 border-b bg-white" style={{ borderColor: colors.border }}>
@@ -108,49 +60,15 @@ export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
           <Button variant="ghost" size="icon" aria-label="Help">
             <HelpCircle className="h-5 w-5" />
           </Button>
-          
-          {/* Admin Profile Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="hidden items-center gap-2 rounded-full border px-2 py-1 sm:flex hover:bg-gray-50" 
-                style={{ borderColor: colors.border }}
-              >
-                <Avatar className="h-7 w-7">
-                  <AvatarFallback style={{ backgroundColor: colors.primaryLight, color: colors.primary }}>
-                    {initials}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-xs font-medium" style={{ color: colors.textPrimary }}>
-                  {adminName.toUpperCase()}
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{adminName}</p>
-                  {adminEmail && (
-                    <p className="text-xs leading-none text-muted-foreground">{adminEmail}</p>
-                  )}
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-600 focus:text-red-600">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          {/* Mobile Avatar (no dropdown on mobile) */}
-          <div className="flex items-center gap-2 rounded-full border px-2 py-1 sm:hidden" style={{ borderColor: colors.border }}>
+          <div className="hidden items-center gap-2 rounded-full border px-2 py-1 sm:flex" style={{ borderColor: colors.border }}>
             <Avatar className="h-7 w-7">
               <AvatarFallback style={{ backgroundColor: colors.primaryLight, color: colors.primary }}>
                 {initials}
               </AvatarFallback>
             </Avatar>
+            <span className="text-xs font-medium" style={{ color: colors.textPrimary }}>
+              {adminName.toUpperCase()}
+            </span>
           </div>
         </div>
       </div>
