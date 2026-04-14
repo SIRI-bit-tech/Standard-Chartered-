@@ -53,9 +53,10 @@ export function AdminHeader({ onOpenMobileMenu }: AdminHeaderProps) {
     localStorage.removeItem('admin_name')
     localStorage.removeItem('admin_email')
     localStorage.removeItem('admin_username')
+    localStorage.removeItem('admin_refresh_token')
     
-    // Hard redirect to admin login (avoids layout re-render issues)
-    window.location.href = '/admin/auth/login'
+    // Use replace instead of href to prevent back button issues
+    window.location.replace('/admin/auth/login')
   }
 
   return (
