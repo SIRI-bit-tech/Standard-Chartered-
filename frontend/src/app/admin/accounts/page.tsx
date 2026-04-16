@@ -31,7 +31,7 @@ export default function AdminAccountsPage() {
   const [items, setItems] = useState<AdminAccountRow[]>([])
   const [filters, setFilters] = useState({
     q: '',
-    status: 'all' as const,
+    status: 'all' as const,  // Show all accounts by default, not just active ones
     type: 'all' as const,
   })
 
@@ -48,7 +48,7 @@ export default function AdminAccountsPage() {
         status: filters.status,
         type_filter: filters.type,
         page: '1',
-        page_size: '10',
+        page_size: '50',
       })
       const res = await apiClient.get<{ success: boolean; data: { items: AdminAccountRow[] } }>(
         `/admin/accounts/list?${qs.toString()}`,

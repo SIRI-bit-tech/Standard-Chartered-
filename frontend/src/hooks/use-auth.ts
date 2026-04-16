@@ -134,15 +134,26 @@ export function useAuth() {
           }
         }
 
-        setUser(data)
-        identifyUser(data.id, {
-          country: data.country,
-          tier: data.tier,
+        // Fetch fresh profile data to get complete user object (including transfer_pin_set)
+        let userData = data
+        try {
+          const profileRes = await axios.get(`${API_BASE_URL}${API_ENDPOINTS.PROFILE}`, {
+            headers: { Authorization: `Bearer ${token.access_token}` }
+          })
+          userData = profileRes.data.data
+        } catch (e) {
+          console.warn('Failed to fetch profile, using login data')
+        }
+
+        setUser(userData)
+        identifyUser(userData.id, {
+          country: userData.country,
+          tier: userData.tier,
         });
 
         if (data.redirect_to) {
           if (data.redirect_to === "/auth/set-transfer-pin" && data.verification_token) {
-            router.push(`${data.redirect_to}?email=${encodeURIComponent(data.email)}&token=${encodeURIComponent(data.verification_token)}`)
+            router.push(`${data.redirect_to}?email=${encodeURIComponent(userData.email)}&token=${encodeURIComponent(data.verification_token)}`)
           } else {
             router.push(data.redirect_to)
           }

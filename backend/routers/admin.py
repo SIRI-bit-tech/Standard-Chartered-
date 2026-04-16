@@ -6,17 +6,19 @@ from datetime import datetime, timezone, timedelta
 import uuid
 import json
 
-from models.admin import AdminUser, AdminAuditLog, AdminRole
-from models.support import SupportTicket, TicketMessage
+from models.admin import AdminUser, AdminAuditLog
+from models.support import SupportTicket, TicketMessage, LoginHistory
 from models.user import User
 from models.account import Account, AccountStatus
 from models.transaction import Transaction, TransactionType, TransactionStatus
-from models.notification import Notification, NotificationType
-from models.transfer import Transfer, TransferStatus, TransferType
+from models.transfer import Transfer, TransferStatus, TransferType, Beneficiary
 from models.deposit import Deposit, DepositStatus
 from models.virtual_card import VirtualCard, VirtualCardStatus
-from models.loan import Loan, LoanStatus, LoanApplication, LoanApplicationStatus, LoanProduct, LoanType
-from database import get_db
+from models.loan import Loan, LoanStatus, LoanApplication, LoanApplicationStatus, LoanProduct, LoanType, LoanPayment, LoanSchedule
+from models.notification import Notification, NotificationType
+from models.document import Document
+from models.bill_payment import BillPayment, BillPayee, ScheduledPayment
+from models.user_restriction import UserRestriction, RestrictionType
 from schemas.admin import (
     AdminRegisterRequest, AdminLoginRequest, AdminResponse,
     ApproveTransferRequest, DeclineTransferRequest, TransferApprovalResponse,
@@ -30,8 +32,13 @@ from schemas.admin import (
     GenerateTransactionsRequest, GenerateTransactionsPreviewRequest,
     GenerateTransactionsPreviewResponse, GenerateTransactionsResponse
 )
+from schemas.user_restriction import (
+    CreateRestrictionRequest, RemoveRestrictionRequest, 
+    UserRestrictionResponse, UserRestrictionsResponse
+)
 from pydantic import ValidationError as PydanticValidationError
 from utils.admin_auth import AdminAuthManager, AdminPermissionManager, get_current_admin
+from database import get_db
 from utils.errors import (
     ValidationError, AuthenticationError, NotFoundError, UnauthorizedError, InternalServerError, ConflictError
 )
@@ -701,6 +708,15 @@ async def admin_list_users(
 
     payload = []
     for u in items:
+        # Fetch user restrictions
+        restrictions_result = await db.execute(
+            select(UserRestriction).where(
+                UserRestriction.user_id == u.id,
+                UserRestriction.is_active == True
+            )
+        )
+        restrictions = restrictions_result.scalars().all()
+        
         payload.append(
             {
                 "id": u.id,
@@ -713,6 +729,15 @@ async def admin_list_users(
                 "verification": _verification_status(u),
                 "is_restricted": getattr(u, "is_restricted", False),
                 "restricted_until": u.restricted_until.isoformat() if getattr(u, "restricted_until", None) else None,
+                "restrictions": [
+                    {
+                        "id": r.id,
+                        "restriction_type": r.restriction_type.value if isinstance(r.restriction_type, RestrictionType) else r.restriction_type,
+                        "is_active": r.is_active,
+                        "message": r.message
+                    }
+                    for r in restrictions
+                ],
                 "created_at": u.created_at.isoformat() if u.created_at else None,
             }
         )
@@ -2893,7 +2918,7 @@ async def admin_delete_user(
     user_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Admin delete user account (cascade deletes)"""
+    """Admin delete user account and all associated data"""
     try:
         admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
         admin = admin_result.scalar()
@@ -2905,6 +2930,8 @@ async def admin_delete_user(
         if not user:
             raise NotFoundError(resource="User", error_code="USER_NOT_FOUND")
         
+        logger.info(f"Admin {admin.email} starting complete deletion of user {user_id}")
+        
         # Delete from Stytch if applicable
         if settings.AUTH_PROVIDER == "stytch":
             try:
@@ -2915,30 +2942,199 @@ async def admin_delete_user(
             except Exception as stytch_err:
                 logger.error(f"Failed to delete user {user.id} from Stytch: {stytch_err}")
 
-        await db.delete(user)
+        # Delete all user-related data in order of dependencies
+        deletion_steps = []
         
+        # 1. Delete user restrictions
+        restrictions_result = await db.execute(select(UserRestriction).where(UserRestriction.user_id == user_id))
+        restrictions = restrictions_result.scalars().all()
+        for restriction in restrictions:
+            await db.delete(restriction)
+            deletion_steps.append(f"restriction_{restriction.id}")
+        
+        # 2. Delete user notifications
+        notifications_result = await db.execute(select(Notification).where(Notification.user_id == user_id))
+        notifications = notifications_result.scalars().all()
+        for notification in notifications:
+            await db.delete(notification)
+            deletion_steps.append(f"notification_{notification.id}")
+        
+        # 3. Delete user support tickets and messages
+        tickets_result = await db.execute(select(SupportTicket).where(SupportTicket.user_id == user_id))
+        tickets = tickets_result.scalars().all()
+        for ticket in tickets:
+            # Delete ticket messages first
+            messages_result = await db.execute(select(TicketMessage).where(TicketMessage.ticket_id == ticket.id))
+            messages = messages_result.scalars().all()
+            for message in messages:
+                await db.delete(message)
+                deletion_steps.append(f"message_{message.id}")
+            # Delete the ticket
+            await db.delete(ticket)
+            deletion_steps.append(f"ticket_{ticket.id}")
+        
+        # 4. Delete user documents
+        documents_result = await db.execute(select(Document).where(Document.user_id == user_id))
+        documents = documents_result.scalars().all()
+        for document in documents:
+            await db.delete(document)
+            deletion_steps.append(f"document_{document.id}")
+        
+        # 5. Handle loan applications and loans carefully to avoid foreign key constraints
+        # First, set application_id to NULL for all user loans
+        loans_result = await db.execute(select(Loan).where(Loan.user_id == user_id))
+        loans = loans_result.scalars().all()
+        for loan in loans:
+            # Clear the foreign key reference first
+            loan.application_id = None
+            await db.flush()  # Flush to ensure the change is applied
+        
+        # Now delete loan applications
+        applications_result = await db.execute(select(LoanApplication).where(LoanApplication.user_id == user_id))
+        applications = applications_result.scalars().all()
+        for application in applications:
+            await db.delete(application)
+            deletion_steps.append(f"loan_application_{application.id}")
+        
+        # Now delete loans and their related data
+        for loan in loans:
+            # Delete loan payments
+            payments_result = await db.execute(select(LoanPayment).where(LoanPayment.loan_id == loan.id))
+            payments = payments_result.scalars().all()
+            for payment in payments:
+                await db.delete(payment)
+                deletion_steps.append(f"loan_payment_{payment.id}")
+            # Delete loan schedule
+            schedule_result = await db.execute(select(LoanSchedule).where(LoanSchedule.loan_id == loan.id))
+            schedule = schedule_result.scalars().all()
+            for schedule_item in schedule:
+                await db.delete(schedule_item)
+                deletion_steps.append(f"loan_schedule_{schedule_item.id}")
+            # Delete the loan
+            await db.delete(loan)
+            deletion_steps.append(f"loan_{loan.id}")
+        
+        # 6. Delete user virtual cards
+        cards_result = await db.execute(select(VirtualCard).where(VirtualCard.user_id == user_id))
+        cards = cards_result.scalars().all()
+        for card in cards:
+            await db.delete(card)
+            deletion_steps.append(f"virtual_card_{card.id}")
+        
+        # 7. Delete user bill payments and payees
+        bill_payments_result = await db.execute(select(BillPayment).where(BillPayment.user_id == user_id))
+        bill_payments = bill_payments_result.scalars().all()
+        for payment in bill_payments:
+            await db.delete(payment)
+            deletion_steps.append(f"bill_payment_{payment.id}")
+        
+        payees_result = await db.execute(select(BillPayee).where(BillPayee.user_id == user_id))
+        payees = payees_result.scalars().all()
+        for payee in payees:
+            await db.delete(payee)
+            deletion_steps.append(f"bill_payee_{payee.id}")
+        
+        # 8. Delete user scheduled payments
+        scheduled_payments_result = await db.execute(select(ScheduledPayment).where(ScheduledPayment.user_id == user_id))
+        scheduled_payments = scheduled_payments_result.scalars().all()
+        for scheduled_payment in scheduled_payments:
+            await db.delete(scheduled_payment)
+            deletion_steps.append(f"scheduled_payment_{scheduled_payment.id}")
+        
+        # 9. Delete user deposits
+        deposits_result = await db.execute(select(Deposit).where(Deposit.user_id == user_id))
+        deposits = deposits_result.scalars().all()
+        for deposit in deposits:
+            await db.delete(deposit)
+            deletion_steps.append(f"deposit_{deposit.id}")
+        
+        # 10. Delete user beneficiaries
+        beneficiaries_result = await db.execute(select(Beneficiary).where(Beneficiary.user_id == user_id))
+        beneficiaries = beneficiaries_result.scalars().all()
+        for beneficiary in beneficiaries:
+            await db.delete(beneficiary)
+            deletion_steps.append(f"beneficiary_{beneficiary.id}")
+        
+        # 11. Delete user transfers
+        transfers_result = await db.execute(select(Transfer).where(Transfer.from_user_id == user_id))
+        transfers = transfers_result.scalars().all()
+        for transfer in transfers:
+            await db.delete(transfer)
+            deletion_steps.append(f"transfer_{transfer.id}")
+        
+        # 12. Delete user transactions
+        transactions_result = await db.execute(select(Transaction).where(Transaction.user_id == user_id))
+        transactions = transactions_result.scalars().all()
+        for transaction in transactions:
+            await db.delete(transaction)
+            deletion_steps.append(f"transaction_{transaction.id}")
+        
+        # 13. Delete user accounts (this should be last due to foreign key constraints)
+        accounts_result = await db.execute(select(Account).where(Account.user_id == user_id))
+        accounts = accounts_result.scalars().all()
+        for account in accounts:
+            await db.delete(account)
+            deletion_steps.append(f"account_{account.id}")
+        
+        # 14. Delete user login history
+        login_history_result = await db.execute(select(LoginHistory).where(LoginHistory.user_id == user_id))
+        login_history = login_history_result.scalars().all()
+        for history in login_history:
+            await db.delete(history)
+            deletion_steps.append(f"login_history_{history.id}")
+        
+        # 15. Finally delete the user
+        await db.delete(user)
+        deletion_steps.append(f"user_{user_id}")
+        
+        # Create audit log
         audit_log = AdminAuditLog(
             id=str(uuid.uuid4()),
             admin_id=admin.id,
             admin_email=admin.email,
-            action="delete_user",
+            action="delete_user_complete",
             resource_type="user",
             resource_id=user_id,
-            details=json.dumps({"user_id": user_id})
+            details=json.dumps({
+                "user_id": user_id,
+                "user_email": user.email,
+                "deleted_items": deletion_steps,
+                "total_items_deleted": len(deletion_steps)
+            })
         )
         db.add(audit_log)
         
         await db.commit()
         
         AblyRealtimeManager.publish_admin_event("users", {"type": "deleted", "user_id": user_id})
-        logger.info(f"User deleted by admin {admin.email}: {user_id}")
+        logger.info(f"Complete user deletion by admin {admin.email}: {user_id} - {len(deletion_steps)} items deleted")
         
-        return {"success": True, "message": "User deleted"}
+        return {
+            "success": True, 
+            "message": f"User and all associated data deleted successfully",
+            "details": {
+                "user_id": user_id,
+                "total_items_deleted": len(deletion_steps),
+                "deleted_categories": {
+                    "restrictions": len([s for s in deletion_steps if s.startswith("restriction_")]),
+                    "notifications": len([s for s in deletion_steps if s.startswith("notification_")]),
+                    "support_tickets": len([s for s in deletion_steps if s.startswith("ticket_")]),
+                    "documents": len([s for s in deletion_steps if s.startswith("document_")]),
+                    "loans": len([s for s in deletion_steps if s.startswith("loan_")]),
+                    "virtual_cards": len([s for s in deletion_steps if s.startswith("virtual_card_")]),
+                    "bill_payments": len([s for s in deletion_steps if s.startswith("bill_payment_")]),
+                    "transfers": len([s for s in deletion_steps if s.startswith("transfer_")]),
+                    "beneficiaries": len([s for s in deletion_steps if s.startswith("beneficiary_")]),
+                    "transactions": len([s for s in deletion_steps if s.startswith("transaction_")]),
+                    "accounts": len([s for s in deletion_steps if s.startswith("account_")])
+                }
+            }
+        }
     except (UnauthorizedError, NotFoundError):
         raise
     except Exception as e:
-        logger.error("User deletion failed", error=e)
-        raise InternalServerError(operation="user deletion", error_code="DELETION_FAILED", original_error=e)
+        logger.error("Complete user deletion failed", error=e)
+        raise InternalServerError(operation="complete user deletion", error_code="DELETION_FAILED", original_error=e)
 @router.get("/audit-logs", response_model=list[AdminAuditLogResponse])
 async def get_audit_logs(
     limit: int = Query(50, ge=1, le=500),
@@ -3682,4 +3878,243 @@ async def admin_create_loan(
         "data": {"loan_id": loan_id},
         "message": "Loan created successfully",
     }
+
+
+# User Restrictions Management
+# ═════════════════════════════════════════════════════════════════════
+
+@router.post("/users/restrict", response_model=UserRestrictionResponse)
+async def create_user_restriction(
+    admin_id: str,
+    request: CreateRestrictionRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a user restriction"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        
+        if not admin or not AdminPermissionManager.has_permission(admin.role, "users:update"):
+            raise UnauthorizedError(
+                message="You don't have permission to restrict users",
+                error_code="PERMISSION_DENIED"
+            )
+        
+        user_result = await db.execute(select(User).where(User.id == request.user_id))
+        user = user_result.scalar()
+        
+        if not user:
+            raise NotFoundError(
+                resource="User",
+                error_code="USER_NOT_FOUND"
+            )
+        
+        # Check if restriction already exists
+        existing = await db.execute(
+            select(UserRestriction).where(
+                and_(
+                    UserRestriction.user_id == request.user_id,
+                    UserRestriction.restriction_type == request.restriction_type,
+                    UserRestriction.is_active == True
+                )
+            )
+        )
+        if existing.scalar_one_or_none():
+            raise ConflictError(
+                message=f"User already has {request.restriction_type.value} restriction",
+                error_code="RESTRICTION_EXISTS"
+            )
+        
+        # Create restriction
+        restriction = UserRestriction(
+            id=str(uuid.uuid4()),
+            user_id=request.user_id,
+            restriction_type=request.restriction_type,
+            message=request.message,
+            created_by=admin_id,
+            created_at=datetime.now(timezone.utc)
+        )
+        db.add(restriction)
+        
+        # Audit log
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="create_restriction",
+            resource_type="user_restriction",
+            resource_id=restriction.id,
+            details=json.dumps({
+                "user_id": request.user_id,
+                "restriction_type": request.restriction_type.value,
+                "message": request.message
+            })
+        )
+        db.add(audit_log)
+        
+        await db.commit()
+        
+        # Notify user via realtime
+        restriction_type_display = "Post No Debit" if request.restriction_type == RestrictionType.POST_NO_DEBIT else "Online Banking"
+        AblyRealtimeManager.publish_notification(
+            request.user_id,
+            "restriction_added",
+            f"Account Restricted: {restriction_type_display}",
+            f"Your account has been restricted. {request.message}"
+        )
+        
+        logger.info(f"Admin {admin.id} created {request.restriction_type.value} restriction for user {request.user_id}")
+        
+        return {
+            "success": True,
+            "restriction_id": restriction.id,
+            "restriction_type": request.restriction_type,
+            "message": f"{restriction_type_display} restriction created successfully"
+        }
+        
+    except (UnauthorizedError, NotFoundError, ConflictError):
+        raise
+    except Exception as e:
+        logger.error("Create user restriction failed", error=e)
+        raise InternalServerError(
+            operation="create_user_restriction",
+            error_code="CREATE_RESTRICTION_FAILED",
+            original_error=e
+        )
+
+
+@router.delete("/users/restrict", response_model=UserRestrictionResponse)
+async def remove_user_restriction(
+    admin_id: str,
+    request: RemoveRestrictionRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Remove a user restriction"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        
+        if not admin or not AdminPermissionManager.has_permission(admin.role, "users:update"):
+            raise UnauthorizedError(
+                message="You don't have permission to remove restrictions",
+                error_code="PERMISSION_DENIED"
+            )
+        
+        # Find and deactivate restriction
+        restriction_result = await db.execute(
+            select(UserRestriction).where(
+                and_(
+                    UserRestriction.user_id == request.user_id,
+                    UserRestriction.restriction_type == request.restriction_type,
+                    UserRestriction.is_active == True
+                )
+            )
+        )
+        restriction = restriction_result.scalar_one_or_none()
+        
+        if not restriction:
+            raise NotFoundError(
+                resource="User Restriction",
+                error_code="RESTRICTION_NOT_FOUND"
+            )
+        
+        # Deactivate restriction
+        restriction.is_active = False
+        db.add(restriction)
+        
+        # Audit log
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="remove_restriction",
+            resource_type="user_restriction",
+            resource_id=restriction.id,
+            details=json.dumps({
+                "user_id": request.user_id,
+                "restriction_type": request.restriction_type.value
+            })
+        )
+        db.add(audit_log)
+        
+        await db.commit()
+        
+        # Notify user via realtime
+        restriction_type_display = "Post No Debit" if request.restriction_type == RestrictionType.POST_NO_DEBIT else "Online Banking"
+        AblyRealtimeManager.publish_notification(
+            request.user_id,
+            "restriction_removed",
+            f"Restriction Removed: {restriction_type_display}",
+            f"Your {restriction_type_display} restriction has been removed."
+        )
+        
+        logger.info(f"Admin {admin.id} removed {request.restriction_type.value} restriction from user {request.user_id}")
+        
+        return {
+            "success": True,
+            "restriction_id": restriction.id,
+            "restriction_type": request.restriction_type,
+            "message": f"{restriction_type_display} restriction removed successfully"
+        }
+        
+    except (UnauthorizedError, NotFoundError):
+        raise
+    except Exception as e:
+        logger.error("Remove user restriction failed", error=e)
+        raise InternalServerError(
+            operation="remove_user_restriction",
+            error_code="REMOVE_RESTRICTION_FAILED",
+            original_error=e
+        )
+
+
+@router.get("/users/{user_id}/restrictions", response_model=UserRestrictionsResponse)
+async def get_user_restrictions(
+    user_id: str,
+    admin_id: str = Query(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all restrictions for a user"""
+    try:
+        admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
+        admin = admin_result.scalar()
+        
+        if not admin or not AdminPermissionManager.has_permission(admin.role, "users:read"):
+            raise UnauthorizedError(
+                message="You don't have permission to view user restrictions",
+                error_code="PERMISSION_DENIED"
+            )
+        
+        restrictions_result = await db.execute(
+            select(UserRestriction)
+            .where(UserRestriction.user_id == user_id)
+            .order_by(UserRestriction.created_at.desc())
+        )
+        restrictions = restrictions_result.scalars().all()
+        
+        restriction_details = []
+        for r in restrictions:
+            restriction_details.append({
+                "id": r.id,
+                "restriction_type": r.restriction_type,
+                "is_active": r.is_active,
+                "message": r.message,
+                "created_at": r.created_at.isoformat(),
+                "created_by": r.created_by
+            })
+        
+        return {
+            "success": True,
+            "restrictions": restriction_details
+        }
+        
+    except UnauthorizedError:
+        raise
+    except Exception as e:
+        logger.error("Get user restrictions failed", error=e)
+        raise InternalServerError(
+            operation="get_user_restrictions",
+            error_code="GET_RESTRICTIONS_FAILED",
+            original_error=e
+        )
 

@@ -28,8 +28,6 @@ type UserDetail = {
   postal_code?: string | null
   created_at?: string | null
   is_active?: boolean
-  is_restricted: boolean
-  restricted_until?: string | null
 }
 
 export function AdminEditUserDialog({
@@ -98,14 +96,13 @@ export function AdminEditUserDialog({
         city: form.city ?? '',
         state: form.state ?? '',
         postal_code: form.postal_code ?? '',
-        is_restricted: form.is_restricted,
-        restricted_until: form.restricted_until ? new Date(form.restricted_until).toISOString() : null,
+        is_active: form.is_active,
       }
       if (form.created_at) {
         const newDt = new Date(form.created_at)
         const now = new Date()
         if (newDt.getTime() > now.getTime()) {
-          setError('Date Joined cannot be in the future')
+          setError('Date Joined cannot be in future')
           setLoading(false)
           return
         }
@@ -207,71 +204,7 @@ export function AdminEditUserDialog({
                 <p className="text-xs text-muted-foreground mt-1">Can be set to any past date (not future).</p>
               </div>
 
-              <div className="p-4 bg-red-50 rounded-lg border border-red-100 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-red-700 uppercase tracking-wider">Security & Restrictions</h4>
-                  <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${form.is_restricted ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800'}`}>
-                    {form.is_restricted ? 'Restricted' : 'Active / Unrestricted'}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <label className="text-sm font-medium text-red-900">Restrict Account</label>
-                    <p className="text-[10px] text-red-600">Block transfers and show security alerts to user.</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    id="is_restricted_checkbox"
-                    className="w-5 h-5 rounded border-red-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                    checked={form.is_restricted}
-                    onChange={(e) => setForm({ ...form, is_restricted: e.target.checked })}
-                  />
-                </div>
-
-                {form.is_restricted && (
-                  <div className="space-y-3 pt-2 border-t border-red-100">
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <label className="text-xs font-bold text-red-700 uppercase">Restriction Ends</label>
-                        <button
-                          type="button"
-                          onClick={() => setForm({ ...form, is_restricted: false, restricted_until: null })}
-                          className="text-[10px] font-bold text-red-600 hover:text-red-800 underline uppercase"
-                        >
-                          Unrestrict Now
-                        </button>
-                      </div>
-                      <Input
-                        type="datetime-local"
-                        className="bg-white border-red-200 text-sm"
-                        value={form.restricted_until ? (() => {
-                          const d = new Date(form.restricted_until);
-                          const Y = d.getFullYear();
-                          const M = String(d.getMonth() + 1).padStart(2, '0');
-                          const D = String(d.getDate()).padStart(2, '0');
-                          const h = String(d.getHours()).padStart(2, '0');
-                          const m = String(d.getMinutes()).padStart(2, '0');
-                          return `${Y}-${M}-${D}T${h}:${m}`;
-                        })() : ''}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (!v) {
-                            setForm({ ...form, restricted_until: null });
-                          } else {
-                            const iso = new Date(v).toISOString();
-                            setForm({ ...form, restricted_until: iso });
-                          }
-                        }}
-                      />
-                      <p className="text-[10px] text-red-500 mt-1 italic">
-                        User will see restriction alerts until this date.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+                          </div>
           )}
         </div>
         <DialogFooter className="p-4 border-t">

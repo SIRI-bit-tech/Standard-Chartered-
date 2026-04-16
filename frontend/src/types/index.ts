@@ -248,6 +248,13 @@ export interface AdminDashboardOverviewResponse {
 export type AdminUserStatus = 'active' | 'suspended' | 'inactive' | 'restricted' | 'pending_approval' | 'pending_verification'
 export type AdminVerificationStatus = 'verified' | 'pending' | 'needs_review' | 'pending_approval'
 
+export interface AdminUserRestriction {
+  id: string
+  restriction_type: 'post_no_debit' | 'online_banking'
+  is_active: boolean
+  message: string
+}
+
 export interface AdminUserRow {
   id: string
   user_id: string // e.g. "SC-882104"
@@ -259,6 +266,7 @@ export interface AdminUserRow {
   verification: AdminVerificationStatus
   is_restricted: boolean
   restricted_until: string | null
+  restrictions: AdminUserRestriction[]
   created_at?: string | null
 }
 

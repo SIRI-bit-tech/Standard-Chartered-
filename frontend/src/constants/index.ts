@@ -49,6 +49,7 @@ export const API_ENDPOINTS = {
 
   // Profile
   PROFILE: '/api/v1/profile',
+  PROFILE_RESTRICTIONS: '/api/v1/profile/restrictions',
   PROFILE_SETTINGS: '/api/v1/profile/settings',
   PROFILE_DOCUMENTS: '/api/v1/profile/documents',
   LOGIN_HISTORY: '/api/v1/profile/login-history',

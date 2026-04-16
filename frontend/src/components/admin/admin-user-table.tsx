@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { MoreHorizontal, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { MoreHorizontal, ShieldCheck, AlertTriangle, Ban, Lock } from 'lucide-react'
 import { colors } from '@/types'
 import type { AdminUserRow, Account } from '@/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -23,6 +23,8 @@ import { AdminEditUserDialog } from '@/components/admin/admin-edit-user-dialog'
 import { GenerateTransactionsDialog } from '@/components/admin/GenerateTransactionsDialog'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { toast } from 'sonner'
+import { AdminRestrictionDialog } from '@/components/admin/admin-restriction-dialog'
+import { AdminRestrictionStatus } from '@/components/admin/admin-restriction-status'
 
 function statusBadge(status: AdminUserRow['status']) {
   if (status === 'active') return { bg: `${colors.success}20`, fg: colors.success, label: 'Active' }
@@ -39,7 +41,10 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
   const [generateTxDialogOpen, setGenerateTxDialogOpen] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [userAccounts, setUserAccounts] = useState<Account[]>([])
-  const [confirmConfig, setConfirmConfig] = useState<{
+  const [restrictionDialogOpen, setRestrictionDialogOpen] = useState(false)
+  const [restrictionType, setRestrictionType] = useState<'post_no_debit' | 'online_banking' | null>(null)
+  const [selectedUserName, setSelectedUserName] = useState<string>('')
+    const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean
     title: string
     description: string
@@ -90,6 +95,7 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
             <TableHead>User</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Restrictions</TableHead>
             <TableHead>Verification</TableHead>
             <TableHead className="text-right pr-4">Actions</TableHead>
           </TableRow>
@@ -127,6 +133,30 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
                   <Badge className="border-0" style={{ backgroundColor: st.bg, color: st.fg }}>
                     {st.label}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {u.restrictions && u.restrictions.length > 0 ? (
+                    <div className="flex flex-col gap-1">
+                      {u.restrictions.filter((r: any) => r.is_active).map((r: any) => (
+                        <Badge 
+                          key={r.id} 
+                          variant="outline"
+                          className="text-[10px] px-1 py-0 h-5 w-fit"
+                          style={{ 
+                            backgroundColor: r.restriction_type === 'post_no_debit' ? `${colors.error}15` : `${colors.warning}15`,
+                            color: r.restriction_type === 'post_no_debit' ? colors.error : colors.warning,
+                            borderColor: r.restriction_type === 'post_no_debit' ? colors.error : colors.warning
+                          }}
+                        >
+                          {r.restriction_type === 'post_no_debit' ? 'PND' : 'Banking'}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs" style={{ color: colors.success }}>
+                      None
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   {u.verification === 'verified' ? (
@@ -232,6 +262,37 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
+                          setSelectedUserId(u.id)
+                          setSelectedUserName(u.name)
+                          setRestrictionType('post_no_debit')
+                          setRestrictionDialogOpen(true)
+                        }}
+                      >
+                        <Ban className="h-4 w-4 mr-2" />
+                        Apply Post No Debit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedUserId(u.id)
+                          setSelectedUserName(u.name)
+                          setRestrictionType('online_banking')
+                          setRestrictionDialogOpen(true)
+                        }}
+                      >
+                        <Lock className="h-4 w-4 mr-2" />
+                        Apply Online Banking Restriction
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedUserId(u.id)
+                          setSelectedUserName(u.name)
+                        }}
+                      >
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        View Restrictions
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
                           setConfirmConfig({
                             isOpen: true,
                             title: 'Delete User?',
@@ -280,7 +341,6 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
         accounts={userAccounts}
         onSuccess={() => {
           toast.success('Transactions generated successfully')
-          window.location.reload()
         }}
       />
       <ConfirmModal
@@ -294,6 +354,22 @@ export function AdminUserTable({ items }: { items: AdminUserRow[] }) {
         description={confirmConfig.description}
         confirmText={confirmConfig.confirmText}
         variant={confirmConfig.variant}
+      />
+      
+      <AdminRestrictionDialog
+        open={restrictionDialogOpen}
+        onOpenChange={setRestrictionDialogOpen}
+        userId={selectedUserId || ''}
+        userName={selectedUserName}
+        restrictionType={restrictionType}
+        onSuccess={() => {
+          toast.success('Restriction applied successfully')
+        }}
+      />
+      
+      <AdminRestrictionStatus
+        userId={selectedUserId || ''}
+        userName={selectedUserName}
       />
     </div>
   )

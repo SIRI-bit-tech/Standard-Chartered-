@@ -4,6 +4,7 @@ import { formatCurrency } from '@/lib/utils'
 import { TransferPinModal } from '@/components/transfers/transfer-pin-modal'
 import { apiClient } from '@/lib/api-client'
 import { PayeeDirectory } from './payee-directory'
+import { useRestrictionCheck } from '@/hooks/use-restriction-check'
 
 export interface BillPayFormValues {
   payeeId: string
@@ -22,6 +23,7 @@ export function BillPaymentForm({
   accounts: Array<{ id: string; nickname?: string; account_number: string; available_balance: number; currency: string }>
   onSuccess: () => Promise<void> | void
 }) {
+  const { checkPostNoDebit } = useRestrictionCheck()
   const [values, setValues] = useState<BillPayFormValues>({
     payeeId: payees[0]?.id || '',
     fromAccountId: accounts[0]?.id || '',
@@ -157,7 +159,13 @@ export function BillPaymentForm({
         </button>
         <button
           type="button"
-          onClick={() => setPinOpen(true)}
+          onClick={() => {
+            // Check for PND restriction first
+            if (checkPostNoDebit()) {
+              return // Modal will be shown by the hook
+            }
+            setPinOpen(true)
+          }}
           className="rounded-lg px-4 py-2 text-sm font-medium text-white"
           style={{ backgroundColor: colors.primary }}
           disabled={values.amount <= 0 || !values.payeeId || !values.fromAccountId}

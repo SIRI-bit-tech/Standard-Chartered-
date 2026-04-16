@@ -12,6 +12,7 @@ import { LinkClickLoader } from '@/components/ui/link-click-loader'
 import Script from 'next/script'
 
 import { RestrictionProvider } from '@/components/auth/RestrictionProvider'
+import { UserRestrictionsProvider } from '@/contexts/user-restrictions-context'
 import { SetupTransferPinModal } from '@/components/auth/setup-transfer-pin-modal'
 import { useAuthStore } from '@/lib/store'
 import { useState } from 'react'
@@ -55,7 +56,9 @@ export default function DashboardLayout({
           <DashboardHeader />
           <TradingViewTicker />
           <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
-            {children}
+            <UserRestrictionsProvider userId={user?.id}>
+              {children}
+            </UserRestrictionsProvider>
           </main>
           <SessionKeeper />
         </div>

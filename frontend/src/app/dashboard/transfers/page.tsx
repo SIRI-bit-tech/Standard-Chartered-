@@ -32,6 +32,7 @@ import { HistoryKpis } from '@/components/transfers/history-kpis'
 import { HistoryTable } from '@/components/transfers/history-table'
 import { CountrySelector } from '@/components/ui/country-selector'
 import { parseApiError } from '@/utils/error-handler'
+import { useRestrictionCheck } from '@/hooks/use-restriction-check'
 import type {
   Account,
   TransferTypeTab,
@@ -322,8 +323,16 @@ export default function TransfersPage() {
 
   const confirmDisabled = validateBeforeReview() != null
 
+  // Add restriction check
+  const { checkPostNoDebit } = useRestrictionCheck()
+
   // Open PIN modal when user clicks Review/Confirm (no header/breadcrumb as per requirements)
   const handleReviewTransfer = () => {
+    // Check for PND restriction first
+    if (checkPostNoDebit()) {
+      return // Modal will be shown by the hook
+    }
+
     const validationError = validateBeforeReview()
     if (validationError) {
       setTransferError(validationError)

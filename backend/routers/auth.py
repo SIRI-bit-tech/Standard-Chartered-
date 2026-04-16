@@ -335,6 +335,28 @@ async def login(
             raise UnauthorizedError(message="Your account is currently undergoing approval. You will be notified via email once approved.")
         raise UnauthorizedError(message="Account is inactive. Please contact support.")
     
+    # Check for ONLINE_BANKING restriction
+    from models.user_restriction import UserRestriction, RestrictionType
+    from utils.errors import APIError
+    
+    restriction_result = await db.execute(
+        select(UserRestriction).where(
+            UserRestriction.user_id == user.id,
+            UserRestriction.restriction_type == RestrictionType.ONLINE_BANKING,
+            UserRestriction.is_active == True
+        )
+    )
+    restriction = restriction_result.scalar_one_or_none()
+    if restriction:
+        # Use custom message if available, otherwise default
+        message = restriction.message or "Online banking access is restricted for this account. Please contact support."
+        raise APIError(
+            status_code=403,
+            message=message,
+            error_code="ONLINE_BANKING_RESTRICTED",
+            details={"field": "restriction", "restriction_type": "online_banking"}
+        )
+    
     # If approved but transfer pin is not set, redirect to set pin
     redirect_to = None
     if user.is_approved and not user.transfer_pin:

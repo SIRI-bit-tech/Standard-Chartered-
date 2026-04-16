@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, DateTime, Boolean, Text, Enum as SQLEnum
+from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime, timezone
 import enum
@@ -34,6 +35,9 @@ class AdminUser(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     created_by = Column(String(255), nullable=True)  # Admin who created this admin
+    
+    # Relationships
+    created_restrictions = relationship("UserRestriction", back_populates="admin")
     
     def __repr__(self):
         return f"<AdminUser {self.email}>"

@@ -28,6 +28,7 @@ from models.deposit import Deposit
 from models.virtual_card import VirtualCard
 from models.admin import AdminUser, AdminAuditLog, AdminPermission
 from models.security import TrustedDevice
+from models.user_restriction import UserRestriction
 
 logger = logging.getLogger(__name__)
 

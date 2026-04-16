@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime
 from utils.auth import get_current_user_id
 from routers.transfers import _verify_transfer_pin
+from utils.transfer_helpers import _ensure_user_active
 from catalog.global_billers import query_catalog as global_query_catalog, find_entry_by_code
 from pydantic import BaseModel
 
@@ -182,6 +183,7 @@ async def pay_bill(
 ):
     """Pay bill: verifies PIN, debits account, writes ledger, and records bill payment.
     This integrates with unified history by creating a Transaction with type=PAYMENT."""
+    await _ensure_user_active(db, current_user_id)
     account_id = req.account_id if req and getattr(req, "account_id", None) else account_id
     payee_id = req.payee_id if req and getattr(req, "payee_id", None) else payee_id
     amount = req.amount if req and getattr(req, "amount", None) is not None else amount

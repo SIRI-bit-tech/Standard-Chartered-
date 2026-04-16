@@ -16,6 +16,7 @@ from .support import SupportTicket, TicketMessage, Chat, ChatMessage, LoginHisto
 from .bill_payment import BillPayment, BillPayee, ScheduledPayment
 from .deposit import Deposit, DepositType, DepositStatus
 from .virtual_card import VirtualCard, VirtualCardType, VirtualCardStatus
+from .user_restriction import UserRestriction
 
 __all__ = [
     "User",
@@ -48,4 +49,5 @@ __all__ = [
     "VirtualCard",
     "VirtualCardType",
     "VirtualCardStatus",
+    "UserRestriction",
 ]

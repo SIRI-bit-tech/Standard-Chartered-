@@ -12,13 +12,7 @@ import json
 
 router = APIRouter()
 
-async def _ensure_user_active(db: AsyncSession, user_id: str) -> None:
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account suspended")
+from utils.transfer_helpers import _ensure_user_active
 
 
 @router.get("/products")

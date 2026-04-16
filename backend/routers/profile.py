@@ -13,12 +13,45 @@ from models.loan import Loan
 from models.virtual_card import VirtualCard
 from models.bill_payment import BillPayment
 from models.deposit import Deposit
+from models.user_restriction import UserRestriction, RestrictionType
 from database import get_db
 from datetime import datetime, timezone
 from utils.auth import get_current_user_id
 from utils.cloudinary import CloudinaryManager
 
 router = APIRouter()
+
+
+@router.get("/restrictions")
+async def get_my_restrictions(
+    current_user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get current user's restrictions"""
+    result = await db.execute(
+        select(UserRestriction).where(
+            UserRestriction.user_id == current_user_id,
+            UserRestriction.is_active == True
+        )
+    )
+    restrictions = result.scalars().all()
+    
+    return {
+        "success": True,
+        "data": {
+            "restrictions": [
+                {
+                    "id": r.id,
+                    "restriction_type": r.restriction_type.value if isinstance(r.restriction_type, RestrictionType) else r.restriction_type,
+                    "is_active": r.is_active,
+                    "message": r.message,
+                    "created_at": r.created_at.isoformat() if r.created_at else None
+                }
+                for r in restrictions
+            ]
+        },
+        "message": "Restrictions retrieved"
+    }
 
 @router.get("/realtime/token")
 async def get_realtime_token(

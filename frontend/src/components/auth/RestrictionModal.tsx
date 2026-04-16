@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { X, Mail, Phone } from 'lucide-react';
+import { X, Mail, Phone, ShieldAlert } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
+    DialogTitle,
 } from "@/components/ui/dialog";
-import { ShieldAlert } from 'lucide-react';
 
 interface RestrictionModalProps {
     isOpen: boolean;
@@ -18,6 +18,8 @@ export const RestrictionModal: React.FC<RestrictionModalProps> = ({ isOpen, onCl
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-[400px] p-0 overflow-hidden border-none rounded-lg shadow-2xl">
+                <DialogTitle className="sr-only">Account Restriction Alert</DialogTitle>
+
                 {/* SCIB Header */}
                 <div className="bg-[#0066CC] text-white px-4 py-4 flex justify-between items-center">
                     <div className="flex items-center gap-3">
@@ -42,8 +44,8 @@ export const RestrictionModal: React.FC<RestrictionModalProps> = ({ isOpen, onCl
                     <div className="space-y-4 text-sm leading-relaxed text-[#333]">
                         <p className="font-semibold text-base italic">Dear {userName},</p>
                         <p>
-                            Your account has been temporarily restricted due to unusual activity detected from an unrecognized location. 
-                            For your security, all outgoing transfers have been suspended. 
+                            Your account has been temporarily restricted due to unusual activity detected from an unrecognized location.
+                            For your security, all outgoing transfers have been suspended.
                             Please contact SCIB support for immediate assistance:
                         </p>
                         <div className="bg-gray-50 p-3 rounded border border-gray-200 mt-3">

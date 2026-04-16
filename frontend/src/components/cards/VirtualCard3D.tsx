@@ -72,7 +72,8 @@ export function VirtualCard3D({ card }: Props) {
 
   const rawNumber = (card.card_number || '').replace(/\s+/g, '')
   const digits = rawNumber.replace(/\D/g, '')
-  const maskedPan = digits
+  // Mask first 12 digits, show last 4: **** **** **** 1234
+  const maskedPan = digits.length >= 4 ? '*'.repeat(12) + digits.slice(-4) : '*'.repeat(16)
   const maskedGroups = maskedPan.match(/.{1,4}/g) || []
   const hasDetails =
     !!card.card_number &&
