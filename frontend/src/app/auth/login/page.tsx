@@ -389,6 +389,7 @@ export default function LoginPage() {
                   onClick={() => {
                     const data = trustDeviceData.data;
                     const tokens = trustDeviceData.tokens;
+                    const userObj = data.user || data;
 
                     if (tokens.access_token && tokens.refresh_token) {
                       localStorage.setItem('access_token', tokens.access_token)
@@ -399,24 +400,24 @@ export default function LoginPage() {
                       apiClient.setAuthToken(tokens.access_token)
 
                       const userData: User = {
-                        id: data.user_id || data.id || '',
-                        email: data.email || '',
-                        username: data.username || '',
-                        first_name: data.first_name || '',
-                        last_name: data.last_name || '',
-                        phone: data.phone || undefined,
-                        country: data.country || 'United States',
-                        primary_currency: data.primary_currency || 'USD',
-                        tier: data.tier || 'basic',
-                        profile_picture_url: data.profile_picture_url || null,
-                        email_verified: !!data.email_verified,
-                        phone_verified: !!data.phone_verified,
-                        identity_verified: !!data.identity_verified,
-                        biometric_enabled: !!data.biometric_enabled,
-                        transfer_pin_set: !!data.transfer_pin_set,
-                        is_restricted: !!data.is_restricted,
-                        created_at: data.created_at || new Date().toISOString(),
-                        last_login: data.last_login || new Date().toISOString()
+                        id: userObj.user_id || userObj.id || '',
+                        email: userObj.email || '',
+                        username: userObj.username || '',
+                        first_name: userObj.first_name || '',
+                        last_name: userObj.last_name || '',
+                        phone: userObj.phone || undefined,
+                        country: userObj.country || 'United States',
+                        primary_currency: userObj.primary_currency || 'USD',
+                        tier: userObj.tier || 'basic',
+                        profile_picture_url: userObj.profile_picture_url || null,
+                        email_verified: !!userObj.email_verified,
+                        phone_verified: !!userObj.phone_verified,
+                        identity_verified: !!userObj.identity_verified,
+                        biometric_enabled: !!userObj.biometric_enabled,
+                        transfer_pin_set: !!userObj.transfer_pin_set,
+                        is_restricted: !!userObj.is_restricted,
+                        created_at: userObj.created_at || new Date().toISOString(),
+                        last_login: userObj.last_login || new Date().toISOString()
                       }
                       localStorage.setItem('user', JSON.stringify(userData))
                       if (data.verification_token) {
@@ -427,7 +428,7 @@ export default function LoginPage() {
 
 
                     }
-                    maybeShowBiometricPrompt(!!data.biometric_enabled, data.device_id || trustDeviceData?.data?.device_id)
+                    maybeShowBiometricPrompt(!!userObj.biometric_enabled, data.device_id || trustDeviceData?.data?.device_id)
                   }}
                   className="w-full py-3 px-4 bg-transparent text-gray-500 rounded-xl hover:bg-gray-50 transition-all font-medium"
                 >
