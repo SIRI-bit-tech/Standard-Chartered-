@@ -100,6 +100,7 @@ export function SetupTransferPinModal({ open, onOpenChange, onSuccess, email, to
             const userData = JSON.parse(storedUser)
             userData.transfer_pin_set = true
             localStorage.setItem('user', JSON.stringify(userData))
+            // IMPORTANT: Update the Zustand store immediately
             setUser(userData)
           } catch (e) {
             console.error('Failed to update local user data', e)
@@ -109,6 +110,8 @@ export function SetupTransferPinModal({ open, onOpenChange, onSuccess, email, to
         // Close modal after a short delay to show success state
         setTimeout(() => {
           onSuccess()
+          // Force close the modal
+          onOpenChange(false)
         }, 1500)
       }
     } catch (error: any) {

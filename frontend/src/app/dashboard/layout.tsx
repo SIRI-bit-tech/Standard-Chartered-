@@ -36,9 +36,8 @@ export default function DashboardLayout({
   // Check if PIN setup is required
   useEffect(() => {
     // Only show if user is logged in and hasn't set their PIN
-    // and we are NOT already on the dashboard page (to avoid overlapping with other UI)
-    // Actually, we want it to block the dashboard, so layout is the right place.
-    if (user && user.transfer_pin_set === false) {
+    // transfer_pin_set should be true if PIN is already set
+    if (user && user.transfer_pin_set !== true) {
       setShowPinModal(true)
     } else {
       setShowPinModal(false)
