@@ -1585,6 +1585,57 @@ async def admin_edit_transaction(
         logger.error("Edit transaction failed", error=e)
         raise InternalServerError(operation="edit transaction", error_code="TX_EDIT_FAILED", original_error=e)
 
+@router.delete("/transactions/{transaction_id}")
+async def admin_delete_transaction(
+    transaction_id: str,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a transaction from the database."""
+    try:
+        admin = current_admin
+        if not AdminPermissionManager.has_permission(admin.role, "transactions:delete"):
+            raise UnauthorizedError(message="You don't have permission to delete transactions", error_code="PERMISSION_DENIED")
+        
+        result = await db.execute(select(Transaction).where(Transaction.id == transaction_id))
+        tx = result.scalar_one_or_none()
+        if not tx:
+            raise NotFoundError(resource="Transaction", error_code="TX_NOT_FOUND")
+        
+        # Store transaction details for audit log before deletion
+        tx_details = {
+            "transaction_id": tx.id,
+            "user_id": tx.user_id,
+            "account_id": tx.account_id,
+            "type": tx.type,
+            "amount": float(tx.amount),
+            "description": tx.description,
+            "created_at": tx.created_at.isoformat() if tx.created_at else None
+        }
+        
+        # Delete the transaction
+        await db.delete(tx)
+        
+        # Create audit log
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="delete_transaction",
+            resource_type="transaction",
+            resource_id=transaction_id,
+            details=json.dumps(tx_details)
+        )
+        db.add(audit_log)
+        await db.commit()
+        
+        return {"success": True, "message": "Transaction deleted successfully"}
+    except (UnauthorizedError, NotFoundError):
+        raise
+    except Exception as e:
+        logger.error("Delete transaction failed", error=e)
+        raise InternalServerError(operation="delete transaction", error_code="TX_DELETE_FAILED", original_error=e)
+
 @router.post("/transfers/reverse")
 async def admin_reverse_transfer(
     payload: dict,

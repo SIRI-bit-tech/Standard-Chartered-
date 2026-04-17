@@ -17,6 +17,7 @@
    const [createdAt, setCreatedAt] = useState(tx.created_at ? tx.created_at.substring(0, 16) : '')
    const [busy, setBusy] = useState(false)
    const [reverseOpen, setReverseOpen] = useState(false)
+   const [deleteOpen, setDeleteOpen] = useState(false)
     const [receipt, setReceipt] = useState<TransferReceipt | null>(null)
     const [amount, setAmount] = useState<string>('')
     const [processedAt, setProcessedAt] = useState<string>('')
@@ -90,6 +91,20 @@
        setBusy(false)
      }
    }
+
+   async function deleteTransaction() {
+     try {
+       setBusy(true)
+       await apiClient.delete(`/admin/transactions/${tx.id}`)
+       setDeleteOpen(false)
+       setOpen(false)
+       window.location.reload()
+     } catch (e) {
+       logger.error('Failed to delete transaction', { error: e })
+     } finally {
+       setBusy(false)
+     }
+   }
  
    return (
      <>
@@ -104,6 +119,12 @@
                Reverse Transfer
              </DropdownMenuItem>
            ) : null}
+           <DropdownMenuItem 
+             onClick={() => setDeleteOpen(true)}
+             className="text-red-600 focus:text-red-600"
+           >
+             Delete Transaction
+           </DropdownMenuItem>
          </DropdownMenuContent>
        </DropdownMenu>
  
@@ -172,6 +193,23 @@
              <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
              <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={reverseTransfer} disabled={busy}>
                Confirm Reverse
+             </AlertDialogAction>
+           </AlertDialogFooter>
+         </AlertDialogContent>
+       </AlertDialog>
+
+       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+         <AlertDialogContent>
+           <AlertDialogHeader>
+             <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
+           </AlertDialogHeader>
+           <p className="text-sm text-muted-foreground">
+             This will permanently delete the transaction from the user. This action cannot be undone.
+           </p>
+           <AlertDialogFooter>
+             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+             <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={deleteTransaction} disabled={busy}>
+               {busy ? 'Deleting...' : 'Delete Transaction'}
              </AlertDialogAction>
            </AlertDialogFooter>
          </AlertDialogContent>

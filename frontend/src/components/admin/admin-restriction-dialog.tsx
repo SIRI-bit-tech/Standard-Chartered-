@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,15 @@ interface RestrictionDialogProps {
   onSuccess?: () => void
 }
 
+const DEFAULT_MESSAGES = {
+  post_no_debit: `Your account has been restricted due to a suspicious activity or login attempt from an unrecognized device. Outgoing transfers and payments are disabled until this is resolved.
+Contact support@standardcharteredibank.com to verify your identity and restore full access.`,
+  
+  online_banking: `Your account has been temporarily suspended due to suspicious activity or an unauthorized login attempt from an unrecognized device. Access has been disabled for your security.
+
+Contact support@standardcharteredibank.com to verify your identity and restore access.`
+}
+
 export function AdminRestrictionDialog({ 
   open, 
   onOpenChange, 
@@ -36,6 +45,13 @@ export function AdminRestrictionDialog({
 }: RestrictionDialogProps) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
+  // Set default message when dialog opens or restriction type changes
+  useEffect(() => {
+    if (open && restrictionType) {
+      setMessage(DEFAULT_MESSAGES[restrictionType])
+    }
+  }, [open, restrictionType])
 
   const handleRestrict = async () => {
     if (!message.trim()) {
@@ -77,6 +93,12 @@ export function AdminRestrictionDialog({
     }
   }
 
+  const handleUseDefault = () => {
+    if (restrictionType) {
+      setMessage(DEFAULT_MESSAGES[restrictionType])
+    }
+  }
+
   const getRestrictionDisplayName = (type: RestrictionType) => {
     return type === 'post_no_debit' ? 'Post No Debit' : 'Online Banking'
   }
@@ -85,12 +107,6 @@ export function AdminRestrictionDialog({
     return type === 'post_no_debit' 
       ? 'User will be blocked from withdrawing, transferring, or making payments. Deposits can still be received.'
       : 'User will be blocked from logging into online banking.'
-  }
-
-  const getPlaceholderMessage = (type: RestrictionType) => {
-    return type === 'post_no_debit'
-      ? 'Your account has been restricted due to security concerns. Please contact support for assistance with withdrawals and transfers.'
-      : 'Your online banking access has been temporarily restricted. Please visit a branch or contact support.'
   }
 
   return (
@@ -118,17 +134,28 @@ export function AdminRestrictionDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="restriction-message">Restriction Message</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="restriction-message">Restriction Message</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleUseDefault}
+                className="h-7 text-xs"
+              >
+                Use Default
+              </Button>
+            </div>
             <Textarea
               id="restriction-message"
-              placeholder={getPlaceholderMessage(restrictionType!)}
+              placeholder="Enter a custom message or use the default..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              className="min-h-[100px]"
-              maxLength={500}
+              className="min-h-[180px] text-sm"
+              maxLength={1000}
             />
             <p className="text-xs text-muted-foreground">
-              This message will be displayed to the user when they encounter the restriction.
+              This message will be displayed to the user when they encounter the restriction. You can customize it or use the default message.
             </p>
           </div>
         </div>
