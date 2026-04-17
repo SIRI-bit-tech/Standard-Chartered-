@@ -22,7 +22,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user } = useAuthStore()
+  const { user, setUser } = useAuthStore()
   const [showPinModal, setShowPinModal] = useState(false)
 
   // Ensure API client sends Bearer token for authenticated requests
@@ -35,6 +35,23 @@ export default function DashboardLayout({
 
   // Check if PIN setup is required
   useEffect(() => {
+    // Sync user data from localStorage 'user' key to Zustand store on mount
+    // This ensures production builds have the latest data
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user')
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser)
+          // If the stored user has transfer_pin_set but the Zustand user doesn't, update it
+          if (userData.transfer_pin_set && user && !user.transfer_pin_set) {
+            setUser(userData)
+          }
+        } catch (e) {
+          console.error('Failed to sync user data', e)
+        }
+      }
+    }
+
     // Only show if user is logged in and hasn't set their PIN
     // transfer_pin_set should be true if PIN is already set
     if (user && user.transfer_pin_set !== true) {

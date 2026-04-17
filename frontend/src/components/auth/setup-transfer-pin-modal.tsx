@@ -93,18 +93,26 @@ export function SetupTransferPinModal({ open, onOpenChange, onSuccess, email, to
         setSuccess(true)
         toast.success('Transfer PIN set successfully!')
         
-        // Update user in store to reflect PIN is now set
+        // Update BOTH localStorage 'user' key AND Zustand store
         const storedUser = localStorage.getItem('user')
         if (storedUser) {
           try {
             const userData = JSON.parse(storedUser)
             userData.transfer_pin_set = true
             localStorage.setItem('user', JSON.stringify(userData))
-            // IMPORTANT: Update the Zustand store immediately
-            setUser(userData)
           } catch (e) {
             console.error('Failed to update local user data', e)
           }
+        }
+        
+        // CRITICAL: Update Zustand store directly with the current user object
+        // This ensures the auth-storage is updated immediately
+        const currentUser = useAuthStore.getState().user
+        if (currentUser) {
+          setUser({
+            ...currentUser,
+            transfer_pin_set: true
+          })
         }
 
         // Close modal after a short delay to show success state
