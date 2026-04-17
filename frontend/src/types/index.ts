@@ -150,11 +150,12 @@ export interface AdminTransactionRow {
 export interface DomesticTransferForm {
   from_account_id: string
   recipient_name: string
+  account_type: 'checking' | 'savings'
+  bank_name: string
   routing_number: string
   account_number: string
-  physical_address: string
   amount: number
-  memo: string
+  memo?: string
 }
 
 /** Form state for international wire (SWIFT) */

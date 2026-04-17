@@ -83,16 +83,15 @@ export const useNotificationStore = create<NotificationStore>((set) => ({
     set((state) => {
       const n = state.notifications.find(notif => notif.id === id)
       if (n?.status !== 'unread') return state
+      // Remove notification instead of marking as read
       return {
-        notifications: state.notifications.map((n) =>
-          n.id === id ? { ...n, status: 'read' as const } : n
-        ),
+        notifications: state.notifications.filter((notif) => notif.id !== id),
         unreadCount: Math.max(0, state.unreadCount - 1)
       }
     }),
   markAllRead: () =>
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, status: 'read' as const })),
+    set(() => ({
+      notifications: [], // Remove all notifications
       unreadCount: 0
     })),
 }))

@@ -56,41 +56,6 @@ const ESTIMATED_DELIVERY: Record<TransferTypeTab, string> = {
   ach: '1-3 business days',
 }
 
-// Interface for recipient search response
-interface RecipientSearchResponse {
-  success: boolean
-  data: Array<{
-    user_id: string
-    display_name: string
-    username: string
-    email: string
-    accounts: Array<{
-      id: string
-      type: string
-      currency: string
-      last_four: string
-      is_primary: boolean
-      status: string
-    }>
-  }>
-  message: string
-}
-
-// Interface for recipient account (simplified version of Account)
-interface RecipientAccount {
-  id: string
-  type: string
-  currency: string
-  last_four: string
-  is_primary: boolean
-  status: string
-}
-
-// Extended type for selected recipient with account selection
-type SelectedRecipient = RecipientSearchResponse['data'][0] & {
-  selectedAccount?: RecipientSearchResponse['data'][0]['accounts'][0] | null
-}
-
 export default function TransfersPage() {
   const searchParams = useSearchParams()
   const { user } = useAuthStore()
@@ -99,36 +64,6 @@ export default function TransfersPage() {
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new')
   const [transferType, setTransferType] = useState<TransferTypeTab>('domestic')
 
-  // State for recipient search and selection
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<RecipientSearchResponse['data']>([])
-  const [selectedRecipient, setSelectedRecipient] = useState<SelectedRecipient | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  // Handler functions
-  const handleRecipientSearch = async (query: string) => {
-    if (!query.trim()) return
-
-    setLoading(true)
-    try {
-      const response = await apiClient.get('/transfers/recipients/search', { params: { query } }) as { data: RecipientSearchResponse }
-      setSearchResults(response.data.data || [])
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to search recipients',
-        variant: 'destructive'
-      })
-      setSearchResults([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const selectRecipient = (recipient: RecipientSearchResponse['data'][0]) => {
-    setSelectedRecipient(recipient as SelectedRecipient)
-    setSearchQuery('')  // Clear search after selection
-  }
   const [accountsList, setAccountsList] = useState<Account[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(true)
   const [loadingHistory, setLoadingHistory] = useState(false)
@@ -154,9 +89,10 @@ export default function TransfersPage() {
   const [domesticForm, setDomesticForm] = useState<DomesticTransferForm>({
     from_account_id: '',
     recipient_name: '',
+    account_type: 'checking',
+    bank_name: '',
     routing_number: '',
     account_number: '',
-    physical_address: '',
     amount: 0,
     memo: '',
   })
@@ -295,8 +231,13 @@ export default function TransfersPage() {
 
     if (transferType === 'domestic') {
       if (!domesticForm.from_account_id) return 'Select a “From” account.'
-      if (!selectedRecipient) return 'Please select a recipient from the search results.'
-      if (selectedRecipient && (!selectedRecipient.accounts || selectedRecipient.accounts.length === 0)) return 'Recipient has no available accounts.'
+      if (!domesticForm.recipient_name.trim()) return 'Enter the recipient name.'
+      if (!domesticForm.bank_name.trim()) return 'Enter the recipient bank name.'
+      if (!domesticForm.routing_number.trim()) return 'Enter a routing number.'
+      if (!/^\d{9}$/.test(domesticForm.routing_number.trim())) return 'Routing number must be 9 digits.'
+      if (routingValid === false) return routingErrorMsg || 'Invalid routing number.'
+      if (!domesticForm.account_number.trim()) return 'Enter an account number.'
+      if (!/^[0-9]{4,17}$/.test(domesticForm.account_number.trim())) return 'Account number must be 4-17 digits.'
       return null
     }
 
@@ -363,8 +304,10 @@ export default function TransfersPage() {
         const payload = {
           transfer_pin: pin,
           from_account_id: domesticForm.from_account_id,
-          recipient_id: selectedRecipient?.user_id,
-          to_account_id: selectedRecipient?.selectedAccount?.id ?? selectedRecipient?.accounts.find(acc => acc.is_primary)?.id ?? selectedRecipient?.accounts[0]?.id,
+          routing_number: domesticForm.routing_number,
+          account_number: domesticForm.account_number,
+          bank_name: domesticForm.bank_name,
+          account_holder: domesticForm.recipient_name,
           amount: domesticForm.amount,
           description: domesticForm.memo || undefined,
         }
@@ -387,13 +330,13 @@ export default function TransfersPage() {
           setDomesticForm({
             from_account_id: '',
             recipient_name: '',
+            account_type: 'checking',
+            bank_name: '',
             routing_number: '',
             account_number: '',
-            physical_address: '',
             amount: 0,
             memo: '',
           })
-          setSelectedRecipient(null)
 
         }
       } else if (transferType === 'international') {
@@ -555,129 +498,123 @@ export default function TransfersPage() {
                 <>
                   {transferType === 'domestic' && (
                     <>
-                      <SectionCard number={1} title="Funding Account">
-                        <FromAccountSelect
-                          accounts={accountsList}
-                          value={domesticForm.from_account_id}
-                          onChange={(id) => {
-                            setFromAccountId(id)
-                            setDomesticForm((p) => ({ ...p, from_account_id: id }))
-                          }}
+                      <SectionCard number={1} title="Transfer Details">
+                        <InfoBanner
+                          message="Domestic wire transfers typically take 1-2 business days. A fee of $15-$30 will be charged."
                         />
-                      </SectionCard>
-                      <SectionCard number={2} title="Recipient Information">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="sm:col-span-2">
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <FromAccountSelect
+                            accounts={accountsList}
+                            value={domesticForm.from_account_id}
+                            onChange={(id) => {
+                              setFromAccountId(id)
+                              setDomesticForm((p) => ({ ...p, from_account_id: id }))
+                            }}
+                          />
+                          <div>
                             <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                              Recipient Search
+                              Recipient Name
                             </Label>
-                            <div className="relative">
+                            <Input
+                              placeholder="Enter full name"
+                              value={domesticForm.recipient_name}
+                              onChange={(e) => setDomesticForm((p) => ({ ...p, recipient_name: e.target.value }))}
+                              className="mt-1.5"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                              Recipient Bank Name
+                            </Label>
+                            <Input
+                              placeholder="Enter bank name"
+                              value={domesticForm.bank_name}
+                              onChange={(e) => setDomesticForm((p) => ({ ...p, bank_name: e.target.value }))}
+                              className="mt-1.5"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                              Account Type
+                            </Label>
+                            <Select
+                              value={domesticForm.account_type}
+                              onValueChange={(v: 'checking' | 'savings') => setDomesticForm((p) => ({ ...p, account_type: v }))}
+                            >
+                              <SelectTrigger className="mt-1.5 w-full" style={{ borderColor: colors.border }}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="checking">Checking</SelectItem>
+                                <SelectItem value="savings">Savings</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <>
+                            <div>
+                              <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
+                                Recipient Routing Number (9 digits)
+                              </Label>
                               <Input
-                                placeholder="Search by name..."
-                                value={searchQuery}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                  setSearchQuery(e.target.value)
-                                  if (e.target.value.length >= 2) {
-                                    handleRecipientSearch(e.target.value)
-                                  } else {
-                                    setSearchResults([])
+                                placeholder="000000000"
+                                maxLength={9}
+                                value={domesticForm.routing_number}
+                                onChange={async (e) => {
+                                  const val = e.target.value.replace(/\D/g, '')
+                                  setDomesticForm((p) => ({ ...p, routing_number: val }))
+                                  setRoutingErrorMsg('')
+                                  setRoutingValid(null)
+                                  if (val.length === 9) {
+                                    try {
+                                      setRoutingChecking(true)
+                                      const resp = await apiClient.get<{ valid: boolean; bank_name?: string }>(`/api/v1/transfers/validate-routing?number=${val}`)
+                                      const isValid = !!resp?.valid
+                                      setRoutingValid(isValid)
+                                      if (isValid && resp.bank_name) {
+                                        setDomesticForm((p) => ({ ...p, bank_name: resp.bank_name || p.bank_name }))
+                                      }
+                                      if (!isValid) setRoutingErrorMsg('Invalid routing number')
+                                    } catch {
+                                      setRoutingValid(false)
+                                      setRoutingErrorMsg('Validation service unavailable')
+                                    } finally {
+                                      setRoutingChecking(false)
+                                    }
                                   }
                                 }}
                                 className="mt-1.5"
-                                disabled={loading}
                               />
-                              {loading && (
-                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                                  <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                                </div>
-                              )}
-                              {searchResults.length > 0 && (
-                                <div className="absolute z-10 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                  {searchResults.map((recipient) => (
-                                    <div
-                                      key={recipient.user_id}
-                                      className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                                      onClick={() => selectRecipient(recipient)}
-                                    >
-                                      <div className="flex justify-between items-start">
-                                        <div>
-                                          <div className="font-medium text-sm" style={{ color: colors.textPrimary }}>
-                                            {recipient.display_name}
-                                          </div>
-                                          <div className="text-xs" style={{ color: colors.textSecondary }}>
-                                            {recipient.email}
-                                          </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-xs text-gray-500">
-                                            {recipient.accounts.map((account) => (
-                                              <div key={account.id} className="flex items-center gap-1 text-xs">
-                                                <span className="font-medium">{account.type}</span>
-                                                <span>•••• {account.last_four}</span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              {routingChecking && <p className="mt-1 text-xs" style={{ color: colors.textSecondary }}>Validating routing number…</p>}
+                              {routingValid === false && <p className="mt-1 text-xs" style={{ color: colors.error }}>{routingErrorMsg || 'Invalid routing number'}</p>}
+                              {routingValid && <p className="mt-1 text-xs" style={{ color: colors.success }}>Routing number recognized</p>}
                             </div>
-                          </div>
-                          {selectedRecipient ? (
-                            <div className="sm:col-span-2">
+                            <div>
                               <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
-                                Selected Recipient
+                                Recipient Account Number
                               </Label>
-                              <div className="p-3 bg-gray-50 rounded-lg border">
-                                <div className="font-medium text-sm" style={{ color: colors.textPrimary }}>
-                                  {selectedRecipient.display_name}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {selectedRecipient.email}
-                                </div>
-                                <div className="mt-2">
-                                  <Label className="text-xs">Select Account</Label>
-                                  <select
-                                    value={selectedRecipient?.selectedAccount?.id ?? selectedRecipient?.accounts.find((acc) => acc.is_primary)?.id ?? ''}
-                                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                                      if (selectedRecipient) {
-                                        setSelectedRecipient({
-                                          ...selectedRecipient,
-                                          selectedAccount: selectedRecipient.accounts.find(acc => acc.id === e.target.value) || null
-                                        })
-                                      }
-                                    }}
-                                    className="mt-1 w-full p-2 border rounded"
-                                  >
-                                    {selectedRecipient.accounts.map((account: RecipientAccount) => (
-                                      <option key={account.id} value={account.id}>
-                                        {account.type} (••• {account.last_four})
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
+                              <Input
+                                placeholder="Enter account number"
+                                value={domesticForm.account_number}
+                                onChange={(e) => setDomesticForm((p) => ({ ...p, account_number: e.target.value }))}
+                                className="mt-1.5"
+                              />
                             </div>
-                          ) : null}
-                        </div>
-                      </SectionCard>
-                      <SectionCard number={3} title="Transfer Amount">
-                        <div className="space-y-4">
-                          <AmountInput
-                            label={`Amount (${currency})`}
-                            value={domesticForm.amount}
-                            onChange={(v) => setDomesticForm((p) => ({ ...p, amount: v }))}
-                            currency={currency}
-                          />
-                          <div>
+                          </>
+                          <div className="sm:col-span-2">
+                            <AmountInput
+                              label={`Amount (${currency})`}
+                              value={domesticForm.amount}
+                              onChange={(v) => setDomesticForm((p) => ({ ...p, amount: v }))}
+                              currency={currency}
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
                             <Label className="text-sm font-medium" style={{ color: colors.textPrimary }}>
                               Memo (Optional)
                             </Label>
                             <Input
                               placeholder="Reference for recipient"
-                              value={domesticForm.memo}
+                              value={domesticForm.memo || ''}
                               onChange={(e) => setDomesticForm((p) => ({ ...p, memo: e.target.value }))}
                               className="mt-1.5"
                             />

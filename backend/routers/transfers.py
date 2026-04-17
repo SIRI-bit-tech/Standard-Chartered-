@@ -202,11 +202,29 @@ async def domestic_transfer(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Domestic transfer to other accounts. Supports both account number and recipient name."""
+    """Domestic wire transfer to external bank account. Requires PIN. Auto-completes after 2 minutes."""
     await _ensure_user_active(db, user_id)
+    await _verify_transfer_pin(db, user_id, request.transfer_pin)
+    
+    # Validate routing number with authoritative lookup
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"https://bankrouting.io/api/v1/aba/{request.routing_number}")
+    except Exception:
+        logger.exception("Authoritative routing lookup failed during domestic transfer")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid routing number")
+    
+    if resp.status_code != 200:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid routing number")
+    
+    payload = resp.json()
+    directory_name = (payload.get("data") or {}).get("bank_name")
+    if payload.get("status") != "success" or not directory_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid routing number")
+    
     # Verify from account ownership and balance
     account_result = await db.execute(
-        select(Account).where(Account.id == request.from_account_id)
+        select(Account).where(Account.id == request.from_account_id).with_for_update()
     )
     from_account = account_result.scalar_one_or_none()
     if not from_account:
@@ -216,60 +234,19 @@ async def domestic_transfer(
     if getattr(from_account, "status", None) and from_account.status != AccountStatus.ACTIVE:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
     
-    # Handle recipient - prioritized name-based transfers with optional account number fallback
-    to_account = None
-    recipient_info = None
-    
-    if request.recipient_id:
-        # Primary: Modern name-based transfer using recipient_id
-        # First verify recipient exists and get their accounts
-        recipient_result = await db.execute(
-            select(User).where(User.id == request.recipient_id)
-        )
-        recipient_user = recipient_result.scalar_one_or_none()
-        if not recipient_user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipient not found")
-        
-        # Get recipient's primary account for transfer
-        recipient_accounts = await db.execute(
-            select(Account).where(
-                Account.user_id == request.recipient_id,
-                Account.is_primary == True
-            )
-        )
-        to_account = recipient_accounts.scalar_one_or_none()
-        if not to_account:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipient has no primary account")
-        
-        recipient_info = f"{recipient_user.first_name} {recipient_user.last_name}"
-        
-    elif request.to_account_id:
-        # Fallback: Traditional account ID transfer (backward compatibility)
-        to_account_result = await db.execute(
-            select(Account).where(Account.id == request.to_account_id)
-        )
-        to_account = to_account_result.scalar_one_or_none()
-        if not to_account:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recipient account not found")
-        
-        recipient_info = f"Account ending in {to_account.account_number[-4:]}"
-        
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="recipient_id is required for domestic transfers"
-        )
+    # Generate random fee between $15-$30
+    import random
+    fee_amount = round(random.uniform(15.0, 30.0), 2)
+    total_amount = request.amount + fee_amount
     
     # Verify sufficient funds
-    total_amount = request.amount + 2.50  # Include domestic transfer fee
     if from_account.balance < total_amount:
         from utils.errors import ValidationError
         raise ValidationError(
             message="Insufficient funds",
             details={"field": "amount"}
         )
-
-    await _verify_transfer_pin(db, user_id, request.transfer_pin)
+    
     # Debit immediately and create processing ledger
     transfer_id = str(uuid.uuid4())
     reference = str(uuid.uuid4())[:12].upper()
@@ -277,24 +254,28 @@ async def domestic_transfer(
     from_account.balance = from_account.balance - total_amount
     from_account.available_balance = from_account.available_balance - total_amount
     from_account.updated_at = datetime.utcnow()
+    
+    recipient_info = f"{request.account_holder} - {request.bank_name}"
+    
     new_transfer = Transfer(
         id=transfer_id,
         from_account_id=request.from_account_id,
         from_user_id=user_id,
-        to_account_id=to_account.id,
+        to_account_id=None,  # External transfer, no internal account
         type=TransferType.DOMESTIC,
         amount=request.amount,
         currency=from_account.currency,
-        fee_amount=2.50,
+        fee_amount=fee_amount,
         total_amount=total_amount,
         reference_number=reference,
-        # Persist recipient name for history
         description=recipient_info,
         status=TransferStatus.PROCESSING,
         requires_mfa="false",
         created_at=datetime.utcnow(),
     )
     db.add(new_transfer)
+    
+    # Create withdrawal transaction
     tx = Transaction(
         id=str(uuid.uuid4()),
         account_id=from_account.id,
@@ -305,19 +286,22 @@ async def domestic_transfer(
         currency=from_account.currency,
         balance_before=from_before,
         balance_after=from_account.balance,
-        description=f"Domestic transfer to {recipient_info}",
+        description=f"Domestic wire to {request.account_holder}",
         reference_number=f"TX-{uuid.uuid4().hex[:12].upper()}",
         transfer_id=new_transfer.id,
         created_at=datetime.utcnow(),
     )
     db.add(tx)
+    
     await db.commit()
-    # Auto-complete
+    
+    # Auto-complete after 2 minutes (120 seconds)
     _schedule_auto_complete(transfer_id, 120)
+    
     return {
         "success": True,
         "data": {"transfer_id": transfer_id, "reference": reference},
-        "message": "Domestic transfer is processing",
+        "message": "Domestic wire transfer is processing",
     }
 
 
@@ -393,7 +377,7 @@ async def ach_transfer(
             total_amount=request.amount,
             reference_number=f"ACH-{uuid.uuid4().hex[:12].upper()}",
             description=f"{request.account_holder.strip()} | {request.bank_name.strip()}",
-            status=TransferStatus.PROCESSING,
+            status=TransferStatus.PENDING,
             requires_mfa="false",
             created_at=datetime.utcnow(),
             to_account_number=request.account_number,
@@ -405,7 +389,7 @@ async def ach_transfer(
             account_id=account.id,
             user_id=user_id,
             type=TxType.WITHDRAWAL,
-            status=TxStatus.PROCESSING,
+            status=TxStatus.PENDING,
             amount=request.amount,
             currency=account.currency,
             balance_before=balance_before,
@@ -419,8 +403,7 @@ async def ach_transfer(
         await db.commit()
         await db.refresh(new_transfer)
         
-        # Auto-complete this transfer in ~2 minutes
-        asyncio.create_task(_auto_complete_transfer(new_transfer.id, 120))
+        # DO NOT auto-complete - requires manual admin approval
         
         AblyRealtimeManager.publish_notification(
             user_id,
@@ -432,7 +415,7 @@ async def ach_transfer(
         return {
             "success": True,
             "transfer_id": new_transfer.id,
-            "status": "processing",
+            "status": "pending",
             "message": "ACH transfer submitted. Processing typically takes 3-5 business days."
         }
     except HTTPException:
@@ -592,7 +575,7 @@ async def international_transfer(
         reference_number=reference,
         # Encode "recipient_name | bank_name" for display in history/receipt
         description=f"{request.beneficiary_name.strip()} | {request.beneficiary_bank_name.strip()}",
-        status=TransferStatus.PROCESSING,
+        status=TransferStatus.PENDING,
         requires_mfa="false",
         created_at=datetime.utcnow(),
     )
@@ -602,7 +585,7 @@ async def international_transfer(
         account_id=account.id,
         user_id=user_id,
         type=TxType.WITHDRAWAL,
-        status=TxStatus.PROCESSING,
+        status=TxStatus.PENDING,
         amount=total_amount,
         currency="USD",
         balance_before=before,
@@ -614,11 +597,11 @@ async def international_transfer(
     )
     db.add(tx)
     await db.commit()
-    _schedule_auto_complete(transfer_id, 120)
+    # DO NOT auto-complete - requires manual admin approval
     return {
         "success": True,
         "data": {"transfer_id": transfer_id, "reference": reference},
-        "message": "International transfer is processing",
+        "message": "International transfer submitted for review",
     }
 
 @router.get("/history")

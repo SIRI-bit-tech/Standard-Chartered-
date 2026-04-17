@@ -11,7 +11,7 @@ interface LoginRestrictionGuardProps {
 }
 
 export function LoginRestrictionGuard({ userId, onRestricted }: LoginRestrictionGuardProps) {
-  const { hasOnlineBankingRestriction, onlineBankingRestriction, checkOnlineBanking } = useRestrictionCheck()
+  const { hasOnlineBankingRestriction, onlineBankingRestriction } = useRestrictionCheck()
   const router = useRouter()
   const [showModal, setShowModal] = useState(false)
 

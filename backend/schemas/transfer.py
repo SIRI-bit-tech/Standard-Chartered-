@@ -28,17 +28,31 @@ class BeneficiaryType(str, Enum):
 
 
 class DomesticTransferRequest(BaseModel):
-    """Domestic transfer request - name-based transfers only"""
+    """Domestic transfer request - routing number based like ACH"""
     transfer_pin: str = Field(..., pattern=r"^\d{4}$", description="4-digit transfer PIN")
     from_account_id: str
-    recipient_id: str = Field(..., description="Recipient user ID (required for name-based transfer)")
-    to_account_id: Optional[str] = Field(None, description="Recipient account ID (optional, for backward compatibility)")
+    bank_name: str = Field(..., max_length=100)
+    routing_number: str = Field(..., max_length=9)
+    account_number: str = Field(..., max_length=20)
+    account_holder: str = Field(..., max_length=100)
     amount: float = Field(..., gt=0)
     description: Optional[str] = Field(None, max_length=200)
     
     @validator("transfer_pin")
     def validate_transfer_pin_strength(cls, v: str) -> str:
         return validate_transfer_pin_strength(v)
+
+    @validator('routing_number')
+    def validate_routing(cls, v):
+        if not v.isdigit() or len(v) != 9:
+            raise ValueError('Routing number must be 9 digits')
+        digits = [int(d) for d in v]
+        checksum = (3 * (digits[0] + digits[3] + digits[6]) +
+                    7 * (digits[1] + digits[4] + digits[7]) +
+                    1 * (digits[2] + digits[5] + digits[8])) % 10
+        if checksum != 0:
+            raise ValueError('Invalid routing number checksum')
+        return v
 
 
 class InternationalTransferRequest(BaseModel):

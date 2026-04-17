@@ -19,15 +19,17 @@ export function RestrictionGuard({
   userId, 
   fallback,
   onRestricted 
-}: RestrictionGuardProps) {
+}: Readonly<RestrictionGuardProps>) {
   const { checkRestriction, getActiveRestriction } = useUserRestrictions(userId)
   const [showModal, setShowModal] = useState(false)
 
   const isRestricted = checkRestriction(restrictionType)
   const activeRestriction = getActiveRestriction(restrictionType)
 
-  const handleRestrictedAction = () => {
+  const handleRestrictedAction = (e?: React.MouseEvent) => {
     if (isRestricted && activeRestriction) {
+      e?.preventDefault()
+      e?.stopPropagation()
       onRestricted?.(activeRestriction)
       setShowModal(true)
     }
@@ -38,14 +40,17 @@ export function RestrictionGuard({
   }
 
   return (
-    <>
+    <div 
+      onClickCapture={isRestricted ? handleRestrictedAction : undefined}
+      className="contents"
+    >
       {children}
       <UserRestrictionModal
         open={showModal}
         onClose={() => setShowModal(false)}
         restriction={activeRestriction}
       />
-    </>
+    </div>
   )
 }
 

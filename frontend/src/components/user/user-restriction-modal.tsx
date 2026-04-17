@@ -17,10 +17,10 @@ interface UserRestrictionModalProps {
   restriction: UserRestriction | null
 }
 
-export function UserRestrictionModal({ open, onClose, restriction }: UserRestrictionModalProps) {
+export function UserRestrictionModal({ open, onClose, restriction }: Readonly<UserRestrictionModalProps>) {
   if (!restriction) return null
 
-  const getIcon = (type: RestrictionType) => {
+  const getIcon = (_type: RestrictionType) => {
     // Always show danger/alert icon regardless of type
     return <AlertTriangle className="h-8 w-8 text-red-500" />
   }
