@@ -7,8 +7,6 @@ import { toast } from 'sonner'
 import { ProfileHeader } from '@/components/profile/profile-header'
 import { PersonalInfoForm, type PersonalInfo } from '@/components/profile/personal-info-form'
 import { SecurityPanel } from '@/components/profile/security-panel'
-import { ActivityList } from '@/components/profile/activity-list'
-import { DevicesPanel } from '@/components/profile/devices-panel'
 import { useUserRealtime } from '@/hooks/use-user-realtime'
 import { ProfileAvatarUploader } from '@/components/profile/profile-avatar-uploader'
 
@@ -27,8 +25,6 @@ export default function ProfilePage() {
     postal_code: '',
     email: '',
   })
-  const [loginHistory, setLoginHistory] = useState<any[]>([])
-  const [trustedDevices, setTrustedDevices] = useState<any[]>([])
   const { user, setUser } = useAuthStore()
 
   useEffect(() => {
@@ -61,20 +57,6 @@ export default function ProfilePage() {
             last_login: profileResponse.data.last_login || user.last_login,
           })
         }
-      }
-
-      // Load login history
-      const historyResponse = await apiClient.get<{ success: boolean; data: any[] }>(
-        `/api/v1/security/login-history?limit=10`
-      )
-      if (historyResponse.success) {
-        setLoginHistory(historyResponse.data)
-      }
-
-      // Load actual trusted devices
-      const devicesResponse = await apiClient.get<{ success: boolean; data: any[] }>(`/api/v1/security/devices`)
-      if (devicesResponse.success) {
-        setTrustedDevices(devicesResponse.data)
       }
     } catch (error) {
       console.error('Failed to load profile data:', error)
@@ -154,7 +136,6 @@ export default function ProfilePage() {
             {[
               { id: 'personal', label: 'Personal Info' },
               { id: 'security', label: 'Security' },
-              { id: 'activity', label: 'Activity' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -218,31 +199,6 @@ export default function ProfilePage() {
                 <div className="space-y-6">
                   <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">Security Settings</h2>
                   <SecurityPanel />
-                </div>
-              )}
-
-              {activeTab === 'activity' && (
-                <div className="space-y-10">
-                  <section>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">Recent Login Activity</h2>
-                    <ActivityList items={loginHistory} />
-                  </section>
-
-                  <section>
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Trusted Devices</h2>
-                      <button
-                        onClick={loadProfileData}
-                        className="text-primary text-sm hover:underline font-bold"
-                      >
-                        Refresh List
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-500 mb-6">
-                      These devices have access to your account without requiring additional security prompts.
-                    </p>
-                    <DevicesPanel items={trustedDevices} />
-                  </section>
                 </div>
               )}
             </div>
