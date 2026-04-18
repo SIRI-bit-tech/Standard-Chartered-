@@ -312,7 +312,7 @@ async def ach_transfer(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """ACH transfer to external bank account. Requires PIN."""
+    """ACH transfer to external bank account. Requires PIN. $5 fee applies."""
     await _ensure_user_active(db, user_id)
     await _verify_transfer_pin(db, user_id, request.transfer_pin)
     try:
@@ -343,7 +343,7 @@ async def ach_transfer(
             )
 
         account_result = await db.execute(
-            select(Account).where(Account.id == request.from_account_id)
+            select(Account).where(Account.id == request.from_account_id).with_for_update()
         )
         account = account_result.scalar()
         if not account or account.user_id != user_id:
@@ -353,7 +353,12 @@ async def ach_transfer(
             )
         if getattr(account, "status", None) and account.status != AccountStatus.ACTIVE:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Source account inactive")
-        if account.available_balance < request.amount:
+        
+        # Apply $5 fee
+        fee_amount = 5.0
+        total_amount = request.amount + fee_amount
+        
+        if account.available_balance < total_amount:
             from utils.errors import ValidationError
             raise ValidationError(
                 message="Insufficient funds",
@@ -361,8 +366,8 @@ async def ach_transfer(
             )
         
         balance_before = account.balance
-        account.balance = account.balance - request.amount
-        account.available_balance = account.available_balance - request.amount
+        account.balance = account.balance - total_amount
+        account.available_balance = account.available_balance - total_amount
         account.updated_at = datetime.utcnow()
         # Persist useful receipt details in available fields (no schema change)
         # - to_account_number stores recipient account number
@@ -374,8 +379,8 @@ async def ach_transfer(
             type=TransferType.ACH,
             amount=request.amount,
             currency=account.currency,
-            fee_amount=0.0,
-            total_amount=request.amount,
+            fee_amount=fee_amount,
+            total_amount=total_amount,
             reference_number=f"ACH-{uuid.uuid4().hex[:12].upper()}",
             description=f"{request.account_holder.strip()} | {request.bank_name.strip()}",
             status=TransferStatus.PENDING,
@@ -391,7 +396,7 @@ async def ach_transfer(
             user_id=user_id,
             type=TxType.WITHDRAWAL,
             status=TxStatus.PENDING,
-            amount=request.amount,
+            amount=total_amount,
             currency=account.currency,
             balance_before=balance_before,
             balance_after=account.balance,

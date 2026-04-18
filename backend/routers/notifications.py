@@ -13,16 +13,20 @@ router = APIRouter()
 @router.get("")
 async def get_notifications(
     limit: int = Query(20),
+    include_read: bool = Query(False, description="Include read notifications"),
     current_user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get user notifications"""
-    result = await db.execute(
-        select(Notification)
-        .where(Notification.user_id == current_user_id)
-        .order_by(Notification.created_at.desc())
-        .limit(limit)
-    )
+    """Get user notifications (unread by default)"""
+    query = select(Notification).where(Notification.user_id == current_user_id)
+    
+    # Only include unread notifications by default
+    if not include_read:
+        query = query.where(Notification.status == "unread")
+    
+    query = query.order_by(Notification.created_at.desc()).limit(limit)
+    
+    result = await db.execute(query)
     notifications = result.scalars().all()
     
     return {

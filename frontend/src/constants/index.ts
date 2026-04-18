@@ -116,7 +116,7 @@ export const TRANSFER_TYPES = {
 export const TRANSFER_FEES = {
   DOMESTIC: 22.5, // $15-$30 range, showing midpoint for display
   INTERNATIONAL: 25,
-  ACH: 0,
+  ACH: 5,
   WIRE: 15,
 }
 

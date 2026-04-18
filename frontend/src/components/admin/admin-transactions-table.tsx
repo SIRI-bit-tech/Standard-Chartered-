@@ -51,7 +51,14 @@
                  {`${t.currency} ${t.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                </TableCell>
                <TableCell>
-                 <Badge variant="outline" className="border-0">
+                 <Badge 
+                   variant="outline" 
+                   className="border-0"
+                   style={{
+                     backgroundColor: t.status === 'pending' ? '#fef3c7' : t.status === 'completed' ? '#d1fae5' : '#f3f4f6',
+                     color: t.status === 'pending' ? '#92400e' : t.status === 'completed' ? '#065f46' : '#374151'
+                   }}
+                 >
                    {t.status}
                  </Badge>
                </TableCell>

@@ -18,6 +18,7 @@
    const [busy, setBusy] = useState(false)
    const [reverseOpen, setReverseOpen] = useState(false)
    const [deleteOpen, setDeleteOpen] = useState(false)
+   const [approveOpen, setApproveOpen] = useState(false)
     const [receipt, setReceipt] = useState<TransferReceipt | null>(null)
     const [amount, setAmount] = useState<string>('')
     const [processedAt, setProcessedAt] = useState<string>('')
@@ -105,6 +106,20 @@
        setBusy(false)
      }
    }
+
+   async function approveTransaction() {
+     try {
+       setBusy(true)
+       await apiClient.post(`/admin/transactions/${tx.id}/approve`, {})
+       setApproveOpen(false)
+       setOpen(false)
+       window.location.reload()
+     } catch (e) {
+       logger.error('Failed to approve transaction', { error: e })
+     } finally {
+       setBusy(false)
+     }
+   }
  
    return (
      <>
@@ -113,6 +128,11 @@
            <Button variant="ghost" size="sm">Actions</Button>
          </DropdownMenuTrigger>
          <DropdownMenuContent align="end">
+           {tx.status === 'pending' && (
+             <DropdownMenuItem onClick={() => setApproveOpen(true)} className="text-green-600 focus:text-green-600">
+               Approve Transaction
+             </DropdownMenuItem>
+           )}
            <DropdownMenuItem onClick={() => setOpen(true)}>Edit Details</DropdownMenuItem>
            {tx.transfer_id ? (
              <DropdownMenuItem onClick={() => { setOpen(true); setReverseOpen(true) }}>
@@ -210,6 +230,23 @@
              <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
              <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={deleteTransaction} disabled={busy}>
                {busy ? 'Deleting...' : 'Delete Transaction'}
+             </AlertDialogAction>
+           </AlertDialogFooter>
+         </AlertDialogContent>
+       </AlertDialog>
+
+       <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>
+         <AlertDialogContent>
+           <AlertDialogHeader>
+             <AlertDialogTitle>Approve this transaction?</AlertDialogTitle>
+           </AlertDialogHeader>
+           <p className="text-sm text-muted-foreground">
+             This will mark the transaction as completed and update the user's account balance if applicable.
+           </p>
+           <AlertDialogFooter>
+             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+             <AlertDialogAction className="bg-green-600 hover:bg-green-700" onClick={approveTransaction} disabled={busy}>
+               {busy ? 'Approving...' : 'Approve Transaction'}
              </AlertDialogAction>
            </AlertDialogFooter>
          </AlertDialogContent>

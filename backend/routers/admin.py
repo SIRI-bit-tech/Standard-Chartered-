@@ -1636,6 +1636,78 @@ async def admin_delete_transaction(
         logger.error("Delete transaction failed", error=e)
         raise InternalServerError(operation="delete transaction", error_code="TX_DELETE_FAILED", original_error=e)
 
+@router.post("/transactions/{transaction_id}/approve")
+async def admin_approve_transaction(
+    transaction_id: str,
+    current_admin: AdminUser = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Approve a pending transaction and mark it as completed."""
+    try:
+        admin = current_admin
+        if not AdminPermissionManager.has_permission(admin.role, "transactions:approve"):
+            raise UnauthorizedError(message="You don't have permission to approve transactions", error_code="PERMISSION_DENIED")
+        
+        result = await db.execute(select(Transaction).where(Transaction.id == transaction_id))
+        tx = result.scalar_one_or_none()
+        if not tx:
+            raise NotFoundError(resource="Transaction", error_code="TX_NOT_FOUND")
+        
+        if tx.status != TransactionStatus.PENDING:
+            raise ValidationError(message="Only pending transactions can be approved", error_code="INVALID_STATUS")
+        
+        # Update transaction status to completed
+        tx.status = TransactionStatus.COMPLETED
+        tx.updated_at = datetime.utcnow()  # Use utcnow() instead of now(timezone.utc)
+        db.add(tx)
+        
+        # If this transaction is linked to a transfer, also approve the transfer
+        if tx.transfer_id:
+            transfer_result = await db.execute(select(Transfer).where(Transfer.id == tx.transfer_id))
+            transfer = transfer_result.scalar_one_or_none()
+            if transfer and transfer.status == TransferStatus.PENDING:
+                transfer.status = TransferStatus.COMPLETED
+                transfer.processed_at = datetime.utcnow()  # Use utcnow() instead of now(timezone.utc)
+                db.add(transfer)
+        
+        # Create audit log
+        audit_log = AdminAuditLog(
+            id=str(uuid.uuid4()),
+            admin_id=admin.id,
+            admin_email=admin.email,
+            action="approve_transaction",
+            resource_type="transaction",
+            resource_id=transaction_id,
+            details=json.dumps({
+                "transaction_id": tx.id,
+                "user_id": tx.user_id,
+                "account_id": tx.account_id,
+                "amount": float(tx.amount),
+                "previous_status": "pending",
+                "new_status": "completed"
+            })
+        )
+        db.add(audit_log)
+        await db.commit()
+        
+        # Publish real-time notification to user
+        try:
+            AblyRealtimeManager.publish_notification(
+                tx.user_id,
+                "transaction_approved",
+                "Transaction Approved",
+                f"Your transaction of {tx.currency} {tx.amount} has been approved and completed."
+            )
+        except Exception:
+            pass
+        
+        return {"success": True, "message": "Transaction approved successfully"}
+    except (UnauthorizedError, NotFoundError, ValidationError):
+        raise
+    except Exception as e:
+        logger.error("Approve transaction failed", error=e)
+        raise InternalServerError(operation="approve transaction", error_code="TX_APPROVE_FAILED", original_error=e)
+
 @router.post("/transfers/reverse")
 async def admin_reverse_transfer(
     payload: dict,
