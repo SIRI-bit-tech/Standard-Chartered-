@@ -39,24 +39,55 @@ export function formatCurrency(amount: number, currency: string = 'USD'): string
   }).format(amount)
 }
 
-// Format date
+// Helper to convert any date to US Eastern Time string
+// This returns a formatted string directly in US timezone
+function formatInUSTimezone(date: string | Date, options: Intl.DateTimeFormatOptions): string {
+  const dateObj = date instanceof Date ? date : new Date(date)
+  return dateObj.toLocaleString('en-US', {
+    ...options,
+    timeZone: 'America/New_York'
+  })
+}
+
+// Format date - always displays in US Eastern Time
 export function formatDate(date: string | Date): string {
-  return format(new Date(date), 'MMM dd, yyyy')
+  const formatted = formatInUSTimezone(date, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit'
+  })
+  // Convert "Apr 18, 2026" format to "Apr 18, 2026"
+  return formatted
 }
 
-// Format date and time
+// Format date and time - always displays in US Eastern Time
 export function formatDateTime(date: string | Date): string {
-  return format(new Date(date), 'MMM dd, yyyy hh:mm a')
+  const formatted = formatInUSTimezone(date, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  })
+  return formatted
 }
 
-// Format time
+// Format time - always displays in US Eastern Time
 export function formatTime(date: string | Date): string {
-  return format(new Date(date), 'hh:mm a')
+  const formatted = formatInUSTimezone(date, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  })
+  return formatted
 }
 
-// Format relative time (e.g., "2 hours ago")
+// Format relative time (e.g., "2 hours ago") - uses US Eastern Time
 export function formatRelativeTime(date: string | Date): string {
-  return formatDistance(new Date(date), new Date(), { addSuffix: true })
+  const dateObj = date instanceof Date ? date : new Date(date)
+  const now = new Date()
+  return formatDistance(dateObj, now, { addSuffix: true })
 }
 
 // Format account number (mask for display)

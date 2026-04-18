@@ -136,7 +136,7 @@ export function DocumentList() {
                     {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                   </span>
                   <span className="text-gray-500">
-                    {new Date(doc.uploaded_at).toLocaleDateString()}
+                    {new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                   </span>
                 </div>
                 {doc.rejection_reason && (

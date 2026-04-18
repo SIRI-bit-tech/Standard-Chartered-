@@ -60,7 +60,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
     <div className="space-y-4">
       <div className="rounded-xl border bg-white p-4" style={{ borderColor: colors.border }}>
         <div className="text-sm font-semibold">#{ticket.ticket_number} • {ticket.subject}</div>
-        <div className="text-xs text-muted-foreground">{ticket.category || 'General'} • {new Date(ticket.created_at).toLocaleString()}</div>
+        <div className="text-xs text-muted-foreground">{ticket.category || 'General'} • {new Date(ticket.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
         <div className="mt-3 text-sm rounded border p-3" style={{ borderColor: colors.borderLight }}>
           {ticket.description || 'No description provided.'}
         </div>
@@ -72,7 +72,7 @@ export function SupportTicketDetail({ ticketId }: { ticketId: string }) {
             <div key={r.id} className="text-sm">
               <div className="font-medium">{r.author_name || (r.author_id === 'me' ? 'You' : 'Support')}</div>
               <div className="text-muted-foreground break-words">{r.message}</div>
-              <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
             </div>
           ))}
           {replies.length === 0 && <div className="text-sm text-muted-foreground">No messages yet</div>}

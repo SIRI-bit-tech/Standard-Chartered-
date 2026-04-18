@@ -190,7 +190,7 @@ export function ReceiptModal({ open, onClose, data }: Props) {
                   Date & Time
                 </p>
                 <p className="mt-0.5 font-semibold" style={{ color: colors.textPrimary }}>
-                  {receipt?.created_at ? new Date(receipt.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : (data.created_at ? new Date(data.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—')}
+                  {receipt?.created_at ? new Date(receipt.created_at).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/New_York' }) : (data.created_at ? new Date(data.created_at).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/New_York' }) : '—')}
                 </p>
               </div>
               <div>

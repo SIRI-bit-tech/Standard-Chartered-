@@ -225,8 +225,8 @@ def _serialize_admin_ticket(t: SupportTicket, user: User | None, agent: AdminUse
         "subject": t.subject,
         "status": t.status.value if hasattr(t.status, "value") else t.status,
         "priority": t.priority.value if hasattr(t.priority, "value") else t.priority,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
-        "updated_at": t.updated_at.isoformat() if getattr(t, "updated_at", None) else None,
+        "created_at": t.created_at.isoformat() + 'Z' if t.created_at else None,
+        "updated_at": t.updated_at.isoformat() + 'Z' if getattr(t, "updated_at", None) else None,
         "user_id": t.user_id,
         "user_name": f"{getattr(user,'first_name','') } {getattr(user,'last_name','')}".strip() if user else None,
         "user_email": getattr(user, "email", None) if user else None,
@@ -380,7 +380,7 @@ async def admin_get_ticket_replies(
             "author_id": m.sender_id,
             "author_name": authors.get(m.sender_id),
             "message": m.message,
-            "created_at": m.created_at.isoformat() if m.created_at else None,
+            "created_at": m.created_at.isoformat() + 'Z' if m.created_at else None,
         }
         for m in msgs
     ]
@@ -648,7 +648,7 @@ async def admin_list_cards(admin_id: str, db: AsyncSession = Depends(get_db)):
                 "card_type": c.card_type.value if hasattr(c.card_type, "value") else str(c.card_type),
                 "status": c.status.value if hasattr(c.status, "value") else str(c.status),
                 "card_name": c.card_name,
-                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "created_at": c.created_at.isoformat() + 'Z' if c.created_at else None,
             }
             for c in cards
         ]
@@ -728,7 +728,7 @@ async def admin_list_users(
                 "status": _user_status(u),
                 "verification": _verification_status(u),
                 "is_restricted": getattr(u, "is_restricted", False),
-                "restricted_until": u.restricted_until.isoformat() if getattr(u, "restricted_until", None) else None,
+                "restricted_until": u.restricted_until.isoformat() + 'Z' if getattr(u, "restricted_until", None) else None,
                 "restrictions": [
                     {
                         "id": r.id,
@@ -738,7 +738,7 @@ async def admin_list_users(
                     }
                     for r in restrictions
                 ],
-                "created_at": u.created_at.isoformat() if u.created_at else None,
+                "created_at": u.created_at.isoformat() + 'Z' if u.created_at else None,
             }
         )
 
@@ -804,7 +804,7 @@ async def admin_list_accounts(
                     "name": f"{user.first_name} {user.last_name}".strip() if user else "",
                     "display_id": _to_admin_user_id(user) if user else "",
                 },
-                "created_at": a.created_at.isoformat() if getattr(a, "created_at", None) else None,
+                "created_at": a.created_at.isoformat() + 'Z' if getattr(a, "created_at", None) else None,
             }
         )
 
@@ -1067,7 +1067,7 @@ async def admin_list_transactions(
                 "amount": t.amount,
                 "currency": t.currency,
                 "status": t.status,
-                "created_at": t.created_at.isoformat() if getattr(t, "created_at", None) else None,
+                "created_at": t.created_at.isoformat() + 'Z' if getattr(t, "created_at", None) else None,
                 "transfer_id": getattr(t, "transfer_id", None),
                 "is_generated": getattr(t, "transfer_id", None) is None,  # Flag for generated transactions
                 "account_number": acc.account_number if acc else "",
@@ -1610,7 +1610,7 @@ async def admin_delete_transaction(
             "type": tx.type,
             "amount": float(tx.amount),
             "description": tx.description,
-            "created_at": tx.created_at.isoformat() if tx.created_at else None
+            "created_at": tx.created_at.isoformat() + 'Z' if tx.created_at else None
         }
         
         # Delete the transaction
@@ -2673,8 +2673,8 @@ async def admin_edit_user(
                 "state": request.state,
                 "postal_code": request.postal_code,
                 "is_restricted": request.is_restricted,
-                "restricted_until": request.restricted_until.isoformat() if request.restricted_until else None,
-                "date_joined": request.date_joined.isoformat() if request.date_joined else None
+                "restricted_until": request.restricted_until.isoformat() + 'Z' if request.restricted_until else None,
+                "date_joined": request.date_joined.isoformat() + 'Z' if request.date_joined else None
             })
         )
         db.add(audit_log)
@@ -2765,10 +2765,10 @@ async def admin_get_user_detail(
                 "state": user.state,
                 "postal_code": user.postal_code,
                 "profile_picture_url": getattr(user, "profile_picture_url", None),
-                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "created_at": user.created_at.isoformat() + 'Z' if user.created_at else None,
                 "is_active": user.is_active,
                 "is_restricted": getattr(user, "is_restricted", False),
-                "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
+                "restricted_until": user.restricted_until.isoformat() + 'Z' if getattr(user, "restricted_until", None) else None,
             }
         }
     except (UnauthorizedError, NotFoundError):
@@ -2814,7 +2814,7 @@ async def admin_get_user_accounts(
                 "balance": float(account.balance),
                 "status": account.status.value if hasattr(account.status, "value") else str(account.status),
                 "is_primary": account.is_primary,
-                "created_at": account.created_at.isoformat() if account.created_at else None,
+                "created_at": account.created_at.isoformat() + 'Z' if account.created_at else None,
             })
         
         return {
@@ -3348,7 +3348,7 @@ async def get_all_loan_applications(
                     "amount": a.LoanApplication.requested_amount,
                     "currency": "USD", # Defaulting to USD for now or fetch from account
                     "status": a.LoanApplication.status,
-                    "created_at": a.LoanApplication.created_at.isoformat(),
+                    "created_at": a.LoanApplication.created_at.isoformat() + 'Z',
                     "details": f"Loan for {a.LoanApplication.purpose} - {a.LoanApplication.requested_term_months} months"
                 }
                 for a in applications

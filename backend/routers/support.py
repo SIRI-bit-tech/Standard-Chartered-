@@ -112,7 +112,7 @@ async def get_chat_messages(
                 "sender_id": m.sender_id,
                 "message": m.message,
                 "is_from_agent": m.is_from_agent,
-                "created_at": m.created_at.isoformat()
+                "created_at": m.created_at.isoformat() + 'Z'
             }
             for m in messages
         ],
@@ -139,7 +139,7 @@ async def get_chats(
             {
                 "id": c.id,
                 "status": c.status,
-                "created_at": c.created_at.isoformat()
+                "created_at": c.created_at.isoformat() + 'Z'
             }
             for c in chats
         ],
@@ -216,7 +216,7 @@ async def get_support_tickets(
                 "subject": t.subject,
                 "status": t.status,
                 "priority": t.priority,
-                "created_at": t.created_at.isoformat()
+                "created_at": t.created_at.isoformat() + 'Z'
             }
             for t in tickets
         ],
@@ -245,7 +245,7 @@ async def get_support_ticket_detail(
             "category": t.category,
             "status": t.status,
             "priority": t.priority,
-            "created_at": t.created_at.isoformat()
+            "created_at": t.created_at.isoformat() + 'Z'
         }
     }
 
@@ -295,7 +295,7 @@ async def get_ticket_replies(
                 "author_name": authors.get(m.sender_id),
                 "message": m.message,
                 "is_from_staff": m.is_from_staff,
-                "created_at": m.created_at.isoformat()
+                "created_at": m.created_at.isoformat() + 'Z'
             } for m in msgs
         ]
     }

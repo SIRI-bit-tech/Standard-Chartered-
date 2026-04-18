@@ -142,7 +142,7 @@ export function AdminSupportTickets() {
                   </td>
                   <td className="py-3 px-4 align-top">
                     <div className="text-sm truncate">{t.user_name || t.user_email || t.user_id}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</div>
+                    <div class="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                   </td>
                   <td className="py-3 px-4 text-xs align-top truncate">{t.assigned_to_name || 'Unassigned'}</td>
                   <td className="py-3 px-4 align-top"><StatusPill status={t.status} /></td>
@@ -195,7 +195,7 @@ export function AdminSupportTickets() {
                     <div key={r.id} className="text-sm">
                       <div className="font-medium">{r.author_name || r.author_id}</div>
                       <div className="text-muted-foreground break-words">{r.message}</div>
-                      <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                     </div>
                   ))}
                   {replies.length === 0 && <div className="text-sm text-muted-foreground">No messages yet</div>}

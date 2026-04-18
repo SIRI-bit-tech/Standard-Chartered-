@@ -556,8 +556,8 @@ async def login(
                 "email_verified": bool(user.email_verified),
                 "phone_verified": bool(user.phone_verified),
                 "identity_verified": bool(user.identity_verified),
-                "created_at": user.created_at.isoformat() if user.created_at else None,
-                "last_login": user.last_login.isoformat() if user.last_login else None
+                "created_at": user.created_at.isoformat() + 'Z' if user.created_at else None,
+                "last_login": user.last_login.isoformat() + 'Z' if user.last_login else None
             },
             "token": stytch_session_token or access_token,
             "is_new_device": is_new_device,

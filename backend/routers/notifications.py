@@ -34,7 +34,7 @@ async def get_notifications(
                 "message": n.message,
                 "type": n.type,
                 "status": n.status,
-                "created_at": n.created_at.isoformat()
+                "created_at": n.created_at.isoformat() + 'Z'
             }
             for n in notifications
         ],

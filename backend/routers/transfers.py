@@ -262,6 +262,7 @@ async def domestic_transfer(
         from_account_id=request.from_account_id,
         from_user_id=user_id,
         to_account_id=None,  # External transfer, no internal account
+        to_account_number=request.account_number,  # Store recipient account number
         type=TransferType.DOMESTIC,
         amount=request.amount,
         currency=from_account.currency,
@@ -883,7 +884,7 @@ async def get_transfer_history(
                 counterparty = "External Bank" if direction == "debit" else "Incoming Transfer"
         items.append({
             "id": t.id,
-            "date": t.created_at.isoformat(),
+            "date": t.created_at.isoformat() + 'Z',
             "counterparty": counterparty,
             "subtitle": subtitle or _get_transfer_subtitle(t, direction),
             "bank_name": bank_name,
@@ -970,13 +971,24 @@ async def get_transfer(
     elif getattr(transfer, "to_account_number", None):
         num = transfer.to_account_number
         recipient_account_masked = f"Account (**** {num[-4:]})"
-    # Try to infer bank and recipient from encoded description "name | bank" for external transfers
+    
+    # Parse recipient info from description field
+    # Format can be: "name - bank" (domestic) or "name | bank" (other)
     try:
-        if transfer.description and "|" in str(transfer.description):
-            parts = [p.strip() for p in str(transfer.description).split("|", 1)]
-            if len(parts) == 2:
-                recipient_name = recipient_name or (parts[0] or None)
-                recipient_bank = recipient_bank or (parts[1] or None)
+        if transfer.description:
+            desc_str = str(transfer.description)
+            # Try parsing "name - bank" format (domestic transfers)
+            if " - " in desc_str:
+                parts = [p.strip() for p in desc_str.split(" - ", 1)]
+                if len(parts) == 2:
+                    recipient_name = recipient_name or parts[0]
+                    recipient_bank = recipient_bank or parts[1]
+            # Try parsing "name | bank" format (other transfers)
+            elif "|" in desc_str:
+                parts = [p.strip() for p in desc_str.split("|", 1)]
+                if len(parts) == 2:
+                    recipient_name = recipient_name or (parts[0] or None)
+                    recipient_bank = recipient_bank or (parts[1] or None)
     except Exception:
         pass
     
@@ -989,8 +1001,8 @@ async def get_transfer(
         "fee_amount": getattr(transfer, "fee_amount", 0.0) or 0.0,
         "total_amount": getattr(transfer, "total_amount", None) or (transfer.amount + (getattr(transfer, "fee_amount", 0.0) or 0.0)),
         "reference_number": transfer.reference_number,
-        "created_at": transfer.created_at.isoformat() if transfer.created_at else None,
-        "processed_at": transfer.processed_at.isoformat() if getattr(transfer, "processed_at", None) else None,
+        "created_at": (transfer.created_at.isoformat() + 'Z') if transfer.created_at else None,
+        "processed_at": (transfer.processed_at.isoformat() + 'Z') if getattr(transfer, "processed_at", None) else None,
         "from_account_masked": mask_account(from_acc),
         "recipient_bank": recipient_bank,
         "recipient_name": recipient_name,

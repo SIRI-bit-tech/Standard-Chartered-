@@ -1,6 +1,7 @@
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+import os
 
 
 class Settings(BaseSettings):
@@ -76,4 +77,10 @@ class Settings(BaseSettings):
     OCR_PROVIDER: Optional[str] = None
     OCR_SPACE_API_KEY: Optional[str] = None
     
+    # Timezone - Always use US Eastern Time
+    TIMEZONE: str = "America/New_York"
+    
 settings = Settings()
+
+# Set timezone for the entire application
+os.environ['TZ'] = settings.TIMEZONE

@@ -155,7 +155,7 @@ async def get_applications(
                 "approved_term": a.approved_term_months,
                 "approved_interest_rate": a.approved_interest_rate,
                 "purpose": a.purpose,
-                "created_at": a.created_at.isoformat()
+                "created_at": a.created_at.isoformat() + 'Z'
             }
             for a in applications
         ],
@@ -214,7 +214,7 @@ async def get_loan_accounts(
                 "interest_rate": l.interest_rate,
                 "term_months": l.term_months,
                 "monthly_payment": l.monthly_payment,
-                "next_payment_date": l.next_payment_date.isoformat(),
+                "next_payment_date": l.next_payment_date.isoformat() + 'Z',
                 "payments_made": l.total_payments_made,
                 "daily_interest_rate": getattr(l, "daily_interest_rate", 0.0) or 0.0,
             }
@@ -245,7 +245,7 @@ async def get_loan_details(loan_id: str, db: AsyncSession = Depends(get_db)):
             "remaining_balance": loan.remaining_balance,
             "monthly_payment": loan.monthly_payment,
             "payments_made": loan.total_payments_made,
-            "next_payment_date": loan.next_payment_date.isoformat()
+            "next_payment_date": loan.next_payment_date.isoformat() + 'Z'
         },
         "message": "Loan details retrieved"
     }

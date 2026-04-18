@@ -28,7 +28,7 @@ export function ProfileHeader({ first_name, last_name, email, created_at, profil
             <p className="text-sm truncate" style={{ color: colors.textSecondary }}>{email}</p>
             {created_at ? (
               <p className="text-xs mt-1" style={{ color: colors.gray500 }}>
-                Member since {new Date(created_at).toLocaleDateString()}
+                Member since {new Date(created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
               </p>
             ) : null}
           </div>

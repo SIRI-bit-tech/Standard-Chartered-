@@ -47,7 +47,7 @@ export function TicketTable({ items }: { items: SupportTicket[] }) {
                   </Link>
                 </td>
                 <td className="py-3 px-4">{t.subject}</td>
-                <td className="py-3 px-4">{new Date(t.created_at).toLocaleDateString()}</td>
+                <td className="py-3 px-4">{new Date(t.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}</td>
                 <td className="py-3 px-4">
                   <StatusPill status={t.status} />
                 </td>

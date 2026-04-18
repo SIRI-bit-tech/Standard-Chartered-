@@ -11,8 +11,16 @@ import logging
 import asyncio
 import httpx
 import os
+import time
 from datetime import datetime, timedelta
 from utils.errors import APIError
+
+# Set timezone for the entire application
+os.environ['TZ'] = settings.TIMEZONE
+try:
+    time.tzset()  # Apply timezone setting (Unix/Linux only)
+except AttributeError:
+    pass  # Windows doesn't have tzset
 
 # Import all models to ensure they're registered
 from models.user import User
@@ -36,6 +44,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan context manager for app startup and shutdown"""
     from sqlalchemy import text
+    
+    # Log timezone setting
+    logger.info(f"Application timezone set to: {settings.TIMEZONE}")
 
     # Step 1: ID Length Migrations (Critical for Stytch/Auth)
     async with engine.begin() as conn:

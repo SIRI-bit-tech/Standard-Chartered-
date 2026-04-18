@@ -151,7 +151,7 @@ async def list_trusted_devices(
             "device_name": r.device_name,
             "ip_address": r.ip_address,
             "user_agent": r.user_agent,
-            "last_seen": r.last_seen.isoformat() if r.last_seen else None,
+            "last_seen": r.last_seen.isoformat() + 'Z' if r.last_seen else None,
             "active": r.active
         } for r in rows
     ]}
@@ -274,7 +274,7 @@ async def get_login_history(
     return {"success": True, "data": [
         {
             "id": r.id,
-            "created_at": r.created_at.isoformat(),
+            "created_at": r.created_at.isoformat() + 'Z',
             "ip_address": r.ip_address,
             "city": r.city,
             "country": r.country,

@@ -63,7 +63,7 @@ async def get_accounts(
                 "routing_number": acc.routing_number or ("026002561" if is_us else None),
                 "wallet_id": acc.wallet_id,
                 "wallet_qrcode": getattr(acc, "wallet_qrcode", None),
-                "created_at": acc.created_at.isoformat(),
+                "created_at": acc.created_at.isoformat() + 'Z',
             }
             for acc in accounts
         ],
@@ -101,7 +101,7 @@ async def get_account_details(
             "routing_number": account.routing_number or ("026002561" if is_us else None),
             "wallet_id": account.wallet_id,
             "wallet_qrcode": getattr(account, "wallet_qrcode", None),
-            "created_at": account.created_at.isoformat(),
+            "created_at": account.created_at.isoformat() + 'Z',
         },
         "message": "Account details retrieved",
     }
@@ -157,7 +157,7 @@ async def get_transactions(
                 "amount": t.amount,
                 "currency": t.currency,
                 "description": t.description,
-                "created_at": t.created_at.isoformat(),
+                "created_at": t.created_at.isoformat() + 'Z',
                 "status": t.status,
             }
             for t in transactions
@@ -448,7 +448,7 @@ async def get_account_history(
         items.append(
             {
                 "id": t.id,
-                "date": t.created_at.isoformat(),
+                "date": t.created_at.isoformat() + 'Z',
                 "counterparty": counterparty,
                 "subtitle": subtitle or _get_transaction_subtitle(t, direction),
                 "bank_name": bank_name,
@@ -494,7 +494,7 @@ async def get_statements(
         "data": [
             {
                 "id": s.id,
-                "statement_date": s.statement_date.isoformat(),
+                "statement_date": s.statement_date.isoformat() + 'Z',
                 "document_url": s.document_url,
             }
             for s in statements
@@ -527,10 +527,10 @@ async def download_statement(
             "data": {
                 "download_url": None, 
                 "statement_id": statement_id,
-                "statement_date": statement.statement_date.isoformat(),
+                "statement_date": statement.statement_date.isoformat() + 'Z',
                 "period": {
-                    "start": statement.start_date.isoformat(),
-                    "end": statement.end_date.isoformat()
+                    "start": statement.start_date.isoformat() + 'Z',
+                    "end": statement.end_date.isoformat() + 'Z'
                 }
             },
             "message": "Statement document is not available for download",
@@ -541,10 +541,10 @@ async def download_statement(
         "data": {
             "download_url": download_url, 
             "statement_id": statement_id,
-            "statement_date": statement.statement_date.isoformat(),
+            "statement_date": statement.statement_date.isoformat() + 'Z',
             "period": {
-                "start": statement.start_date.isoformat(),
-                "end": statement.end_date.isoformat()
+                "start": statement.start_date.isoformat() + 'Z',
+                "end": statement.end_date.isoformat() + 'Z'
             }
         },
         "message": "Statement download URL generated",

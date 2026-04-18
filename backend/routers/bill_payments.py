@@ -304,8 +304,8 @@ async def get_payment_history(
                 "amount": p.amount,
                 "currency": p.currency,
                 "status": p.status,
-                "payment_date": p.payment_date.isoformat(),
-                "created_at": p.created_at.isoformat(),
+                "payment_date": p.payment_date.isoformat() + 'Z',
+                "created_at": p.created_at.isoformat() + 'Z',
                 "reference": p.payment_reference,
             }
             for p in payments
@@ -371,7 +371,7 @@ async def get_scheduled_payments(
                 "payee_id": s.payee_id,
                 "amount": s.amount,
                 "frequency": s.frequency,
-                "next_payment_date": s.next_payment_date.isoformat() if s.next_payment_date else None
+                "next_payment_date": s.next_payment_date.isoformat() + 'Z' if s.next_payment_date else None
             }
             for s in scheduled
         ],

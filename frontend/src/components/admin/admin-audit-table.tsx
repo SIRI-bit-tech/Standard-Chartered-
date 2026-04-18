@@ -40,7 +40,7 @@ export function AdminAuditTable({ items }: { items: AdminAuditLog[] }) {
                  {l.details || '—'}
                </TableCell>
                <TableCell className="text-sm" style={{ color: colors.textSecondary }}>
-                 {new Date(l.created_at).toLocaleString()}
+                 {new Date(l.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}
                </TableCell>
              </TableRow>
            ))}

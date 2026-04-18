@@ -45,7 +45,7 @@ async def get_my_restrictions(
                     "restriction_type": r.restriction_type.value if isinstance(r.restriction_type, RestrictionType) else r.restriction_type,
                     "is_active": r.is_active,
                     "message": r.message,
-                    "created_at": r.created_at.isoformat() if r.created_at else None
+                    "created_at": r.created_at.isoformat() + 'Z' if r.created_at else None
                 }
                 for r in restrictions
             ]
@@ -103,9 +103,9 @@ async def get_profile(
             "two_factor_enabled": getattr(user, "two_factor_enabled", False),
             "biometric_enabled": getattr(user, "biometric_enabled", False),
             "is_restricted": getattr(user, "is_restricted", False) and (user.restricted_until is None or (user.restricted_until.replace(tzinfo=timezone.utc) if user.restricted_until.tzinfo is None else user.restricted_until) > datetime.now(timezone.utc)),
-            "restricted_until": user.restricted_until.isoformat() if getattr(user, "restricted_until", None) else None,
-            "created_at": user.created_at.isoformat() if user.created_at else None,
-            "last_login": user.last_login.isoformat() if user.last_login else None
+            "restricted_until": user.restricted_until.isoformat() + 'Z' if getattr(user, "restricted_until", None) else None,
+            "created_at": user.created_at.isoformat() + 'Z' if user.created_at else None,
+            "last_login": user.last_login.isoformat() + 'Z' if user.last_login else None
         },
         "message": "Profile retrieved successfully"
     }
@@ -273,7 +273,7 @@ async def get_documents(
                 "type": d.type,
                 "filename": d.filename,
                 "status": d.status,
-                "created_at": d.created_at.isoformat()
+                "created_at": d.created_at.isoformat() + 'Z'
             }
             for d in documents
         ],
@@ -305,7 +305,7 @@ async def get_login_history(
                 "device_type": h.device_type,
                 "country": h.country,
                 "city": h.city,
-                "created_at": h.created_at.isoformat()
+                "created_at": h.created_at.isoformat() + 'Z'
             }
             for h in history
         ],
