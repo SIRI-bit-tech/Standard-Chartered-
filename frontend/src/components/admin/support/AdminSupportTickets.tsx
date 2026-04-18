@@ -142,7 +142,7 @@ export function AdminSupportTickets() {
                   </td>
                   <td className="py-3 px-4 align-top">
                     <div className="text-sm truncate">{t.user_name || t.user_email || t.user_id}</div>
-                    <div class="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
+                    <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
                   </td>
                   <td className="py-3 px-4 text-xs align-top truncate">{t.assigned_to_name || 'Unassigned'}</td>
                   <td className="py-3 px-4 align-top"><StatusPill status={t.status} /></td>
