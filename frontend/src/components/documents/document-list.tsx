@@ -8,6 +8,7 @@ import { API_BASE_URL } from "@/constants"
 import { ConfirmModal } from "@/components/ui/confirm-modal"
 import { toast } from "sonner"
 import { Button } from "../ui/button"
+import { formatDateShort } from "@/lib/utils"
 
 interface Document {
   id: string
@@ -136,7 +137,7 @@ export function DocumentList() {
                     {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
                   </span>
                   <span className="text-gray-500">
-                    {new Date(doc.uploaded_at).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
+                    {formatDateShort(doc.uploaded_at)}
                   </span>
                 </div>
                 {doc.rejection_reason && (

@@ -1,6 +1,6 @@
 import { colors, type TransferReceipt } from '@/types'
 import { Button } from '@/components/ui/button'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDateTimeShort } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { X, Share2, Download } from 'lucide-react'
@@ -190,7 +190,7 @@ export function ReceiptModal({ open, onClose, data }: Props) {
                   Date & Time
                 </p>
                 <p className="mt-0.5 font-semibold" style={{ color: colors.textPrimary }}>
-                  {receipt?.created_at ? new Date(receipt.created_at).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/New_York' }) : (data.created_at ? new Date(data.created_at).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/New_York' }) : '—')}
+                  {receipt?.created_at ? formatDateTimeShort(receipt.created_at) : (data.created_at ? formatDateTimeShort(data.created_at) : '—')}
                 </p>
               </div>
               <div>

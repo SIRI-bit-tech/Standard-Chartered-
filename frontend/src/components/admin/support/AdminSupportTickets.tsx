@@ -7,6 +7,7 @@ import type { AdminSupportTicket, SupportAgent, TicketReply } from '@/types'
 import { useAdminRealtime } from '@/hooks/use-admin-realtime'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { formatDateTime } from '@/lib/utils'
 
 function StatusPill({ status }: { status: AdminSupportTicket['status'] }) {
   const map: Record<AdminSupportTicket['status'], { bg: string; text: string }> = {
@@ -142,7 +143,7 @@ export function AdminSupportTickets() {
                   </td>
                   <td className="py-3 px-4 align-top">
                     <div className="text-sm truncate">{t.user_name || t.user_email || t.user_id}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
+                    <div className="text-xs text-muted-foreground">{formatDateTime(t.created_at)}</div>
                   </td>
                   <td className="py-3 px-4 text-xs align-top truncate">{t.assigned_to_name || 'Unassigned'}</td>
                   <td className="py-3 px-4 align-top"><StatusPill status={t.status} /></td>
@@ -195,7 +196,7 @@ export function AdminSupportTickets() {
                     <div key={r.id} className="text-sm">
                       <div className="font-medium">{r.author_name || r.author_id}</div>
                       <div className="text-muted-foreground break-words">{r.message}</div>
-                      <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString('en-US', { timeZone: 'America/New_York' })}</div>
+                      <div className="text-xs text-muted-foreground">{formatDateTime(r.created_at)}</div>
                     </div>
                   ))}
                   {replies.length === 0 && <div className="text-sm text-muted-foreground">No messages yet</div>}

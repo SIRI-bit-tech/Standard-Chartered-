@@ -8,6 +8,7 @@ import { colors, type TransferReceipt } from '@/types'
 import Image from 'next/image'
 import { Share2, Download } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatDateTimeShort } from '@/lib/utils'
 
 export default function TransferReceiptPage() {
   const params = useParams<{ id: string }>()
@@ -228,7 +229,7 @@ export default function TransferReceiptPage() {
                   Date & Time
                 </p>
                 <p className="mt-0.5 font-semibold" style={{ color: colors.textPrimary }}>
-                  {data.created_at ? new Date(data.created_at).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/New_York' }) : '—'}
+                  {data.created_at ? formatDateTimeShort(data.created_at) : '—'}
                 </p>
               </div>
               <div>
